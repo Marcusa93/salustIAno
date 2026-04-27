@@ -11,7 +11,7 @@ El ADR 0001 estableció el stack base —Next.js, Supabase, OpenRouter— pero n
 
 Adoptamos las versiones más recientes estables de cada herramienta y unificamos linting y formatting en Biome.
 
-- **Next.js 16.2** con App Router, Turbopack, React Compiler activado.
+- **Next.js 16.2** con App Router y Turbopack. **React Compiler disponible pero desactivado por ahora** — feature aún experimental, builds más lentos sin beneficio demostrado en escala chica. Reactivar cuando salga de experimental.
 - **React 19** y React DOM 19.
 - **TypeScript 5** con `strict: true` y todas las flags estrictas adicionales activadas.
 - **Tailwind CSS v4.2** con configuración CSS-first vía `@theme` en `globals.css`.
@@ -31,7 +31,7 @@ Adoptamos las versiones más recientes estables de cada herramienta y unificamos
 
 **npm o yarn en lugar de pnpm.** pnpm es más rápido, usa menos disco y es más estricto con dependencias fantasma, lo que evita bugs sutiles donde un paquete usa algo que no declaró.
 
-**React Compiler desactivado.** El compilador automatiza memoización pero ralentiza builds. La decisión es activarlo desde el inicio porque es justamente cuando hay menos código y los tiempos de build no duelen, y porque baja la carga cognitiva de pensar `useMemo`/`useCallback` manualmente.
+**React Compiler activado.** Considerada y descartada por ahora: la versión experimental disponible (`babel-plugin-react-compiler@0.0.0`) está marcada por el propio mantenedor como "bad release" y rompe el build con Turbopack. El beneficio (memoización automática) tampoco compensa en una app de escala familiar, donde el costo cognitivo de `useMemo`/`useCallback` es chico. Reactivar cuando el plugin salga de experimental y se publique una versión estable.
 
 ## Consecuencias
 
@@ -39,4 +39,4 @@ Adoptamos las versiones más recientes estables de cada herramienta y unificamos
 
 **Negativo.** Stack joven en algunos puntos: Next 16 tiene meses, Tailwind v4 cambió mucho respecto a v3, Biome aún tiene menos plugins que ESLint. Ocasionalmente vamos a encontrar issues abiertos o tutoriales desactualizados.
 
-**Señales que harían reconsiderar.** Bugs serios en Turbopack o React Compiler que no se resuelvan rápido; reglas de accesibilidad importantes que Biome no soporte; problemas de compatibilidad de shadcn con Tailwind v4.
+**Señales que harían reconsiderar.** Bugs serios en Turbopack que no se resuelvan rápido; release estable de React Compiler con beneficios claros para la escala del proyecto; reglas de accesibilidad importantes que Biome no soporte; problemas de compatibilidad de shadcn con Tailwind v4.

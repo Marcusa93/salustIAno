@@ -63,5 +63,5 @@ Preguntá. Es preferible una pregunta a una decisión silenciosa que después ha
 
 1. **Nunca `process.env` directo.** Toda variable se lee de `@/lib/env`, que valida con Zod al boot. Si una variable nueva hace falta, se agrega al schema en `src/lib/env.ts` y al `.env.example`.
 2. **Nunca importar `@/lib/supabase/admin` desde un Client Component.** El cliente admin bypasea RLS y vive solo en el server. El `import 'server-only'` lo refuerza, pero la regla es independiente del runtime.
-3. **El middleware se mantiene minimalista:** solo refresh de sesión + redirección por estado de auth. Toda lógica de dominio (permisos finos, banners, feature flags) va en layouts, Server Actions o Route Handlers.
+3. **El proxy se mantiene minimalista:** solo refresh de sesión + redirección por estado de auth. La convención `proxy.ts` reemplazó al `middleware.ts` deprecado en Next 16; el helper que refresca la sesión vive en `@/lib/supabase/proxy-helper`. Toda lógica de dominio (permisos finos, banners, feature flags) va en layouts, Server Actions o Route Handlers.
 4. **Cada query confía en RLS.** No filtrar por `family_group_id` ni equivalentes en código de aplicación. Si un endpoint asume "el frontend ya filtró" o "agregamos el `where` por las dudas", está mal: esa lógica vive en las policies de Postgres y nada más.

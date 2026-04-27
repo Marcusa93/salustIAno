@@ -14,7 +14,7 @@ const AUTH_ROUTES = new Set<string>(['/login', '/signup']);
  *
  * ⚠️  CRÍTICO — esto es lo que mantiene la sesión viva en SSR. No agregar
  * más lógica acá: todo lo que sea de dominio (permisos finos, banners,
- * feature flags) va en layouts o Server Actions, no en el middleware.
+ * feature flags) va en layouts o Server Actions, no en el proxy.
  *
  * Reglas:
  *   - Rutas públicas: /login, /signup, /auth/callback, /auth/confirm.
