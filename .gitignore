@@ -2,14 +2,14 @@
 node_modules/
 .pnp
 .pnp.js
+.pnpm-store/
 
 # next.js
 .next/
 out/
 build/
-
-# production
 dist/
+next-env.d.ts
 
 # environment
 .env
@@ -24,7 +24,9 @@ pnpm-debug.log*
 .pnpm-debug.log*
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
@@ -36,13 +38,15 @@ Thumbs.db
 # testing
 coverage/
 .nyc_output/
+playwright-report/
+test-results/
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
 # Supabase
-.supabase/
+supabase/.branches
+supabase/.temp
 
-# locales
+# Vercel
 .vercel
