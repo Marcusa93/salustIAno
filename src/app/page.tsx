@@ -1,121 +1,133 @@
+'use client';
+
+import { BottleIllustration } from '@/components/salu/illustrations/bottle';
+import { HeartIllustration } from '@/components/salu/illustrations/heart';
+import { MoonIllustration } from '@/components/salu/illustrations/moon';
+import { ScaleIllustration } from '@/components/salu/illustrations/scale';
+import { SaluLogo } from '@/components/salu/salu-logo';
 import { ThemeToggle } from '@/components/salu/theme-toggle';
-import { BookOpen, Heart, Sparkles, Stethoscope } from 'lucide-react';
+import { durations, easeWarm } from '@/lib/motion';
+import { motion, useReducedMotion } from 'motion/react';
+import Link from 'next/link';
+import type * as React from 'react';
 
-const PILARES = [
-  {
-    icon: Heart,
-    titulo: 'Cuidar',
-    descripcion: 'Sueño, comidas, pañales y mediciones registrados sin fricción.',
-  },
-  {
-    icon: BookOpen,
-    titulo: 'Recordar',
-    descripcion: 'Una línea de tiempo viva con fotos, anécdotas y voces de la familia.',
-  },
-  {
-    icon: Stethoscope,
-    titulo: 'Acompañar',
-    descripcion: 'Salud organizada para llevar al pediatra, sin diagnosticar.',
-  },
-  {
-    icon: Sparkles,
-    titulo: 'Crear',
-    descripcion: 'Cuentos y canciones personalizadas con el universo de Salu.',
-  },
-] as const;
-
-export default function HomePage() {
+function FadeSection({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const reduced = useReducedMotion();
   return (
-    <main className="relative min-h-screen overflow-hidden">
-      {/* Fondo decorativo: gradiente celeste muy suave */}
-      <div
-        aria-hidden="true"
-        className="-z-10 -translate-x-1/2 pointer-events-none absolute top-0 left-1/2 h-[600px] w-[1200px] max-w-none rounded-full bg-primary-soft opacity-60 blur-3xl dark:opacity-30"
-      />
+    <motion.div
+      className={className}
+      initial={reduced ? false : { opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ duration: durations.slow, ease: easeWarm, delay }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2">
-          <div
-            aria-hidden="true"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-soft"
-          >
-            <span className="font-mono font-semibold text-sm">S</span>
-          </div>
-          <span className="font-medium text-foreground text-lg">Salu</span>
-        </div>
+const features = [
+  {
+    icon: <MoonIllustration />,
+    text: 'Las noches que parecen eternas — cuántas veces tomó, cuánto durmió.',
+  },
+  {
+    icon: <BottleIllustration />,
+    text: 'Cada toma, cada pecho, cada fórmula. Sin papel, sin olvidar.',
+  },
+  {
+    icon: <ScaleIllustration />,
+    text: 'Los gramos que suman, los centímetros que crecen semana a semana.',
+  },
+  {
+    icon: <HeartIllustration />,
+    text: 'Los momentos que querés recordar, guardados para cuando sea grande.',
+  },
+];
+
+export default function LandingPage() {
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="flex items-center justify-between px-6 py-5">
+        <SaluLogo size="default" />
         <ThemeToggle />
       </header>
 
-      <section className="mx-auto max-w-3xl px-6 py-20 text-center sm:py-32">
-        <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-muted-foreground text-sm shadow-soft">
-          <span
-            className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary"
-            aria-hidden="true"
-          />
-          En desarrollo · familia primero
-        </p>
+      {/* Hero — pantalla completa */}
+      <section className="flex min-h-[80svh] flex-1 flex-col items-center justify-center px-6 py-24 text-center">
+        <motion.h1
+          className="max-w-2xl font-display font-normal text-5xl text-foreground leading-[1.1] tracking-[-0.02em] sm:text-6xl md:text-7xl"
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: durations.page, ease: easeWarm }}
+        >
+          Salustiano todavía no nació.
+        </motion.h1>
+        <motion.p
+          className="mt-6 max-w-md font-sans text-lg text-muted-foreground sm:text-xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: durations.slow, ease: easeWarm, delay: 0.2 }}
+        >
+          Pero cuando llegue, este va a ser su lugar.
+        </motion.p>
+      </section>
 
-        <h1 className="text-balance font-semibold text-4xl text-foreground tracking-tight sm:text-6xl">
-          Una memoria viva para acompañar a{' '}
-          <span className="bg-gradient-to-br from-primary to-medical bg-clip-text text-transparent">
-            Salustiano
-          </span>
-          .
-        </h1>
+      {/* Sección 2 — párrafo editorial */}
+      <section className="flex justify-center px-6 py-20">
+        <FadeSection className="max-w-prose text-center">
+          <p className="font-sans text-foreground/80 text-lg leading-[1.75] sm:text-xl">
+            Acá vamos a guardar todo lo que importa de los primeros meses. Las noches en vela, los
+            gramos que van sumando, los momentos que querés recordar para siempre. Una sola app,
+            solo para tu familia.
+          </p>
+        </FadeSection>
+      </section>
 
-        <p className="mx-auto mt-6 max-w-xl text-balance text-lg text-muted-foreground leading-relaxed">
-          Un espacio privado donde la familia registra, recuerda y acompaña la crianza de Salu.
-          Cuidado por personas, con asistencia de algoritmos.
-        </p>
-
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <a
-            href="https://github.com/Marcusa93/salustIAno"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-6 font-medium text-primary-foreground text-sm shadow-soft transition-all hover:shadow-md focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-          >
-            Ver el repositorio
-          </a>
-          <a
-            href="#pilares"
-            className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-6 font-medium text-foreground text-sm shadow-soft transition-all hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-          >
-            Conocé los pilares
-          </a>
+      {/* Sección 3 — ítems con micro-ilustraciones */}
+      <section className="flex justify-center px-6 py-12 pb-24">
+        <div className="flex w-full max-w-sm flex-col gap-10">
+          {features.map((f, i) => (
+            <FadeSection key={f.text} delay={i * 0.08} className="flex items-start gap-5">
+              <div className="mt-0.5 shrink-0 text-primary">{f.icon}</div>
+              <p className="text-base text-foreground/75 leading-[1.65] sm:text-lg">{f.text}</p>
+            </FadeSection>
+          ))}
         </div>
       </section>
 
-      <section
-        id="pilares"
-        aria-labelledby="pilares-heading"
-        className="mx-auto max-w-5xl px-6 py-12 sm:py-20"
-      >
-        <h2 id="pilares-heading" className="sr-only">
-          Pilares del proyecto
-        </h2>
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {PILARES.map(({ icon: Icon, titulo, descripcion }) => (
-            <li
-              key={titulo}
-              className="group rounded-lg border border-border bg-card p-6 shadow-soft transition-all hover:shadow-md"
+      {/* Sección 4 — CTA discreto */}
+      <section className="flex justify-center px-6 py-20">
+        <FadeSection className="text-center">
+          <Link
+            href="/signup"
+            className="border-primary border-b-2 pb-0.5 font-display font-normal text-3xl text-foreground transition-colors duration-200 hover:text-primary sm:text-4xl"
+          >
+            Empezar.
+          </Link>
+          <p className="mt-4 text-muted-foreground text-sm">
+            ¿Ya tenés cuenta?{' '}
+            <Link
+              href="/login"
+              className="underline underline-offset-4 transition-colors hover:text-foreground"
             >
-              <div
-                aria-hidden="true"
-                className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-md bg-primary-soft text-primary"
-              >
-                <Icon className="h-5 w-5" />
-              </div>
-              <h3 className="mb-2 font-semibold text-card-foreground text-lg">{titulo}</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">{descripcion}</p>
-            </li>
-          ))}
-        </ul>
+              Iniciá sesión
+            </Link>
+          </p>
+        </FadeSection>
       </section>
 
-      <footer className="mx-auto max-w-5xl px-6 py-12 text-center text-muted-foreground text-sm">
-        <p>Hecho con cuidado en Tucumán · {new Date().getFullYear()}</p>
+      <footer className="border-border/50 border-t py-5 text-center text-muted-foreground text-xs">
+        Hecho con cuidado en Tucumán
       </footer>
-    </main>
+    </div>
   );
 }

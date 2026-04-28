@@ -1,50 +1,40 @@
-# 0003 — Identidad visual e idioma
+# ADR 0003 — Identidad visual e idioma
 
-**Estado:** aceptada
+**Estado:** Aceptado  
 **Fecha:** 2026-04-27
 
 ## Contexto
 
-El documento `docs/10-decisiones-abiertas.md` listaba la identidad visual y el idioma como decisiones a cerrar antes del primer commit. Ambas son decisiones de bajo costo si se toman ahora y caras si se cambian después: el idioma define toda la copy del producto y la estructura de prompts; la identidad visual define los design tokens que viven en CSS y atraviesan cada componente.
+Antes del primer commit hay que cerrar dos decisiones de producto con impacto técnico:
+1. El idioma del producto.
+2. La identidad visual: paleta, tipografía, tono.
 
-## Decisión
+## Decisiones
 
-**Idioma único: español argentino rioplatense con sensibilidad del NOA.** Toda la copy del producto, los prompts de los agentes y los mensajes de error se escriben en este registro. No hay infraestructura de internacionalización en el MVP.
+### Idioma
 
-**Identidad visual: moderno-cálido con base celeste.** Estética baby sin caer en lo infantilizado: bordes redondeados generosos pero no excesivos, tipografía geométrica humanista (Geist), espaciado amplio, sombras suaves, transiciones smooth. La paleta está construida en OKLCH para tener percepción uniforme en ambos modos.
+**Solo español rioplatense.** Voseo natural en toda la copy de UI. Sin abstracciones de internacionalización.
 
-### Paleta
+**Consecuencias:** Se ahorra toda la infraestructura i18n. Si en el futuro se necesita otro idioma, se refactoriza. El costo de no tenerlo hoy es cero; el costo de tenerlo sin necesitarlo es complejidad permanente.
 
-Color primario: celeste vibrante en `oklch(0.65 0.15 230)` para light mode y `oklch(0.72 0.14 230)` para dark mode. Acento cálido: amarillo paja muy suave en `oklch(0.92 0.08 90)` para contrapeso emocional.
+### Paleta OKLCH
 
-Los tokens completos se definen en `src/app/globals.css` bajo `@theme`. Cualquier cambio futuro de paleta se hace ahí.
+Colores definidos en `src/app/globals.css` con variables CSS en formato OKLCH. Sistema de tokens shadcn/ui (base-nova) sobre Tailwind v4.
+
+Acento de marca: **verde salvia** (`oklch(0.58 0.12 155)`) — transmite naturaleza, crecimiento, calidez sin ser clínico.
+
+Dark mode via `.dark` class (next-themes). Variables redefinidas para modo oscuro.
 
 ### Tipografía
 
-**Geist Sans** como tipografía principal, **Geist Mono** para código y datos numéricos. Ambas vienen optimizadas en Next.js vía `next/font/google` o `next/font/local` y se cargan sin layout shift.
+Geist Sans (variable font, Google Fonts vía `next/font`). Sans-serif limpia, moderna, legible en pantallas pequeñas.
 
-### Border radius
+### Tono de diseño
 
-`--radius: 1rem` como base. Componentes pequeños (botones, badges) `0.75rem`. Cards y contenedores `1.25rem`. Avatar siempre `9999px` (circular).
+Cálido, familiar, moderno, simple. No clínico. No infantil-colorido. Íconos Lucide React (incluido en shadcn base-nova).
 
-### Modo oscuro
+## Alternativas descartadas
 
-Real, basado en navy oscuro `oklch(0.18 0.025 240)`, no negro puro. Contraste WCAG AA en todos los pares de colores semánticos.
-
-## Alternativas consideradas
-
-**Español neutro internacional.** Más amplio en alcance pero menos cálido. Como la app es familiar y privada, el voseo y la cadencia rioplatense generan mayor cercanía. Si en el futuro el producto se abre, se reabre la decisión.
-
-**Paleta en HSL.** Más conocida pero menos uniforme en luminosidad. OKLCH es el estándar moderno y Tailwind v4 lo soporta nativamente.
-
-**Tipografía sistema (`-apple-system`, etc.).** Más rápido de cargar pero estética poco distintiva. Geist es gratis, pesa poco con `next/font`, y le da carácter al producto.
-
-**Estética claramente infantil con muchos colores y formas.** Marco descartó este camino: la app la usan adultos cuidando un bebé, no el bebé. La estética debe ser cálida pero sobria.
-
-## Consecuencias
-
-**Positivo.** Sistema de diseño coherente desde el día uno. Cambiar la paleta entera es modificar variables en un solo archivo CSS. El registro lingüístico cohesionado hace que la copy se sienta como escrita por una persona, no por una IA neutra.
-
-**Negativo.** Si el proyecto se abre a familias fuera de Argentina, hay que internacionalizar copy y replantear el tono. Si en algún momento se incorpora un familiar de habla no española, hay fricción.
-
-**Señales que harían reconsiderar.** Comentarios consistentes de usuarios sobre que la estética se siente fría o infantil; problemas de contrasto detectados por usuarios con baja visión; necesidad real de soporte multilingüe.
+- **Internacionalización (next-intl, i18next):** Overhead innecesario para un producto de una sola familia en Argentina.
+- **Colores azules/verdes médicos:** Demasiado clínicos para el tono buscado.
+- **Tailwind v3 con configuración tradicional:** Tailwind v4 es el default en Next.js 16; v3 requeriría config adicional sin beneficio.
