@@ -65,3 +65,13 @@ Preguntá. Es preferible una pregunta a una decisión silenciosa que después ha
 2. **Nunca importar `@/lib/supabase/admin` desde un Client Component.** El cliente admin bypasea RLS y vive solo en el server. El `import 'server-only'` lo refuerza, pero la regla es independiente del runtime.
 3. **El proxy se mantiene minimalista:** solo refresh de sesión + redirección por estado de auth. La convención `proxy.ts` reemplazó al `middleware.ts` deprecado en Next 16; el helper que refresca la sesión vive en `@/lib/supabase/proxy-helper`. Toda lógica de dominio (permisos finos, banners, feature flags) va en layouts, Server Actions o Route Handlers.
 4. **Cada query confía en RLS.** No filtrar por `family_group_id` ni equivalentes en código de aplicación. Si un endpoint asume "el frontend ya filtró" o "agregamos el `where` por las dudas", está mal: esa lógica vive en las policies de Postgres y nada más.
+
+## Reglas de la capa de IA
+
+1. **Toda llamada a un LLM pasa por `src/lib/ai/agents/*.ts`.** Nunca llamar `callLLM` directo desde server actions, route handlers ni componentes. Si necesitás un agente nuevo, agregalo en `agents/`.
+2. **System prompts versionados.** Cada agente tiene su prompt en `src/lib/ai/prompts/<name>.md` y un `PROMPT_VERSION` constante en su archivo. Cambiar el prompt **siempre** bumpea la versión a mano (ej. `story-v1` → `story-v2`). Esto deja trazable en `ai_logs.prompt_version` qué versión generó cada output.
+3. **Output validado con Zod ANTES de tocar UI o base.** El agente devuelve `AgentResult<T>` solo si el output parsea contra `outputSchema`. Si no parsea, tira `AIParseError`.
+4. **Guardrails siempre aplicados.** `applyGuardrails` se llama en cada agente después de validar el output. No skipear, ni con flag de feature ni con env var.
+5. **Logs sin contenido.** `logStore.record` registra metadata (agente, modelo, tokens, latencia, errores) — nunca prompts ni outputs. La regla está en `docs/06-privacidad.md` y se aplica también a futuros stores que implementen `LogStore`.
+6. **`ai_logs` con RLS estricta.** SELECT solo para admin de la familia (o `family_group_id IS NULL` para logs de sistema). INSERT solo vía admin client server-side; nunca desde authenticated.
+7. **Errores tipados.** Capturar `AIError` y discriminar por `type` (`config | network | provider | parse | guardrail | validation`) para que la UI pueda mostrar mensajes apropiados sin hardcodear strings.

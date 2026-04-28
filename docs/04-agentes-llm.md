@@ -9,7 +9,7 @@ No se construyen ocho agentes a la vez. Se construye uno y se establece el patr�
 
 ## Orden de incorporación
 
-Resumen diario en primer lugar; generador de cuentos en segundo; resumen para pediatra en modo borrador en tercero; agente pedagógico en cuarto; análisis de patrones de sueño y alimentación recién cuando haya al menos seis meses de datos reales que analizar. Antes de eso, los "patrones" serían ruido estadístico.
+Resumen diario en primer lugar; generador de cuentos en segundo (✅ implementado en `src/lib/ai/agents/story.ts`, prompt `story-v1`); resumen para pediatra en modo borrador en tercero; agente pedagógico en cuarto; análisis de patrones de sueño y alimentación recién cuando haya al menos seis meses de datos reales que analizar. Antes de eso, los "patrones" serían ruido estadístico.
 
 ## Agente médico: tratamiento especial
 

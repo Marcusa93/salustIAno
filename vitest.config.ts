@@ -19,6 +19,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
+      // server-only tira en runtime fuera de Server Components.
+      // En tests no aplica esa restricción, así que stubeamos a un módulo vacío.
+      'server-only': resolve(__dirname, './tests/stubs/server-only.ts'),
     },
   },
 });
