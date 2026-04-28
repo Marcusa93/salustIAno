@@ -9,34 +9,21 @@ import { AIParseError, AIValidationError } from '../errors';
 import { applyGuardrails } from '../guardrails';
 import { logStore } from '../logger';
 import type { AgentContext, AgentResult } from '../types';
+import {
+  type StoryInput,
+  type StoryOutput,
+  storyInputSchema,
+  storyOutputSchema,
+} from './story-schema';
+
+export { storyInputSchema, storyOutputSchema };
+export type { StoryInput, StoryOutput };
 
 const AGENT_NAME = 'story-generator';
 const MODEL = 'anthropic/claude-opus-4-7';
 const PROMPT_VERSION = 'story-v1';
 
 const SYSTEM_PROMPT = readFileSync(join(process.cwd(), 'src/lib/ai/prompts/story.md'), 'utf8');
-
-export const storyInputSchema = z.object({
-  childName: z.string().min(1).max(100),
-  ageDescription: z.string().min(1).max(200),
-  moment: z.enum(['dormir', 'jugar', 'calmar', 'estimular', 'recordar']),
-  characters: z.array(z.string().min(1).max(50)).min(1).max(8),
-  emotion: z.string().min(1).max(100).optional(),
-  duration: z.enum(['corto', 'medio', 'largo']),
-  style: z.string().max(100).optional(),
-  familyValues: z.array(z.string().max(100)).max(5).optional(),
-});
-
-export type StoryInput = z.infer<typeof storyInputSchema>;
-
-export const storyOutputSchema = z.object({
-  title: z.string().min(1).max(200),
-  story: z.string().min(50).max(5000),
-  moralOrTheme: z.string().min(1).max(500),
-  charactersUsed: z.array(z.string()),
-});
-
-export type StoryOutput = z.infer<typeof storyOutputSchema>;
 
 /**
  * Genera un cuento personalizado para Salustiano.
