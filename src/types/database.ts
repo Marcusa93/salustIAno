@@ -563,6 +563,59 @@ export type Database = {
           },
         ];
       };
+      medical_milestones: {
+        Row: {
+          category: Database['public']['Enums']['milestone_category'];
+          completed_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          description: string | null;
+          due_at: string | null;
+          family_group_id: string;
+          id: string;
+          notes: string | null;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          category?: Database['public']['Enums']['milestone_category'];
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          due_at?: string | null;
+          family_group_id: string;
+          id?: string;
+          notes?: string | null;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          category?: Database['public']['Enums']['milestone_category'];
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          due_at?: string | null;
+          family_group_id?: string;
+          id?: string;
+          notes?: string | null;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'medical_milestones_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       notes: {
         Row: {
           category: Database['public']['Enums']['note_category'];
@@ -726,6 +779,7 @@ export type Database = {
       family_role: 'admin' | 'caregiver' | 'family' | 'viewer';
       feeding_reaction: 'none' | 'mild' | 'strong';
       feeding_type: 'breastfeeding' | 'bottle' | 'solid';
+      milestone_category: 'control_pediatrico' | 'pesquisa' | 'estudio' | 'vacuna' | 'otro';
       note_category: 'memory' | 'observation' | 'milestone' | 'other';
       sleep_quality: 'good' | 'regular' | 'bad' | 'unknown';
     };
@@ -860,6 +914,7 @@ export const Constants = {
       family_role: ['admin', 'caregiver', 'family', 'viewer'],
       feeding_reaction: ['none', 'mild', 'strong'],
       feeding_type: ['breastfeeding', 'bottle', 'solid'],
+      milestone_category: ['control_pediatrico', 'pesquisa', 'estudio', 'vacuna', 'otro'],
       note_category: ['memory', 'observation', 'milestone', 'other'],
       sleep_quality: ['good', 'regular', 'bad', 'unknown'],
     },

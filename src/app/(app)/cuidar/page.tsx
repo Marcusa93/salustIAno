@@ -26,11 +26,10 @@ const OPTIONS: CuidarOption[] = [
     Icon: BookHeart,
   },
   {
+    href: '/cuidar/calendario',
     title: 'Calendario de controles',
-    description: 'Pesquisa neonatal, ecografías, vacunas — los hitos que vienen.',
+    description: 'Pesquisa neonatal, ecografías, vacunas. Lo que viene y lo que ya hicieron.',
     Icon: CalendarClock,
-    badge: 'Próximamente',
-    disabled: true,
   },
 ];
 

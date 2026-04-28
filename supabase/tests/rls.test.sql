@@ -481,6 +481,161 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Test 13: medical_milestones — admin lee solo los propios; family lee
+-- pero family de A no ve los de B.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+insert into public.medical_milestones (
+  family_group_id, category, title, description, due_at, created_by
+) values
+  (
+    current_setting('test.family_a')::uuid,
+    'pesquisa',
+    'Pesquisa neonatal',
+    'Le sacan sangre del talón.',
+    now() + interval '5 days',
+    current_setting('test.user_admin_a')::uuid
+  ),
+  (
+    current_setting('test.family_b')::uuid,
+    'control_pediatrico',
+    'Primer control',
+    null,
+    now() + interval '7 days',
+    current_setting('test.user_admin_b')::uuid
+  );
+
+do $$
+declare
+  v_count_a int;
+  v_count_b_visible int;
+begin
+  perform pg_temp.switch_user(current_setting('test.user_admin_a')::uuid);
+  set local role authenticated;
+
+  select count(*) into v_count_a
+  from public.medical_milestones
+  where family_group_id = current_setting('test.family_a')::uuid;
+
+  select count(*) into v_count_b_visible
+  from public.medical_milestones
+  where family_group_id = current_setting('test.family_b')::uuid;
+
+  reset role;
+
+  if v_count_a <> 1 then
+    raise exception 'FAIL test 13a: admin_a debería ver 1 milestone (got %)', v_count_a;
+  end if;
+  if v_count_b_visible <> 0 then
+    raise exception 'FAIL test 13b: admin_a no debería ver milestones de family_b (got %)', v_count_b_visible;
+  end if;
+  raise notice 'PASS test 13: admin_a lee milestones propios (1) y no los de family_b (0)';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Test 14: rol family puede LEER milestones pero NO INSERT (ADR 0004)
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_count int;
+  v_blocked boolean := false;
+begin
+  perform pg_temp.switch_user(current_setting('test.user_family_a')::uuid);
+  set local role authenticated;
+
+  select count(*) into v_count
+  from public.medical_milestones
+  where family_group_id = current_setting('test.family_a')::uuid;
+
+  begin
+    insert into public.medical_milestones (
+      family_group_id, category, title, created_by
+    ) values (
+      current_setting('test.family_a')::uuid,
+      'otro',
+      'Intento de family',
+      current_setting('test.user_family_a')::uuid
+    );
+  exception
+    when insufficient_privilege or check_violation then
+      v_blocked := true;
+  end;
+
+  reset role;
+
+  if v_count <> 1 then
+    raise exception 'FAIL test 14a: rol family debería leer milestones (got %)', v_count;
+  end if;
+  if not v_blocked then
+    raise exception 'FAIL test 14b: rol family NO debería poder insertar milestones (ADR 0004)';
+  end if;
+  raise notice 'PASS test 14: rol family lee milestones (1) pero no inserta (RLS bloquea)';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Test 15: admin puede UPDATE (toggle completed) y DELETE; family no.
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_milestone_id uuid;
+  v_blocked_update boolean := false;
+  v_admin_update_ok boolean := false;
+begin
+  -- Buscamos el milestone de family_a creado en setup del test 13.
+  reset role;
+  select id into v_milestone_id
+  from public.medical_milestones
+  where family_group_id = current_setting('test.family_a')::uuid
+  limit 1;
+
+  -- family intenta UPDATE → bloqueado.
+  perform pg_temp.switch_user(current_setting('test.user_family_a')::uuid);
+  set local role authenticated;
+
+  begin
+    update public.medical_milestones
+    set notes = 'family intenta editar'
+    where id = v_milestone_id;
+    -- Si no tira error, RLS USING devolvió 0 rows actualizadas.
+    if found then
+      raise exception 'FAIL test 15a: family no debería poder actualizar';
+    end if;
+    v_blocked_update := true;
+  exception
+    when insufficient_privilege then
+      v_blocked_update := true;
+  end;
+
+  reset role;
+
+  -- admin SÍ puede actualizar.
+  perform pg_temp.switch_user(current_setting('test.user_admin_a')::uuid);
+  set local role authenticated;
+
+  update public.medical_milestones
+  set completed_at = now()
+  where id = v_milestone_id;
+  v_admin_update_ok := found;
+
+  reset role;
+
+  if not v_blocked_update then
+    raise exception 'FAIL test 15a: family no debería actualizar';
+  end if;
+  if not v_admin_update_ok then
+    raise exception 'FAIL test 15b: admin debería actualizar y FOUND debería ser true';
+  end if;
+  raise notice 'PASS test 15: admin actualiza milestones; family no (RLS bloquea)';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- End of tests
 -- ---------------------------------------------------------------------------
 
