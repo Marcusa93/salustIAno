@@ -362,6 +362,125 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Test 10: care_guides — miembro lee, no-miembro no lee
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+-- Insertamos como postgres (BYPASSRLS) una entrada de care_guide para
+-- cada familia, con un autor (admin de cada una) plausible.
+insert into public.care_guides (family_group_id, category, title, content, source, created_by)
+values
+  (
+    current_setting('test.family_a')::uuid,
+    'dormir',
+    'Sueño seguro',
+    'Boca arriba, en su Moisés. Colchón duro, sin nada alrededor.',
+    'Pediatra Dra. Romero',
+    current_setting('test.user_admin_a')::uuid
+  ),
+  (
+    current_setting('test.family_b')::uuid,
+    'higiene',
+    'Limpieza',
+    'Algodón con óleo calcáreo o agua y jabón.',
+    null,
+    current_setting('test.user_admin_b')::uuid
+  );
+
+do $$
+declare
+  v_count_a int;
+  v_count_b_visible int;
+begin
+  perform pg_temp.switch_user(current_setting('test.user_admin_a')::uuid);
+  set local role authenticated;
+
+  select count(*) into v_count_a
+  from public.care_guides
+  where family_group_id = current_setting('test.family_a')::uuid;
+
+  select count(*) into v_count_b_visible
+  from public.care_guides
+  where family_group_id = current_setting('test.family_b')::uuid;
+
+  reset role;
+
+  if v_count_a <> 1 then
+    raise exception 'FAIL test 10a: admin_a should see 1 care_guide from family_a (got %)', v_count_a;
+  end if;
+  if v_count_b_visible <> 0 then
+    raise exception 'FAIL test 10b: admin_a should not see care_guides from family_b (got %)', v_count_b_visible;
+  end if;
+  raise notice 'PASS test 10: admin_a lee care_guides propios (1) y no los de family_b (0)';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Test 11: care_guides — miembro family puede insertar (con self-attribution)
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_inserted int := 0;
+begin
+  perform pg_temp.switch_user(current_setting('test.user_family_a')::uuid);
+  set local role authenticated;
+
+  insert into public.care_guides (family_group_id, category, title, content, created_by)
+  values (
+    current_setting('test.family_a')::uuid,
+    'otros',
+    'Algo que aprendí',
+    'Anotación corta del rol family.',
+    current_setting('test.user_family_a')::uuid
+  )
+  returning 1 into v_inserted;
+
+  reset role;
+
+  if v_inserted is null or v_inserted <> 1 then
+    raise exception 'FAIL test 11: rol family debería poder insertar care_guides en su familia';
+  end if;
+  raise notice 'PASS test 11: rol family inserta care_guides en su familia (self-attributed)';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Test 12: care_guides — admin_a NO puede insertar en family_b (cross-family)
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_blocked boolean := false;
+begin
+  perform pg_temp.switch_user(current_setting('test.user_admin_a')::uuid);
+  set local role authenticated;
+
+  begin
+    insert into public.care_guides (family_group_id, category, title, content, created_by)
+    values (
+      current_setting('test.family_b')::uuid,
+      'otros',
+      'Cross family attempt',
+      'Esto no debería pasar.',
+      current_setting('test.user_admin_a')::uuid
+    );
+  exception
+    when insufficient_privilege or check_violation then
+      v_blocked := true;
+  end;
+
+  reset role;
+
+  if not v_blocked then
+    raise exception 'FAIL test 12: admin_a no debería poder insertar care_guides en family_b';
+  end if;
+  raise notice 'PASS test 12: admin_a no inserta care_guides cross-family (RLS bloquea)';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- End of tests
 -- ---------------------------------------------------------------------------
 

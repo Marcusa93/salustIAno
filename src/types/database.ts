@@ -115,6 +115,53 @@ export type Database = {
           },
         ];
       };
+      care_guides: {
+        Row: {
+          category: Database['public']['Enums']['care_guide_category'];
+          content: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          family_group_id: string;
+          id: string;
+          source: string | null;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          category?: Database['public']['Enums']['care_guide_category'];
+          content: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id: string;
+          id?: string;
+          source?: string | null;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          category?: Database['public']['Enums']['care_guide_category'];
+          content?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          id?: string;
+          source?: string | null;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'care_guides_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       child_measurements: {
         Row: {
           child_id: string;
@@ -668,6 +715,13 @@ export type Database = {
     Enums: {
       audit_action: 'insert' | 'update' | 'soft_delete' | 'restore' | 'hard_delete';
       breast_side: 'left' | 'right' | 'both';
+      care_guide_category:
+        | 'dormir'
+        | 'higiene'
+        | 'alimentacion'
+        | 'control'
+        | 'emergencia'
+        | 'otros';
       diaper_type: 'wet' | 'dirty' | 'both' | 'dry';
       family_role: 'admin' | 'caregiver' | 'family' | 'viewer';
       feeding_reaction: 'none' | 'mild' | 'strong';
@@ -801,6 +855,7 @@ export const Constants = {
     Enums: {
       audit_action: ['insert', 'update', 'soft_delete', 'restore', 'hard_delete'],
       breast_side: ['left', 'right', 'both'],
+      care_guide_category: ['dormir', 'higiene', 'alimentacion', 'control', 'emergencia', 'otros'],
       diaper_type: ['wet', 'dirty', 'both', 'dry'],
       family_role: ['admin', 'caregiver', 'family', 'viewer'],
       feeding_reaction: ['none', 'mild', 'strong'],

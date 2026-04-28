@@ -1,5 +1,6 @@
 'use server';
 
+import { ensureFamilyForUser } from '@/lib/bootstrap-family';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 import { type SignupInput, signupSchema } from '@/lib/validators/auth';
@@ -61,6 +62,13 @@ export async function signupAction(data: SignupInput): Promise<SignupResult> {
   // session != null. Si la tiene activa (default), session es null y
   // el user tiene que confirmar mail antes de loguearse.
   const requiresEmailConfirmation = signUpData.session === null;
+
+  // Si la sesión quedó activa de una (sin email confirm), bootstrap acá.
+  // Si requiere mail, el bootstrap ocurre en /auth/confirm cuando el user
+  // hace click en el link.
+  if (!requiresEmailConfirmation && signUpData.user) {
+    await ensureFamilyForUser(signUpData.user.id);
+  }
 
   return { ok: true, requiresEmailConfirmation };
 }
