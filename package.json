@@ -19,6 +19,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
+    "db:link": "supabase link --project-ref cwzngscywmgnjuudsgva",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff --linked",
+    "db:types": "supabase gen types typescript --linked --schema public > src/types/database.ts",
+    "db:test:rls": "psql \"$SUPABASE_DB_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/rls.test.sql",
     "prepare": "husky"
   },
   "dependencies": {
@@ -49,6 +55,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
     "postcss": "^8.4.49",
+    "supabase": "^2.95.5",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.9"

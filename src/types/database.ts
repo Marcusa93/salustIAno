@@ -1,19 +1,749 @@
-/**
- * Tipos de la base de datos Supabase.
- *
- * Placeholder mientras no haya migraciones. Cuando aparezcan tablas reales,
- * regenerar este archivo con `supabase gen types typescript` (lo cableamos
- * como `pnpm db:types` cuando arranque el paso de migraciones).
- */
-
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: '14.5';
+  };
   public: {
-    Tables: Record<string, never>;
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
+    Tables: {
+      audit_logs: {
+        Row: {
+          action: Database['public']['Enums']['audit_action'];
+          actor_user_id: string | null;
+          created_at: string;
+          family_group_id: string | null;
+          id: string;
+          new_data: Json | null;
+          old_data: Json | null;
+          record_id: string;
+          table_name: string;
+        };
+        Insert: {
+          action: Database['public']['Enums']['audit_action'];
+          actor_user_id?: string | null;
+          created_at?: string;
+          family_group_id?: string | null;
+          id?: string;
+          new_data?: Json | null;
+          old_data?: Json | null;
+          record_id: string;
+          table_name: string;
+        };
+        Update: {
+          action?: Database['public']['Enums']['audit_action'];
+          actor_user_id?: string | null;
+          created_at?: string;
+          family_group_id?: string | null;
+          id?: string;
+          new_data?: Json | null;
+          old_data?: Json | null;
+          record_id?: string;
+          table_name?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'audit_logs_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      child_measurements: {
+        Row: {
+          child_id: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          head_circumference_cm: number | null;
+          height_cm: number | null;
+          id: string;
+          measured_at: string;
+          notes: string | null;
+          updated_at: string;
+          weight_grams: number | null;
+        };
+        Insert: {
+          child_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          head_circumference_cm?: number | null;
+          height_cm?: number | null;
+          id?: string;
+          measured_at: string;
+          notes?: string | null;
+          updated_at?: string;
+          weight_grams?: number | null;
+        };
+        Update: {
+          child_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          head_circumference_cm?: number | null;
+          height_cm?: number | null;
+          id?: string;
+          measured_at?: string;
+          notes?: string | null;
+          updated_at?: string;
+          weight_grams?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'child_measurements_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      child_profiles: {
+        Row: {
+          avatar_path: string | null;
+          birth_date: string | null;
+          birth_height_cm: number | null;
+          birth_place: string | null;
+          birth_time: string | null;
+          birth_weight_grams: number | null;
+          blood_type: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          family_group_id: string;
+          gestational_weeks_at_birth: number | null;
+          health_insurance: string | null;
+          id: string;
+          is_preterm: boolean | null;
+          name: string;
+          notes: string | null;
+          pediatrician_name: string | null;
+          pediatrician_phone: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          avatar_path?: string | null;
+          birth_date?: string | null;
+          birth_height_cm?: number | null;
+          birth_place?: string | null;
+          birth_time?: string | null;
+          birth_weight_grams?: number | null;
+          blood_type?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id: string;
+          gestational_weeks_at_birth?: number | null;
+          health_insurance?: string | null;
+          id?: string;
+          is_preterm?: boolean | null;
+          name: string;
+          notes?: string | null;
+          pediatrician_name?: string | null;
+          pediatrician_phone?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          avatar_path?: string | null;
+          birth_date?: string | null;
+          birth_height_cm?: number | null;
+          birth_place?: string | null;
+          birth_time?: string | null;
+          birth_weight_grams?: number | null;
+          blood_type?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          gestational_weeks_at_birth?: number | null;
+          health_insurance?: string | null;
+          id?: string;
+          is_preterm?: boolean | null;
+          name?: string;
+          notes?: string | null;
+          pediatrician_name?: string | null;
+          pediatrician_phone?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'child_profiles_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      diaper_events: {
+        Row: {
+          child_id: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          id: string;
+          notes: string | null;
+          occurred_at: string;
+          type: Database['public']['Enums']['diaper_type'];
+          updated_at: string;
+        };
+        Insert: {
+          child_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          notes?: string | null;
+          occurred_at: string;
+          type: Database['public']['Enums']['diaper_type'];
+          updated_at?: string;
+        };
+        Update: {
+          child_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          notes?: string | null;
+          occurred_at?: string;
+          type?: Database['public']['Enums']['diaper_type'];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'diaper_events_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      family_groups: {
+        Row: {
+          created_at: string;
+          deleted_at: string | null;
+          id: string;
+          name: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          deleted_at?: string | null;
+          id?: string;
+          name: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          deleted_at?: string | null;
+          id?: string;
+          name?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      family_memberships: {
+        Row: {
+          accepted_at: string;
+          created_at: string;
+          deleted_at: string | null;
+          display_name: string | null;
+          family_group_id: string;
+          id: string;
+          relationship: string | null;
+          role: Database['public']['Enums']['family_role'];
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          accepted_at?: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          display_name?: string | null;
+          family_group_id: string;
+          id?: string;
+          relationship?: string | null;
+          role?: Database['public']['Enums']['family_role'];
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          accepted_at?: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          display_name?: string | null;
+          family_group_id?: string;
+          id?: string;
+          relationship?: string | null;
+          role?: Database['public']['Enums']['family_role'];
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'family_memberships_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      feeding_events: {
+        Row: {
+          amount_ml: number | null;
+          child_id: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          duration_minutes: number | null;
+          foods: string[] | null;
+          id: string;
+          notes: string | null;
+          occurred_at: string;
+          reaction: Database['public']['Enums']['feeding_reaction'];
+          side: Database['public']['Enums']['breast_side'] | null;
+          type: Database['public']['Enums']['feeding_type'];
+          updated_at: string;
+        };
+        Insert: {
+          amount_ml?: number | null;
+          child_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          duration_minutes?: number | null;
+          foods?: string[] | null;
+          id?: string;
+          notes?: string | null;
+          occurred_at: string;
+          reaction?: Database['public']['Enums']['feeding_reaction'];
+          side?: Database['public']['Enums']['breast_side'] | null;
+          type: Database['public']['Enums']['feeding_type'];
+          updated_at?: string;
+        };
+        Update: {
+          amount_ml?: number | null;
+          child_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          duration_minutes?: number | null;
+          foods?: string[] | null;
+          id?: string;
+          notes?: string | null;
+          occurred_at?: string;
+          reaction?: Database['public']['Enums']['feeding_reaction'];
+          side?: Database['public']['Enums']['breast_side'] | null;
+          type?: Database['public']['Enums']['feeding_type'];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'feeding_events_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      invitations: {
+        Row: {
+          accepted_at: string | null;
+          created_at: string;
+          email: string;
+          expires_at: string;
+          family_group_id: string;
+          id: string;
+          invited_by: string;
+          role: Database['public']['Enums']['family_role'];
+          token: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          created_at?: string;
+          email: string;
+          expires_at?: string;
+          family_group_id: string;
+          id?: string;
+          invited_by: string;
+          role: Database['public']['Enums']['family_role'];
+          token?: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          created_at?: string;
+          email?: string;
+          expires_at?: string;
+          family_group_id?: string;
+          id?: string;
+          invited_by?: string;
+          role?: Database['public']['Enums']['family_role'];
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'invitations_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      media_items: {
+        Row: {
+          caption: string | null;
+          child_id: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          height: number | null;
+          id: string;
+          mime_type: string;
+          size_bytes: number | null;
+          storage_path: string;
+          taken_at: string | null;
+          updated_at: string;
+          width: number | null;
+        };
+        Insert: {
+          caption?: string | null;
+          child_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          height?: number | null;
+          id?: string;
+          mime_type: string;
+          size_bytes?: number | null;
+          storage_path: string;
+          taken_at?: string | null;
+          updated_at?: string;
+          width?: number | null;
+        };
+        Update: {
+          caption?: string | null;
+          child_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          height?: number | null;
+          id?: string;
+          mime_type?: string;
+          size_bytes?: number | null;
+          storage_path?: string;
+          taken_at?: string | null;
+          updated_at?: string;
+          width?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'media_items_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      notes: {
+        Row: {
+          category: Database['public']['Enums']['note_category'];
+          child_id: string;
+          content: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          id: string;
+          occurred_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          category?: Database['public']['Enums']['note_category'];
+          child_id: string;
+          content: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          occurred_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          category?: Database['public']['Enums']['note_category'];
+          child_id?: string;
+          content?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          occurred_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'notes_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      sleep_sessions: {
+        Row: {
+          child_id: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          ended_at: string | null;
+          id: string;
+          is_nap: boolean;
+          notes: string | null;
+          quality: Database['public']['Enums']['sleep_quality'];
+          started_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          child_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          ended_at?: string | null;
+          id?: string;
+          is_nap?: boolean;
+          notes?: string | null;
+          quality?: Database['public']['Enums']['sleep_quality'];
+          started_at: string;
+          updated_at?: string;
+        };
+        Update: {
+          child_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          ended_at?: string | null;
+          id?: string;
+          is_nap?: boolean;
+          notes?: string | null;
+          quality?: Database['public']['Enums']['sleep_quality'];
+          started_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sleep_sessions_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+    };
+    Views: {
+      timeline_events: {
+        Row: {
+          child_id: string | null;
+          created_at: string | null;
+          created_by: string | null;
+          event_type: string | null;
+          id: string | null;
+          occurred_at: string | null;
+          payload: Json | null;
+        };
+        Relationships: [];
+      };
+    };
+    Functions: {
+      child_chronological_age_days: {
+        Args: { p_child_id: string };
+        Returns: number;
+      };
+      child_corrected_age_days: {
+        Args: { p_child_id: string };
+        Returns: number;
+      };
+      child_family_group_id: { Args: { p_child_id: string }; Returns: string };
+      get_timeline: {
+        Args: {
+          p_child_id: string;
+          p_event_types?: string[];
+          p_from?: string;
+          p_limit?: number;
+          p_offset?: number;
+          p_to?: string;
+        };
+        Returns: {
+          child_id: string;
+          created_at: string;
+          created_by: string;
+          event_type: string;
+          id: string;
+          occurred_at: string;
+          payload: Json;
+        }[];
+      };
+      is_family_admin: { Args: { p_family_group_id: string }; Returns: boolean };
+      is_family_caregiver_or_admin: {
+        Args: { p_family_group_id: string };
+        Returns: boolean;
+      };
+      is_family_member: {
+        Args: { p_family_group_id: string };
+        Returns: boolean;
+      };
+      user_family_group_ids: { Args: never; Returns: string[] };
+    };
+    Enums: {
+      audit_action: 'insert' | 'update' | 'soft_delete' | 'restore' | 'hard_delete';
+      breast_side: 'left' | 'right' | 'both';
+      diaper_type: 'wet' | 'dirty' | 'both' | 'dry';
+      family_role: 'admin' | 'caregiver' | 'family' | 'viewer';
+      feeding_reaction: 'none' | 'mild' | 'strong';
+      feeding_type: 'breastfeeding' | 'bottle' | 'solid';
+      note_category: 'memory' | 'observation' | 'milestone' | 'other';
+      sleep_quality: 'good' | 'regular' | 'bad' | 'unknown';
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
 };
+
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>;
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>];
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+      Row: infer R;
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
+      }
+      ? R
+      : never
+    : never;
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema['Tables']
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Insert: infer I;
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I;
+      }
+      ? I
+      : never
+    : never;
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema['Tables']
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Update: infer U;
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U;
+      }
+      ? U
+      : never
+    : never;
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema['Enums']
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
+    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+    : never;
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema['CompositeTypes']
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
+    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+    : never;
+
+export const Constants = {
+  public: {
+    Enums: {
+      audit_action: ['insert', 'update', 'soft_delete', 'restore', 'hard_delete'],
+      breast_side: ['left', 'right', 'both'],
+      diaper_type: ['wet', 'dirty', 'both', 'dry'],
+      family_role: ['admin', 'caregiver', 'family', 'viewer'],
+      feeding_reaction: ['none', 'mild', 'strong'],
+      feeding_type: ['breastfeeding', 'bottle', 'solid'],
+      note_category: ['memory', 'observation', 'milestone', 'other'],
+      sleep_quality: ['good', 'regular', 'bad', 'unknown'],
+    },
+  },
+} as const;
