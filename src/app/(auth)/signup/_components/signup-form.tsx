@@ -4,11 +4,13 @@ import { FormField } from '@/components/salu/form-field';
 import { Button } from '@/components/ui/button';
 import { type SignupInput, signupSchema } from '@/lib/validators/auth';
 import { zodResolver } from '@/lib/zod-compat';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { signupAction } from '../actions';
 
 export function SignupForm() {
+  const router = useRouter();
   const {
     register,
     handleSubmit,
@@ -21,12 +23,24 @@ export function SignupForm() {
     const result = await signupAction(data);
 
     if (!result.ok) {
-      toast.error('Hubo un problema al crear tu cuenta. Revisá los datos.');
+      const rootMessage =
+        result.errors.root ??
+        result.errors.email ??
+        'Hubo un problema al crear tu cuenta. Revisá los datos.';
+      toast.error(rootMessage);
       return;
     }
 
+    if (result.requiresEmailConfirmation) {
+      toast.success('Te mandamos un mail para confirmar tu cuenta.');
+      router.push('/login?confirmed=pending');
+      return;
+    }
+
+    // Cuando el proyecto tiene confirmation desactivada, signUp ya deja
+    // sesión activa. Mandamos directo al onboarding.
     toast.success('¡La casa está lista!');
-    // TODO: redirect to /onboarding after Supabase auth is connected
+    router.push('/onboarding');
   }
 
   return (

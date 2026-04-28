@@ -6,7 +6,13 @@ export const metadata: Metadata = {
   title: 'Entrá',
 };
 
-export default function LoginPage() {
+interface LoginPageProps {
+  searchParams: Promise<{ next?: string; error?: string; confirmed?: string }>;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
@@ -14,7 +20,11 @@ export default function LoginPage() {
         <p className="text-muted-foreground">Tu casa te está esperando.</p>
       </div>
 
-      <LoginForm />
+      <LoginForm
+        next={params.next}
+        errorParam={params.error}
+        confirmedPending={params.confirmed === 'pending'}
+      />
 
       <p className="text-muted-foreground text-sm">
         ¿Todavía no tenés casa?{' '}

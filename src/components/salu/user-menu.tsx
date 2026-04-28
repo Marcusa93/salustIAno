@@ -17,7 +17,6 @@ import {
 import { CheckIcon, LogOut, User } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
-import { toast } from 'sonner';
 
 const themeOptions = [
   { value: 'system', label: 'Sistema' },
@@ -30,8 +29,9 @@ export function UserMenu() {
   const { theme, setTheme } = useTheme();
 
   async function handleSignOut() {
+    // signOut() redirige server-side a /login; no se llega a la línea
+    // siguiente en happy path.
     await signOut();
-    toast.info('Sesión cerrada (placeholder)');
   }
 
   return (

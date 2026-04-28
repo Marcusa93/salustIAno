@@ -11,7 +11,20 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { loginAction } from '../actions';
 
-export function LoginForm() {
+const ERROR_PARAM_MESSAGES: Record<string, string> = {
+  callback_failed: 'No pudimos confirmar la sesión. Probá entrar de nuevo.',
+  callback_missing_code: 'Link de confirmación inválido. Probá entrar de nuevo.',
+  confirm_invalid_link: 'El link del mail venció o es inválido. Probá entrar.',
+  confirm_failed: 'No pudimos confirmar tu mail. Probá generar uno nuevo.',
+};
+
+interface LoginFormProps {
+  next?: string;
+  errorParam?: string;
+  confirmedPending?: boolean;
+}
+
+export function LoginForm({ next, errorParam, confirmedPending = false }: LoginFormProps) {
   const {
     register,
     handleSubmit,
@@ -21,15 +34,13 @@ export function LoginForm() {
   });
 
   async function onSubmit(data: LoginInput) {
-    const result = await loginAction(data);
+    const result = await loginAction(data, next);
 
     if (!result.ok) {
-      toast.error('No pudimos iniciarte la sesión. Revisá tus datos.');
-      return;
+      const rootMessage = result.errors.root ?? 'No pudimos iniciarte la sesión. Revisá tus datos.';
+      toast.error(rootMessage);
     }
-
-    toast.success('¡Bienvenido de vuelta!');
-    // TODO: redirect to /home after Supabase auth is connected
+    // En éxito el server hace redirect; nada más que hacer en el cliente.
   }
 
   return (
@@ -39,6 +50,17 @@ export function LoginForm() {
       aria-label="Formulario de inicio de sesión"
       className="flex flex-col gap-5"
     >
+      {confirmedPending && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-4 text-foreground text-sm">
+          Te mandamos un mail para confirmar tu cuenta. Hacé click en el link y volvé acá a entrar.
+        </div>
+      )}
+      {errorParam && ERROR_PARAM_MESSAGES[errorParam] && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-destructive text-sm">
+          {ERROR_PARAM_MESSAGES[errorParam]}
+        </div>
+      )}
+
       <FormField
         id="login-email"
         label="Email"

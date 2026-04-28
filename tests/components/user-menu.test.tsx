@@ -7,16 +7,8 @@ vi.mock('next-themes', () => ({
   useTheme: vi.fn(() => ({ theme: 'system', setTheme: vi.fn() })),
 }));
 
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    info: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
 vi.mock('@/app/(app)/_actions/sign-out', () => ({
-  signOut: vi.fn().mockResolvedValue({ ok: true }),
+  signOut: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('next/link', () => ({
@@ -29,7 +21,6 @@ vi.mock('next/link', () => ({
 
 import { signOut } from '@/app/(app)/_actions/sign-out';
 import { UserMenu } from '@/components/salu/user-menu';
-import { toast } from 'sonner';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -72,7 +63,7 @@ describe('UserMenu', () => {
     });
   });
 
-  it('click en Cerrar sesión llama a la Server Action y muestra toast', async () => {
+  it('click en Cerrar sesión llama a la Server Action signOut', async () => {
     const user = userEvent.setup();
     render(<UserMenu />);
 
@@ -86,7 +77,6 @@ describe('UserMenu', () => {
 
     await waitFor(() => {
       expect(signOut).toHaveBeenCalled();
-      expect(toast.info).toHaveBeenCalledWith('Sesión cerrada (placeholder)');
     });
   });
 });
