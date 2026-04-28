@@ -8,6 +8,69 @@ export type Database = {
   };
   public: {
     Tables: {
+      ai_logs: {
+        Row: {
+          actor_user_id: string | null;
+          agent: string;
+          child_id: string | null;
+          completion_tokens: number | null;
+          created_at: string;
+          error: string | null;
+          family_group_id: string | null;
+          id: string;
+          latency_ms: number | null;
+          model: string;
+          prompt_tokens: number | null;
+          prompt_version: string | null;
+          total_tokens: number | null;
+        };
+        Insert: {
+          actor_user_id?: string | null;
+          agent: string;
+          child_id?: string | null;
+          completion_tokens?: number | null;
+          created_at?: string;
+          error?: string | null;
+          family_group_id?: string | null;
+          id?: string;
+          latency_ms?: number | null;
+          model: string;
+          prompt_tokens?: number | null;
+          prompt_version?: string | null;
+          total_tokens?: number | null;
+        };
+        Update: {
+          actor_user_id?: string | null;
+          agent?: string;
+          child_id?: string | null;
+          completion_tokens?: number | null;
+          created_at?: string;
+          error?: string | null;
+          family_group_id?: string | null;
+          id?: string;
+          latency_ms?: number | null;
+          model?: string;
+          prompt_tokens?: number | null;
+          prompt_version?: string | null;
+          total_tokens?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'ai_logs_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'ai_logs_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       audit_logs: {
         Row: {
           action: Database['public']['Enums']['audit_action'];

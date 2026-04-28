@@ -261,6 +261,107 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Setup adicional para tests 7-9: insertar un ai_log en cada familia.
+-- Usamos el rol postgres (BYPASSRLS por defecto en Supabase) para simular
+-- el INSERT que en producción haría el admin client server-side.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+insert into public.ai_logs (
+  agent, model, prompt_tokens, completion_tokens, latency_ms, family_group_id
+) values
+  ('story-generator', 'anthropic/claude-haiku-4-5', 120, 480, 850, current_setting('test.family_a')::uuid),
+  ('daily-summary',  'anthropic/claude-haiku-4-5',  90, 220, 540, current_setting('test.family_b')::uuid);
+
+-- ---------------------------------------------------------------------------
+-- Test 7: admin de Familia A lee solo los ai_logs de su familia
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_count_a int;
+  v_count_b_visible int;
+begin
+  perform pg_temp.switch_user(current_setting('test.user_admin_a')::uuid);
+  set local role authenticated;
+
+  select count(*) into v_count_a
+  from public.ai_logs
+  where family_group_id = current_setting('test.family_a')::uuid;
+
+  select count(*) into v_count_b_visible
+  from public.ai_logs
+  where family_group_id = current_setting('test.family_b')::uuid;
+
+  reset role;
+
+  if v_count_a <> 1 then
+    raise exception 'FAIL test 7a: admin_a should see 1 ai_log from family_a (got %)', v_count_a;
+  end if;
+  if v_count_b_visible <> 0 then
+    raise exception 'FAIL test 7b: admin_a should not see ai_logs from family_b (got %)', v_count_b_visible;
+  end if;
+  raise notice 'PASS test 7: admin_a lee ai_logs propios (1) y no lee los de family_b (0)';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Test 8: rol family no lee ai_logs
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_count_family int;
+begin
+  perform pg_temp.switch_user(current_setting('test.user_family_a')::uuid);
+  set local role authenticated;
+
+  select count(*) into v_count_family from public.ai_logs;
+
+  reset role;
+
+  if v_count_family <> 0 then
+    raise exception 'FAIL test 8: role family should not see ai_logs (got %)', v_count_family;
+  end if;
+  raise notice 'PASS test 8: role family no lee ai_logs (count=0)';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Test 9: INSERT directo en ai_logs es rechazado para authenticated
+-- (no hay policy de INSERT — solo el admin client server-side puede escribir).
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_blocked boolean := false;
+begin
+  perform pg_temp.switch_user(current_setting('test.user_admin_a')::uuid);
+  set local role authenticated;
+
+  begin
+    insert into public.ai_logs (agent, model, family_group_id)
+    values (
+      'story-generator',
+      'anthropic/claude-haiku-4-5',
+      current_setting('test.family_a')::uuid
+    );
+  exception
+    when insufficient_privilege or check_violation then
+      v_blocked := true;
+  end;
+
+  reset role;
+
+  if not v_blocked then
+    raise exception 'FAIL test 9: authenticated should not be able to INSERT into ai_logs';
+  end if;
+  raise notice 'PASS test 9: authenticated no inserta en ai_logs (RLS bloquea)';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- End of tests
 -- ---------------------------------------------------------------------------
 
