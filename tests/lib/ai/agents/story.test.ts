@@ -6,6 +6,8 @@ import type { ChatResponse } from '@/lib/ai/types';
 // Mocks: callLLM y logStore se reemplazan para no tocar OpenRouter ni Supabase.
 const callLLMMock = vi.fn<(req: unknown) => Promise<ChatResponse>>(async () => ({
   content: '',
+  toolCalls: [],
+  finishReason: 'stop',
   model: '',
   usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
   latencyMs: 0,
@@ -44,6 +46,8 @@ const validOutput = {
 function mockOK(content: object) {
   callLLMMock.mockResolvedValueOnce({
     content: JSON.stringify(content),
+    toolCalls: [],
+    finishReason: 'stop',
     model: 'anthropic/claude-opus-4-7',
     usage: { promptTokens: 100, completionTokens: 200, totalTokens: 300 },
     latencyMs: 1234,
@@ -130,6 +134,8 @@ describe('generateStory', () => {
   it('JSON malformado del LLM tira AIParseError', async () => {
     callLLMMock.mockResolvedValueOnce({
       content: 'not json {',
+      toolCalls: [],
+      finishReason: 'stop',
       model: 'anthropic/claude-opus-4-7',
       usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
       latencyMs: 100,

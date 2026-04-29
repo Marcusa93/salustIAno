@@ -10,7 +10,7 @@ import {
   type FeedingType,
   SLEEP_QUALITY_LABELS,
 } from '@/lib/validators/events';
-import { Baby, BookHeart, Milk, Moon, Plus } from 'lucide-react';
+import { Baby, BookHeart, Milk, Moon, Plus, Sparkles } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
@@ -163,6 +163,24 @@ export default async function HomePage() {
             : `Esperando a ${child.name}.`}
         </p>
       </header>
+
+      {/* SalustIA */}
+      <Link
+        href="/chat"
+        className="rounded-xl outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+      >
+        <Card className="flex items-center gap-4 border-primary/20 bg-primary/5 p-4 transition-all hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Sparkles className="size-5" aria-hidden />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-medium text-foreground">Preguntale a SalustIA</span>
+            <span className="text-muted-foreground text-xs">
+              Cómo va el día, qué controles vienen, qué dijo la pediatra.
+            </span>
+          </div>
+        </Card>
+      </Link>
 
       {/* Quick add */}
       <section className="flex flex-col gap-3">

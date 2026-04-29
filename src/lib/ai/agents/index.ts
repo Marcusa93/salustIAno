@@ -20,3 +20,6 @@ export {
   type StoryInput,
   type StoryOutput,
 } from './story-schema';
+
+export { chat as salustiaChat } from './salustia';
+export type { SalustiaInput, SalustiaOutput } from './salustia';

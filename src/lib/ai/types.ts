@@ -5,11 +5,52 @@
  * y puede importarse desde cualquier lado para tipear inputs/outputs.
  */
 
-export type ChatRole = 'system' | 'user' | 'assistant';
+export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
+
+/**
+ * Llamada que el LLM quiere hacer a una tool. Devuelta dentro de un
+ * `ChatMessage` con role 'assistant' cuando el modelo decide invocar
+ * funciones.
+ */
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    /** JSON string con los argumentos. Hay que parsear antes de usar. */
+    arguments: string;
+  };
+}
 
 export interface ChatMessage {
   role: ChatRole;
-  content: string;
+  /** Puede ser null cuando el assistant solo está invocando tools. */
+  content: string | null;
+  /** Solo presente en messages con role = 'assistant'. */
+  tool_calls?: ToolCall[];
+  /** Solo presente en messages con role = 'tool', linkea a una `ToolCall.id`. */
+  tool_call_id?: string;
+  /** Solo presente en messages con role = 'tool', nombre de la función. */
+  name?: string;
+}
+
+/**
+ * Definición de una tool que el LLM puede invocar. El formato sigue la
+ * convención de OpenAI Chat Completions; OpenRouter lo traduce a la
+ * representación nativa del modelo (Anthropic, Google, etc.).
+ */
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    /** JSON Schema (subset) describiendo los parámetros. */
+    parameters: {
+      type: 'object';
+      properties: Record<string, unknown>;
+      required?: string[];
+    };
+  };
 }
 
 export interface ChatRequest {
@@ -22,6 +63,11 @@ export interface ChatRequest {
    * un JSON parseable en el `content`.
    */
   responseFormat?: 'json_object' | 'text';
+  /**
+   * Tools que el LLM puede invocar. Si el modelo decide usar una, la
+   * respuesta vendrá con `tool_calls` poblado y `content` posiblemente null.
+   */
+  tools?: ToolDefinition[];
 }
 
 export interface ChatResponseUsage {
@@ -31,7 +77,15 @@ export interface ChatResponseUsage {
 }
 
 export interface ChatResponse {
+  /** Puede ser string vacío cuando el modelo solo invoca tools. */
   content: string;
+  /** Tool calls que el modelo decidió hacer en este turno. */
+  toolCalls: ToolCall[];
+  /**
+   * Razón por la cual el modelo terminó: 'stop' (respuesta normal),
+   * 'tool_calls' (cortó para invocar tools), 'length' (max tokens), etc.
+   */
+  finishReason: string | null;
   model: string;
   usage: ChatResponseUsage;
   /** Latencia medida del lado nuestro (ms entre request y response). */

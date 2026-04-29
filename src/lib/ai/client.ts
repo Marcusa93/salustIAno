@@ -2,13 +2,26 @@ import 'server-only';
 
 import { env } from '@/lib/env';
 import { AIConfigError, AINetworkError, AIProviderError } from './errors';
-import type { ChatRequest, ChatResponse } from './types';
+import type { ChatRequest, ChatResponse, ToolCall } from './types';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const REQUEST_TIMEOUT_MS = 60_000;
 
+interface OpenRouterToolCall {
+  id?: string;
+  type?: 'function';
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
+}
+
 interface OpenRouterChoice {
-  message?: { content?: string };
+  message?: {
+    content?: string | null;
+    tool_calls?: OpenRouterToolCall[];
+  };
+  finish_reason?: string;
 }
 
 interface OpenRouterUsage {
@@ -24,10 +37,36 @@ interface OpenRouterResponse {
 }
 
 /**
+ * Normaliza los tool_calls que vinieron del provider al shape que usamos
+ * adentro. Si vienen incompletos los descartamos en silencio (defensivo).
+ */
+function normalizeToolCalls(raw: OpenRouterToolCall[] | undefined): ToolCall[] {
+  if (!raw) return [];
+  const out: ToolCall[] = [];
+  for (const tc of raw) {
+    if (tc.id && tc.function?.name) {
+      out.push({
+        id: tc.id,
+        type: 'function',
+        function: {
+          name: tc.function.name,
+          arguments: tc.function.arguments ?? '{}',
+        },
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * Llama al endpoint de chat completions de OpenRouter y devuelve un
  * `ChatResponse` normalizado.
  *
- * Sin retry, sin streaming en este commit. Timeout de 60s vía AbortController.
+ * Soporta tool calling (campo opcional `tools` en el request). Cuando el
+ * modelo decide invocar funciones, `toolCalls` viene poblado y `content`
+ * suele ser empty. El loop de orquestación queda del lado del agente.
+ *
+ * Sin retry, sin streaming. Timeout de 60s vía AbortController.
  *
  * @throws {AIConfigError} si OPENROUTER_API_KEY no está seteada.
  * @throws {AINetworkError} si fetch falla (timeout, DNS, conexión cortada).
@@ -60,6 +99,7 @@ export async function callLLM(request: ChatRequest): Promise<ChatResponse> {
         temperature: request.temperature,
         max_tokens: request.maxTokens,
         response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
+        tools: request.tools && request.tools.length > 0 ? request.tools : undefined,
       }),
       signal: controller.signal,
     });
@@ -82,11 +122,16 @@ export async function callLLM(request: ChatRequest): Promise<ChatResponse> {
   const data = (await response.json()) as OpenRouterResponse;
   const latencyMs = Date.now() - startedAt;
 
-  const content = data.choices?.[0]?.message?.content ?? '';
+  const choice = data.choices?.[0];
+  const content = choice?.message?.content ?? '';
+  const toolCalls = normalizeToolCalls(choice?.message?.tool_calls);
+  const finishReason = choice?.finish_reason ?? null;
   const usage = data.usage ?? {};
 
   return {
     content,
+    toolCalls,
+    finishReason,
     model: data.model ?? request.model,
     usage: {
       promptTokens: usage.prompt_tokens ?? 0,
