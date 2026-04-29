@@ -636,6 +636,56 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Test 16: child_profiles — admin de A no puede crear/editar perfil en B
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_blocked_insert boolean := false;
+  v_blocked_update boolean := false;
+  v_child_b_id uuid;
+begin
+  reset role;
+  select id into v_child_b_id
+  from public.child_profiles
+  where family_group_id = current_setting('test.family_b')::uuid
+  limit 1;
+
+  perform pg_temp.switch_user(current_setting('test.user_admin_a')::uuid);
+  set local role authenticated;
+
+  -- Cross-family insert: bloqueado.
+  begin
+    insert into public.child_profiles (family_group_id, name, created_by)
+    values (
+      current_setting('test.family_b')::uuid,
+      'Cross-family attempt',
+      current_setting('test.user_admin_a')::uuid
+    );
+  exception
+    when insufficient_privilege or check_violation then
+      v_blocked_insert := true;
+  end;
+
+  -- Cross-family update: USING devuelve false → 0 rows affected, no error.
+  update public.child_profiles
+  set name = 'Hijacked'
+  where id = v_child_b_id;
+  v_blocked_update := not found;
+
+  reset role;
+
+  if not v_blocked_insert then
+    raise exception 'FAIL test 16a: admin_a no debería insertar child_profiles en family_b';
+  end if;
+  if not v_blocked_update then
+    raise exception 'FAIL test 16b: admin_a no debería actualizar child_profiles de family_b';
+  end if;
+  raise notice 'PASS test 16: admin_a no puede crear ni editar child_profiles cross-family';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- End of tests
 -- ---------------------------------------------------------------------------
 
