@@ -10,7 +10,7 @@ import {
   type FeedingType,
   SLEEP_QUALITY_LABELS,
 } from '@/lib/validators/events';
-import { Baby, Milk, Moon, Plus } from 'lucide-react';
+import { Baby, BookHeart, Milk, Moon, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
@@ -169,7 +169,7 @@ export default async function HomePage() {
         <h2 className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
           Anotar
         </h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <FeedingQuickAdd
             trigger={<button type="button">{quickButtonContent(Milk, 'Tomó')}</button>}
           />
@@ -179,6 +179,9 @@ export default async function HomePage() {
           <DiaperQuickAdd
             trigger={<button type="button">{quickButtonContent(Baby, 'Pañal')}</button>}
           />
+          <Link href="/notas/nuevo" className="contents">
+            {quickButtonContent(BookHeart, 'Momento')}
+          </Link>
         </div>
       </section>
 

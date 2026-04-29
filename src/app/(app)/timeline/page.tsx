@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
@@ -116,11 +117,19 @@ export default async function TimelinePage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-2">
-        <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
-          Timeline
-        </h1>
-        <p className="text-muted-foreground">El día a día de {child.name}.</p>
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-col gap-2">
+            <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
+              Timeline
+            </h1>
+            <p className="text-muted-foreground">El día a día de {child.name}.</p>
+          </div>
+          <Button render={<Link href="/notas/nuevo" />} size="sm">
+            <BookHeart className="size-4" aria-hidden />
+            Anotar momento
+          </Button>
+        </div>
       </header>
 
       <nav aria-label="Filtrar timeline" className="flex flex-wrap gap-2">
