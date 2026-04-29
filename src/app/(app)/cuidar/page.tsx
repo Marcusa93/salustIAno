@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { BookHeart, CalendarClock } from 'lucide-react';
+import { BookHeart, CalendarClock, Ruler } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -30,6 +30,12 @@ const OPTIONS: CuidarOption[] = [
     title: 'Calendario de controles',
     description: 'Pesquisa neonatal, ecografías, vacunas. Lo que viene y lo que ya hicieron.',
     Icon: CalendarClock,
+  },
+  {
+    href: '/cuidar/mediciones',
+    title: 'Mediciones',
+    description: 'Peso, talla, perímetro cefálico. Cómo va creciendo control a control.',
+    Icon: Ruler,
   },
 ];
 
