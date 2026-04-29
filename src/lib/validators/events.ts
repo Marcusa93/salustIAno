@@ -54,6 +54,31 @@ export const sleepSessionSchema = z
 
 export type SleepSessionInput = z.infer<typeof sleepSessionSchema>;
 
+/**
+ * Schema para cerrar un sueño en curso. El UI levanta `started_at` desde el
+ * registro existente para revalidar coherencia (ended > started, < 24h) sin
+ * confiar en el cliente para esa parte.
+ */
+export const closeSleepSchema = z
+  .object({
+    started_at: isoDateTimeString,
+    ended_at: isoDateTimeString,
+    quality: sleepQualityEnum.optional(),
+  })
+  .refine((data) => new Date(data.ended_at).getTime() > new Date(data.started_at).getTime(), {
+    message: 'El final tiene que ser posterior al inicio',
+    path: ['ended_at'],
+  })
+  .refine(
+    (data) => {
+      const diff = new Date(data.ended_at).getTime() - new Date(data.started_at).getTime();
+      return diff < 24 * 60 * 60 * 1000;
+    },
+    { message: 'Más de 24 horas no parece un sueño normal', path: ['ended_at'] },
+  );
+
+export type CloseSleepInput = z.infer<typeof closeSleepSchema>;
+
 // ============================================================================
 // Feeding
 // ============================================================================

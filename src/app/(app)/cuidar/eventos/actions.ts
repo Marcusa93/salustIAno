@@ -2,9 +2,11 @@
 
 import { createClient } from '@/lib/supabase/server';
 import {
+  type CloseSleepInput,
   type DiaperEventInput,
   type FeedingEventInput,
   type SleepSessionInput,
+  closeSleepSchema,
   diaperEventSchema,
   feedingEventSchema,
   sleepSessionSchema,
@@ -80,6 +82,50 @@ export async function createSleepAction(
 
   if (error || !data) {
     return { ok: false, errors: { root: 'No pudimos guardar el sueño.' } };
+  }
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true, id: data.id };
+}
+
+/**
+ * Cierra un sueño en curso (`ended_at IS NULL`). Defensa en profundidad:
+ *   - Validación zod (ended > started, < 24h).
+ *   - WHERE ended_at IS NULL evita reescribir un sueño ya cerrado por otro
+ *     dispositivo entre el render y el submit.
+ *   - RLS sigue gobernando quién puede actualizar.
+ */
+export async function closeSleepAction(
+  id: string,
+  input: CloseSleepInput,
+): Promise<EventResult<CloseSleepInput>> {
+  const parsed = closeSleepSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, errors: flatten<CloseSleepInput>(parsed.error) };
+  }
+
+  const supabase = await createClient();
+
+  const update: { ended_at: string; quality?: SleepSessionInput['quality'] } = {
+    ended_at: parsed.data.ended_at,
+  };
+  if (parsed.data.quality) update.quality = parsed.data.quality;
+
+  const { data, error } = await supabase
+    .from('sleep_sessions')
+    .update(update)
+    .eq('id', id)
+    .is('ended_at', null)
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, errors: { root: 'No pudimos cerrar el sueño.' } };
+  }
+  if (!data) {
+    return { ok: false, errors: { root: 'Ese sueño ya estaba cerrado o no existe.' } };
   }
 
   revalidatePath('/home');

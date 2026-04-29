@@ -1,4 +1,9 @@
-import { diaperEventSchema, feedingEventSchema, sleepSessionSchema } from '@/lib/validators/events';
+import {
+  closeSleepSchema,
+  diaperEventSchema,
+  feedingEventSchema,
+  sleepSessionSchema,
+} from '@/lib/validators/events';
 import { describe, expect, it } from 'vitest';
 
 describe('sleepSessionSchema', () => {
@@ -41,6 +46,53 @@ describe('sleepSessionSchema', () => {
       expect(r.data.quality).toBe('unknown');
       expect(r.data.is_nap).toBe(false);
     }
+  });
+});
+
+describe('closeSleepSchema', () => {
+  const base = {
+    started_at: '2026-05-01T10:00',
+    ended_at: '2026-05-01T11:30',
+  };
+
+  it('acepta un cierre con start + end válidos', () => {
+    expect(closeSleepSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('acepta quality opcional', () => {
+    expect(closeSleepSchema.safeParse({ ...base, quality: 'good' }).success).toBe(true);
+    expect(closeSleepSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('exige ended_at', () => {
+    expect(closeSleepSchema.safeParse({ started_at: base.started_at }).success).toBe(false);
+  });
+
+  it('rechaza ended_at anterior a started_at', () => {
+    expect(
+      closeSleepSchema.safeParse({
+        started_at: '2026-05-01T11:00',
+        ended_at: '2026-05-01T10:00',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rechaza cierre > 24 horas', () => {
+    expect(
+      closeSleepSchema.safeParse({
+        started_at: '2026-05-01T10:00',
+        ended_at: '2026-05-03T10:00',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rechaza quality inválida', () => {
+    expect(
+      closeSleepSchema.safeParse({
+        ...base,
+        quality: 'inventada' as never,
+      }).success,
+    ).toBe(false);
   });
 });
 

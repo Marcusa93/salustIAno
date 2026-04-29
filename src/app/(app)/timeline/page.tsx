@@ -10,9 +10,10 @@ import {
   type FeedingType,
   SLEEP_QUALITY_LABELS,
 } from '@/lib/validators/events';
-import { Baby, BookHeart, Milk, Moon } from 'lucide-react';
+import { Baby, BookHeart, Milk, Moon, Sun } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { CloseSleepSheet } from '../home/_components/close-sleep-sheet';
 
 export const metadata: Metadata = {
   title: 'Timeline',
@@ -190,18 +191,39 @@ export default async function TimelinePage({ searchParams }: PageProps) {
 
 function TimelineEntry({ row }: { row: TimelineRow }) {
   const { Icon, title, detail } = describeEvent(row);
+  const isOpenSleep =
+    row.event_type === 'sleep' &&
+    typeof row.payload.started_at === 'string' &&
+    !row.payload.ended_at;
   return (
     <Card className="flex items-start gap-3 p-3">
       <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
         <Icon className="size-4" aria-hidden />
       </div>
-      <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="font-medium text-foreground text-sm">{title}</span>
         {detail && <span className="text-muted-foreground text-xs">{detail}</span>}
+        {isOpenSleep && (
+          <span className="font-medium text-primary text-xs">Sin cerrar — sigue durmiendo.</span>
+        )}
       </div>
-      <span className="ml-auto whitespace-nowrap text-muted-foreground text-xs">
-        {formatDateTime(row.occurred_at)}
-      </span>
+      <div className="ml-auto flex flex-col items-end gap-1.5">
+        <span className="whitespace-nowrap text-muted-foreground text-xs">
+          {formatDateTime(row.occurred_at)}
+        </span>
+        {isOpenSleep && (
+          <CloseSleepSheet
+            sessionId={row.id}
+            startedAt={row.payload.started_at as string}
+            trigger={
+              <Button type="button" size="xs" variant="outline">
+                <Sun className="size-3" aria-hidden />
+                Se despertó
+              </Button>
+            }
+          />
+        )}
+      </div>
     </Card>
   );
 }

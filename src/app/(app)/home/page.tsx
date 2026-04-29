@@ -10,9 +10,10 @@ import {
   type FeedingType,
   SLEEP_QUALITY_LABELS,
 } from '@/lib/validators/events';
-import { Baby, BookHeart, Milk, Moon, Plus, Sparkles } from 'lucide-react';
+import { Baby, BookHeart, Milk, Moon, Plus, Sparkles, Sun } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { CloseSleepSheet } from './_components/close-sleep-sheet';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
 import { SleepQuickAdd } from './_components/sleep-quick-add';
@@ -124,24 +125,39 @@ export default async function HomePage() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const [{ data: recentEvents }, { data: todayEvents }] = await Promise.all([
-    supabase.rpc('get_timeline', {
-      p_child_id: child.id,
-      p_event_types: ['feeding', 'sleep', 'diaper'],
-      p_limit: 8,
-      p_offset: 0,
-    }),
-    supabase.rpc('get_timeline', {
-      p_child_id: child.id,
-      p_event_types: ['feeding', 'sleep', 'diaper'],
-      p_from: todayStart.toISOString(),
-      p_limit: 200,
-      p_offset: 0,
-    }),
-  ]);
+  const [{ data: recentEvents }, { data: todayEvents }, { data: activeSleeps }] = await Promise.all(
+    [
+      supabase.rpc('get_timeline', {
+        p_child_id: child.id,
+        p_event_types: ['feeding', 'sleep', 'diaper'],
+        p_limit: 8,
+        p_offset: 0,
+      }),
+      supabase.rpc('get_timeline', {
+        p_child_id: child.id,
+        p_event_types: ['feeding', 'sleep', 'diaper'],
+        p_from: todayStart.toISOString(),
+        p_limit: 200,
+        p_offset: 0,
+      }),
+      supabase
+        .from('sleep_sessions')
+        .select('id, started_at, is_nap')
+        .eq('child_id', child.id)
+        .is('ended_at', null)
+        .is('deleted_at', null)
+        .order('started_at', { ascending: false })
+        .limit(1),
+    ],
+  );
 
   const recents = (recentEvents ?? []) as TimelineRow[];
   const today = (todayEvents ?? []) as TimelineRow[];
+  const activeSleep = (activeSleeps?.[0] ?? null) as {
+    id: string;
+    started_at: string;
+    is_nap: boolean;
+  } | null;
 
   const todaySummary = {
     feeding: today.filter((e) => e.event_type === 'feeding').length,
@@ -181,6 +197,33 @@ export default async function HomePage() {
           </div>
         </Card>
       </Link>
+
+      {/* Está durmiendo */}
+      {activeSleep && (
+        <Card className="flex items-center gap-4 border-primary/30 bg-primary/5 p-4">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Moon className="size-5" aria-hidden />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="font-medium text-foreground">
+              {activeSleep.is_nap ? 'Está en la siesta' : 'Está durmiendo'}
+            </span>
+            <span className="text-muted-foreground text-xs">
+              Desde {formatRelativeTime(activeSleep.started_at).toLowerCase()}.
+            </span>
+          </div>
+          <CloseSleepSheet
+            sessionId={activeSleep.id}
+            startedAt={activeSleep.started_at}
+            trigger={
+              <Button type="button" size="sm" variant="outline">
+                <Sun className="size-4" aria-hidden />
+                Se despertó
+              </Button>
+            }
+          />
+        </Card>
+      )}
 
       {/* Quick add */}
       <section className="flex flex-col gap-3">
