@@ -23,3 +23,12 @@ export {
 
 export { chat as salustiaChat } from './salustia';
 export type { SalustiaInput, SalustiaOutput } from './salustia';
+
+export { analyzeDiaperPhoto } from './diaper-vision';
+export {
+  diaperAnalysisSchema,
+  KNOWN_COLORS,
+  KNOWN_CONSISTENCIES,
+  type DiaperAnalysis,
+} from './diaper-vision/schema';
+export type { DiaperVisionInput, DiaperVisionOutput } from './diaper-vision';

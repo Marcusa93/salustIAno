@@ -22,10 +22,37 @@ export interface ToolCall {
   };
 }
 
+/**
+ * Parte de un mensaje multimodal. Sigue la convención OpenAI/OpenRouter:
+ * el campo `content` puede ser un string simple o un array de partes
+ * cuando hay imágenes intercaladas con texto.
+ */
+export interface TextContentPart {
+  type: 'text';
+  text: string;
+}
+
+export interface ImageContentPart {
+  type: 'image_url';
+  image_url: {
+    /** URL https://... o data URL (`data:image/jpeg;base64,...`). */
+    url: string;
+    /** 'auto' por default. 'low' baja tokens, 'high' aumenta detalle. */
+    detail?: 'auto' | 'low' | 'high';
+  };
+}
+
+export type ContentPart = TextContentPart | ImageContentPart;
+
 export interface ChatMessage {
   role: ChatRole;
-  /** Puede ser null cuando el assistant solo está invocando tools. */
-  content: string | null;
+  /**
+   * Puede ser:
+   *   - string: caso normal (texto plano).
+   *   - ContentPart[]: caso multimodal (texto + imágenes).
+   *   - null: cuando el assistant solo está invocando tools.
+   */
+  content: string | ContentPart[] | null;
   /** Solo presente en messages con role = 'assistant'. */
   tool_calls?: ToolCall[];
   /** Solo presente en messages con role = 'tool', linkea a una `ToolCall.id`. */
