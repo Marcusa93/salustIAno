@@ -189,15 +189,21 @@ export async function createDiaperAction(
   const ctx = await getActorContext();
   if ('error' in ctx) return { ok: false, errors: { root: ctx.error } };
 
+  // Cast: photo_analysis se agregó en la migration 20260430120000.
+  // Hasta que se regeneren los Supabase types con el nuevo column, TS no
+  // sabe que existe. El runtime ya lo acepta en cuanto la migration corre.
+  const insertPayload = {
+    child_id: ctx.childId,
+    occurred_at: parsed.data.occurred_at,
+    type: parsed.data.type,
+    notes: emptyToNull(parsed.data.notes),
+    photo_analysis: parsed.data.photo_analysis ?? null,
+    created_by: ctx.userId,
+  };
   const { data, error } = await ctx.supabase
     .from('diaper_events')
-    .insert({
-      child_id: ctx.childId,
-      occurred_at: parsed.data.occurred_at,
-      type: parsed.data.type,
-      notes: emptyToNull(parsed.data.notes),
-      created_by: ctx.userId,
-    })
+    // biome-ignore lint/suspicious/noExplicitAny: ver comentario sobre types stale arriba.
+    .insert(insertPayload as any)
     .select('id')
     .single();
 

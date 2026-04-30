@@ -10,7 +10,7 @@ import {
   type FeedingType,
   SLEEP_QUALITY_LABELS,
 } from '@/lib/validators/events';
-import { Baby, BookHeart, Milk, Moon, Sun } from 'lucide-react';
+import { AlertTriangle, Baby, BookHeart, Camera, Milk, Moon, Sun } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { CloseSleepSheet } from '../home/_components/close-sleep-sheet';
@@ -195,14 +195,39 @@ function TimelineEntry({ row }: { row: TimelineRow }) {
     row.event_type === 'sleep' &&
     typeof row.payload.started_at === 'string' &&
     !row.payload.ended_at;
+  const photoAnalysis =
+    row.event_type === 'diaper' && row.payload.photo_analysis
+      ? (row.payload.photo_analysis as { alarm?: boolean; alarm_reason?: string })
+      : null;
   return (
-    <Card className="flex items-start gap-3 p-3">
+    <Card
+      className={cn(
+        'flex items-start gap-3 p-3',
+        photoAnalysis?.alarm && 'border-destructive/40 bg-destructive/5',
+      )}
+    >
       <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
         <Icon className="size-4" aria-hidden />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="font-medium text-foreground text-sm">{title}</span>
+        <span className="flex items-center gap-1.5 font-medium text-foreground text-sm">
+          {title}
+          {photoAnalysis?.alarm ? (
+            <AlertTriangle
+              className="size-3.5 text-destructive"
+              aria-label="Conviene mostrar al pediatra"
+            />
+          ) : photoAnalysis ? (
+            <Camera
+              className="size-3.5 text-muted-foreground"
+              aria-label="Tiene análisis de foto"
+            />
+          ) : null}
+        </span>
         {detail && <span className="text-muted-foreground text-xs">{detail}</span>}
+        {photoAnalysis?.alarm && photoAnalysis.alarm_reason && (
+          <span className="font-medium text-destructive text-xs">{photoAnalysis.alarm_reason}</span>
+        )}
         {isOpenSleep && (
           <span className="font-medium text-primary text-xs">Sin cerrar — sigue durmiendo.</span>
         )}

@@ -199,10 +199,31 @@ export const DIAPER_TYPE_LABELS: Record<DiaperType, string> = {
   dry: 'Seco',
 };
 
+/**
+ * Shape del análisis estructurado del agente diaper-vision. Lo replicamos
+ * acá (en vez de importar el schema del agente) para mantener los
+ * validators libres de imports server-side.
+ */
+export const diaperPhotoAnalysisSchema = z.object({
+  color: z.string().min(1).max(40),
+  consistency: z.string().min(1).max(40),
+  observations: z.string().min(1).max(800),
+  alarm: z.boolean(),
+  alarm_reason: z.string().max(300),
+  recommendation: z.string().min(1).max(300),
+});
+
+export type DiaperPhotoAnalysis = z.infer<typeof diaperPhotoAnalysisSchema>;
+
 export const diaperEventSchema = z.object({
   occurred_at: isoDateTimeString,
   type: diaperTypeEnum,
   notes: z.string().max(2000).optional().or(z.literal('')),
+  /**
+   * Análisis estructurado del agente diaper-vision si la familia adjuntó
+   * foto. NULL/undefined si fue carga manual.
+   */
+  photo_analysis: diaperPhotoAnalysisSchema.nullish(),
 });
 
 export type DiaperEventInput = z.infer<typeof diaperEventSchema>;

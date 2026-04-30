@@ -1,7 +1,10 @@
 'use client';
 
 import { createDiaperAction } from '@/app/(app)/cuidar/eventos/actions';
-import { DiaperPhotoAnalyzer } from '@/app/(app)/cuidar/panal-foto/_components/diaper-photo-analyzer';
+import {
+  DiaperPhotoAnalyzer,
+  analysisToNoteText,
+} from '@/app/(app)/cuidar/panal-foto/_components/diaper-photo-analyzer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +24,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import type { DiaperAnalysis } from '@/lib/ai/agents';
 import {
   DIAPER_TYPE_LABELS,
   type DiaperEventInput,
@@ -51,6 +55,7 @@ interface DiaperQuickAddProps {
 export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
   const [open, setOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [analysis, setAnalysis] = useState<DiaperAnalysis | null>(null);
 
   const {
     register,
@@ -72,6 +77,7 @@ export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
     const result = await createDiaperAction({
       ...values,
       occurred_at: new Date(values.occurred_at).toISOString(),
+      photo_analysis: analysis ?? undefined,
     });
     if (!result.ok) {
       toast.error(result.errors.root ?? 'No pudimos guardar el pañal.');
@@ -79,6 +85,7 @@ export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
     }
     toast.success('Pañal anotado.');
     reset({ occurred_at: nowLocalISO(), type: 'wet', notes: '' });
+    setAnalysis(null);
     setPhotoOpen(false);
     setOpen(false);
   }
@@ -165,9 +172,13 @@ export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
               >
                 <DiaperPhotoAnalyzer
                   compact
-                  onUseAsNote={(text) =>
-                    setValue('notes', text, { shouldDirty: true, shouldValidate: true })
-                  }
+                  onUseAnalysis={(a) => {
+                    setAnalysis(a);
+                    setValue('notes', analysisToNoteText(a), {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }}
                 />
               </div>
             )}

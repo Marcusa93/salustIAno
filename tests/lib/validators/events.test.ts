@@ -216,4 +216,47 @@ describe('diaperEventSchema', () => {
   it('rechaza occurred_at vacío', () => {
     expect(diaperEventSchema.safeParse({ occurred_at: '', type: 'wet' }).success).toBe(false);
   });
+
+  it('acepta photo_analysis bien formado', () => {
+    expect(
+      diaperEventSchema.safeParse({
+        occurred_at: '2026-05-01T10:00',
+        type: 'dirty',
+        photo_analysis: {
+          color: 'amarillo mostaza',
+          consistency: 'pastosa',
+          observations: 'Se ve normal.',
+          alarm: false,
+          alarm_reason: '',
+          recommendation: 'Sin acciones especiales.',
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('acepta photo_analysis null/ausente', () => {
+    expect(
+      diaperEventSchema.safeParse({
+        occurred_at: '2026-05-01T10:00',
+        type: 'wet',
+        photo_analysis: null,
+      }).success,
+    ).toBe(true);
+    expect(
+      diaperEventSchema.safeParse({
+        occurred_at: '2026-05-01T10:00',
+        type: 'wet',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rechaza photo_analysis con campos faltantes', () => {
+    expect(
+      diaperEventSchema.safeParse({
+        occurred_at: '2026-05-01T10:00',
+        type: 'wet',
+        photo_analysis: { color: 'verde' },
+      }).success,
+    ).toBe(false);
+  });
 });

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
+import { cn } from '@/lib/utils';
 import { chronologicalAgeDays } from '@/lib/validators/child-profile';
 import {
   BREAST_SIDE_LABELS,
@@ -10,7 +11,17 @@ import {
   type FeedingType,
   SLEEP_QUALITY_LABELS,
 } from '@/lib/validators/events';
-import { Baby, BookHeart, Milk, Moon, Plus, Sparkles, Sun } from 'lucide-react';
+import {
+  AlertTriangle,
+  Baby,
+  BookHeart,
+  Camera,
+  Milk,
+  Moon,
+  Plus,
+  Sparkles,
+  Sun,
+} from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { CloseSleepSheet } from './_components/close-sleep-sheet';
@@ -304,13 +315,35 @@ function SummaryCard({
 
 function EventRow({ row }: { row: TimelineRow }) {
   const summary = describeEvent(row);
+  const photoAnalysis =
+    row.event_type === 'diaper' && row.payload.photo_analysis
+      ? (row.payload.photo_analysis as { alarm?: boolean })
+      : null;
   return (
-    <Card className="flex items-center gap-3 p-3">
+    <Card
+      className={cn(
+        'flex items-center gap-3 p-3',
+        photoAnalysis?.alarm && 'border-destructive/40 bg-destructive/5',
+      )}
+    >
       <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
         {summary.Icon ? <summary.Icon className="size-4" aria-hidden /> : null}
       </div>
       <div className="flex flex-col gap-0.5">
-        <span className="font-medium text-foreground text-sm">{summary.title}</span>
+        <span className="flex items-center gap-1.5 font-medium text-foreground text-sm">
+          {summary.title}
+          {photoAnalysis?.alarm ? (
+            <AlertTriangle
+              className="size-3.5 text-destructive"
+              aria-label="Conviene mostrar al pediatra"
+            />
+          ) : photoAnalysis ? (
+            <Camera
+              className="size-3.5 text-muted-foreground"
+              aria-label="Tiene análisis de foto"
+            />
+          ) : null}
+        </span>
         {summary.detail && <span className="text-muted-foreground text-xs">{summary.detail}</span>}
       </div>
       <span className="ml-auto text-muted-foreground text-xs">

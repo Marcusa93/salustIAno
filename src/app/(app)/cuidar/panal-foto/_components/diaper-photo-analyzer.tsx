@@ -32,9 +32,11 @@ export function analysisToNoteText(a: DiaperAnalysis): string {
 interface DiaperPhotoAnalyzerProps {
   /**
    * Si se pasa, aparece el botón "Usar esta descripción en las notas"
-   * cuando hay un análisis. Recibe el texto resumido.
+   * cuando hay un análisis. Recibe el análisis estructurado completo —
+   * el caller decide qué hacer (típicamente: pegar texto en notes +
+   * guardar el JSON en photo_analysis del evento).
    */
-  onUseAsNote?: (text: string) => void;
+  onUseAnalysis?: (analysis: DiaperAnalysis) => void;
   /**
    * Variante compacta (sin textarea de contexto, preview más chica).
    * Pensada para uso dentro de Sheets/modales.
@@ -42,7 +44,7 @@ interface DiaperPhotoAnalyzerProps {
   compact?: boolean;
 }
 
-export function DiaperPhotoAnalyzer({ onUseAsNote, compact = false }: DiaperPhotoAnalyzerProps) {
+export function DiaperPhotoAnalyzer({ onUseAnalysis, compact = false }: DiaperPhotoAnalyzerProps) {
   const photoId = useId();
   const notesId = useId();
   const [file, setFile] = useState<File | null>(null);
@@ -162,17 +164,17 @@ export function DiaperPhotoAnalyzer({ onUseAsNote, compact = false }: DiaperPhot
         )}
       </Button>
 
-      {analysis && <AnalysisCard analysis={analysis} onUseAsNote={onUseAsNote} />}
+      {analysis && <AnalysisCard analysis={analysis} onUseAnalysis={onUseAnalysis} />}
     </div>
   );
 }
 
 function AnalysisCard({
   analysis,
-  onUseAsNote,
+  onUseAnalysis,
 }: {
   analysis: DiaperAnalysis;
-  onUseAsNote?: (text: string) => void;
+  onUseAnalysis?: (analysis: DiaperAnalysis) => void;
 }) {
   return (
     <Card
@@ -220,18 +222,18 @@ function AnalysisCard({
         <p className="text-foreground text-sm leading-relaxed">{analysis.recommendation}</p>
       </div>
 
-      {onUseAsNote && (
+      {onUseAnalysis && (
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => {
-            onUseAsNote(analysisToNoteText(analysis));
-            toast.success('Pegamos la descripción en las notas.');
+            onUseAnalysis(analysis);
+            toast.success('Análisis enganchado al evento.');
           }}
         >
           <ClipboardCheck className="size-4" aria-hidden />
-          Usar esta descripción en las notas
+          Usar este análisis en el pañal
         </Button>
       )}
 
