@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { Camera, ShieldCheck } from 'lucide-react';
 import type { Metadata } from 'next';
-import { DiaperPhotoForm } from './_components/diaper-photo-form';
+import { DiaperPhotoAnalyzer } from './_components/diaper-photo-analyzer';
 
 export const metadata: Metadata = {
   title: 'Pañal con foto',
@@ -34,7 +34,7 @@ export default function PanalFotoPage() {
         </div>
       </Card>
 
-      <DiaperPhotoForm />
+      <DiaperPhotoAnalyzer />
     </div>
   );
 }

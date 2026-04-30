@@ -1,6 +1,7 @@
 'use client';
 
 import { createDiaperAction } from '@/app/(app)/cuidar/eventos/actions';
+import { DiaperPhotoAnalyzer } from '@/app/(app)/cuidar/panal-foto/_components/diaper-photo-analyzer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,7 +28,7 @@ import {
   diaperTypeEnum,
 } from '@/lib/validators/events';
 import { zodResolver } from '@/lib/zod-compat';
-import { Baby, Loader2 } from 'lucide-react';
+import { Baby, Camera, ChevronDown, Loader2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -49,12 +50,14 @@ interface DiaperQuickAddProps {
 
 export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
   const [open, setOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   const {
     register,
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<DiaperEventInput>({
     resolver: zodResolver(diaperEventSchema),
@@ -76,6 +79,7 @@ export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
     }
     toast.success('Pañal anotado.');
     reset({ occurred_at: nowLocalISO(), type: 'wet', notes: '' });
+    setPhotoOpen(false);
     setOpen(false);
   }
 
@@ -135,6 +139,38 @@ export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
               placeholder="Color, consistencia, lo que quieras"
               {...register('notes')}
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setPhotoOpen((v) => !v)}
+              className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50"
+              aria-expanded={photoOpen}
+              aria-controls="d-photo-section"
+            >
+              <span className="inline-flex items-center gap-2 font-medium text-foreground">
+                <Camera className="size-4 text-primary" aria-hidden />
+                Sumar foto (opcional)
+              </span>
+              <ChevronDown
+                className={`size-4 text-muted-foreground transition-transform ${photoOpen ? 'rotate-180' : ''}`}
+                aria-hidden
+              />
+            </button>
+            {photoOpen && (
+              <div
+                id="d-photo-section"
+                className="rounded-lg border border-border/60 bg-muted/20 p-3"
+              >
+                <DiaperPhotoAnalyzer
+                  compact
+                  onUseAsNote={(text) =>
+                    setValue('notes', text, { shouldDirty: true, shouldValidate: true })
+                  }
+                />
+              </div>
+            )}
           </div>
 
           <Button type="submit" disabled={isSubmitting}>

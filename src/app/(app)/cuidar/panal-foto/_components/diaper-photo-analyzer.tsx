@@ -6,30 +6,52 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { DiaperAnalysis } from '@/lib/ai/agents';
-import { AlertTriangle, Camera, Loader2, X } from 'lucide-react';
-import {
-  type ChangeEvent,
-  type FormEvent,
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-} from 'react';
+import { cn } from '@/lib/utils';
+import { AlertTriangle, Camera, ClipboardCheck, Loader2, X } from 'lucide-react';
+import { type ChangeEvent, useEffect, useId, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { analyzeDiaperPhotoAction } from '../actions';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 
-export function DiaperPhotoForm() {
+/**
+ * Convierte un análisis estructurado en texto plano listo para pegar en
+ * el campo `notes` de un `diaper_event`. Comprime color + consistencia +
+ * observaciones, y agrega la alarma si aplica.
+ */
+export function analysisToNoteText(a: DiaperAnalysis): string {
+  const colorCap = a.color.length > 0 ? a.color[0]?.toUpperCase() + a.color.slice(1) : a.color;
+  const main = `${colorCap}, ${a.consistency}. ${a.observations}`.trim();
+  if (a.alarm && a.alarm_reason) {
+    return `${main} (Atención: ${a.alarm_reason})`;
+  }
+  return main;
+}
+
+interface DiaperPhotoAnalyzerProps {
+  /**
+   * Si se pasa, aparece el botón "Usar esta descripción en las notas"
+   * cuando hay un análisis. Recibe el texto resumido.
+   */
+  onUseAsNote?: (text: string) => void;
+  /**
+   * Variante compacta (sin textarea de contexto, preview más chica).
+   * Pensada para uso dentro de Sheets/modales.
+   */
+  compact?: boolean;
+}
+
+export function DiaperPhotoAnalyzer({ onUseAsNote, compact = false }: DiaperPhotoAnalyzerProps) {
+  const photoId = useId();
+  const notesId = useId();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [notes, setNotes] = useState('');
+  const [contextNotes, setContextNotes] = useState('');
   const [analysis, setAnalysis] = useState<DiaperAnalysis | null>(null);
   const [pending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Limpia el objectURL cuando el preview cambia o el componente se desmonta.
   useEffect(() => {
     if (!preview) return;
     return () => URL.revokeObjectURL(preview);
@@ -59,15 +81,14 @@ export function DiaperPhotoForm() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function runAnalysis() {
     if (!file) {
       toast.error('Adjuntá una foto antes de analizar.');
       return;
     }
     const fd = new FormData();
     fd.append('photo', file);
-    if (notes.trim().length > 0) fd.append('notes', notes.trim());
+    if (contextNotes.trim().length > 0) fd.append('notes', contextNotes.trim());
 
     startTransition(async () => {
       const result = await analyzeDiaperPhotoAction(fd);
@@ -80,80 +101,85 @@ export function DiaperPhotoForm() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="photo">Foto del pañal</Label>
-          <Input
-            ref={fileInputRef}
-            id="photo"
-            type="file"
-            accept={ACCEPT}
-            onChange={handleFileChange}
-            disabled={pending}
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={photoId}>Foto del pañal</Label>
+        <Input
+          ref={fileInputRef}
+          id={photoId}
+          type="file"
+          accept={ACCEPT}
+          onChange={handleFileChange}
+          disabled={pending}
+        />
+        <p className="text-muted-foreground text-xs">JPG, PNG o WEBP. Hasta 5 MB.</p>
+      </div>
+
+      {preview && (
+        <Card className="relative overflow-hidden p-2">
+          <button
+            type="button"
+            onClick={clearFile}
+            className="absolute top-3 right-3 z-10 inline-flex size-7 items-center justify-center rounded-full bg-background/80 text-foreground shadow hover:bg-background"
+            aria-label="Quitar foto"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+          <img
+            src={preview}
+            alt="Vista previa del pañal"
+            className={cn('w-full rounded-md object-contain', compact ? 'max-h-44' : 'max-h-80')}
           />
-          <p className="text-muted-foreground text-xs">JPG, PNG o WEBP. Hasta 5 MB.</p>
-        </div>
+        </Card>
+      )}
 
-        {preview && (
-          <Card className="relative overflow-hidden p-2">
-            <button
-              type="button"
-              onClick={clearFile}
-              className="absolute top-3 right-3 z-10 inline-flex size-7 items-center justify-center rounded-full bg-background/80 text-foreground shadow hover:bg-background"
-              aria-label="Quitar foto"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-            <img
-              src={preview}
-              alt="Vista previa del pañal"
-              className="max-h-80 w-full rounded-md object-contain"
-            />
-          </Card>
-        )}
-
+      {!compact && (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="notes">Contexto (opcional)</Label>
+          <Label htmlFor={notesId}>Contexto (opcional)</Label>
           <Textarea
-            id="notes"
+            id={notesId}
             rows={2}
             placeholder="Lo que quieras agregar: edad, si cambió la dieta, si vino con olor distinto…"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            value={contextNotes}
+            onChange={(e) => setContextNotes(e.target.value)}
             disabled={pending}
             maxLength={500}
           />
         </div>
+      )}
 
-        <Button type="submit" disabled={!file || pending}>
-          {pending ? (
-            <>
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-              Analizando…
-            </>
-          ) : (
-            <>
-              <Camera className="size-4" aria-hidden />
-              Analizar
-            </>
-          )}
-        </Button>
-      </form>
+      <Button type="button" onClick={runAnalysis} disabled={!file || pending}>
+        {pending ? (
+          <>
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Analizando…
+          </>
+        ) : (
+          <>
+            <Camera className="size-4" aria-hidden />
+            Analizar
+          </>
+        )}
+      </Button>
 
-      {analysis && <AnalysisCard analysis={analysis} />}
+      {analysis && <AnalysisCard analysis={analysis} onUseAsNote={onUseAsNote} />}
     </div>
   );
 }
 
-function AnalysisCard({ analysis }: { analysis: DiaperAnalysis }) {
+function AnalysisCard({
+  analysis,
+  onUseAsNote,
+}: {
+  analysis: DiaperAnalysis;
+  onUseAsNote?: (text: string) => void;
+}) {
   return (
     <Card
-      className={
-        analysis.alarm
-          ? 'flex flex-col gap-4 border-destructive/40 bg-destructive/5 p-5'
-          : 'flex flex-col gap-4 p-5'
-      }
+      className={cn(
+        'flex flex-col gap-4 p-5',
+        analysis.alarm && 'border-destructive/40 bg-destructive/5',
+      )}
     >
       {analysis.alarm && (
         <div className="flex items-start gap-2 text-destructive">
@@ -193,6 +219,21 @@ function AnalysisCard({ analysis }: { analysis: DiaperAnalysis }) {
         </span>
         <p className="text-foreground text-sm leading-relaxed">{analysis.recommendation}</p>
       </div>
+
+      {onUseAsNote && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            onUseAsNote(analysisToNoteText(analysis));
+            toast.success('Pegamos la descripción en las notas.');
+          }}
+        >
+          <ClipboardCheck className="size-4" aria-hidden />
+          Usar esta descripción en las notas
+        </Button>
+      )}
 
       <p className="text-muted-foreground text-xs italic leading-relaxed">
         Esto es solo una descripción de lo que se ve en la foto. No es un diagnóstico ni reemplaza
