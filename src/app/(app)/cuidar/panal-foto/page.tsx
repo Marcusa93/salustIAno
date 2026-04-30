@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { DiaperPhotoAnalyzer } from './_components/diaper-photo-analyzer';
 
 export const metadata: Metadata = {
-  title: 'Pañal con foto',
+  title: 'Aquitapp',
 };
 
 export default function PanalFotoPage() {
@@ -15,7 +15,7 @@ export default function PanalFotoPage() {
           <Camera className="size-6" aria-hidden />
         </div>
         <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
-          Mirá esto
+          Aquitapp
         </h1>
         <p className="text-muted-foreground">
           Subí una foto del pañal y SalustIA te describe qué ve: color, consistencia, lo que llama

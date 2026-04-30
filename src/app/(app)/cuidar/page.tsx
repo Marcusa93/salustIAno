@@ -39,7 +39,7 @@ const OPTIONS: CuidarOption[] = [
   },
   {
     href: '/cuidar/panal-foto',
-    title: 'Mirá esto',
+    title: 'Aquitapp',
     description: 'Foto del pañal y SalustIA te dice color, consistencia y si conviene mostrarlo.',
     Icon: Camera,
     badge: 'Beta',
