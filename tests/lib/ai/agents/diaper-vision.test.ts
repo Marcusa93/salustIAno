@@ -106,7 +106,7 @@ describe('analyzeDiaperPhoto', () => {
     expect(result.analysis.color).toBe('amarillo mostaza');
     expect(result.analysis.alarm).toBe(false);
     expect(result.meta.totalTokens).toBe(300);
-    expect(result.meta.promptVersion).toBe('diaper-vision-v1');
+    expect(result.meta.promptVersion).toBe('diaper-vision-v2');
   });
 
   it('arma el mensaje user como ContentPart[] con imagen + texto', async () => {
@@ -120,6 +120,32 @@ describe('analyzeDiaperPhoto', () => {
     const parts = userMsg?.content as Array<{ type: string }>;
     expect(parts.some((p) => p.type === 'text')).toBe(true);
     expect(parts.some((p) => p.type === 'image_url')).toBe(true);
+  });
+
+  it('parsea JSON aunque venga envuelto en fences markdown', async () => {
+    callLLMMock.mockResolvedValueOnce({
+      content: `\`\`\`json\n${JSON.stringify(validAnalysis)}\n\`\`\``,
+      toolCalls: [],
+      finishReason: 'stop',
+      model: 'anthropic/claude-haiku-4-5',
+      usage: { promptTokens: 200, completionTokens: 100, totalTokens: 300 },
+      latencyMs: 800,
+    });
+    const result = await analyzeDiaperPhoto({ imageDataUrl: dataUrl });
+    expect(result.analysis.color).toBe('amarillo mostaza');
+  });
+
+  it('parsea JSON aunque haya preludio en prosa', async () => {
+    callLLMMock.mockResolvedValueOnce({
+      content: `Acá va el análisis:\n${JSON.stringify(validAnalysis)}\n— espero que ayude`,
+      toolCalls: [],
+      finishReason: 'stop',
+      model: 'anthropic/claude-haiku-4-5',
+      usage: { promptTokens: 200, completionTokens: 100, totalTokens: 300 },
+      latencyMs: 800,
+    });
+    const result = await analyzeDiaperPhoto({ imageDataUrl: dataUrl });
+    expect(result.analysis.consistency).toBe('pastosa');
   });
 
   it('lanza AIParseError si el LLM devuelve JSON malformado', async () => {

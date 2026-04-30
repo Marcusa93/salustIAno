@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import { callLLM } from '@/lib/ai/client';
 import { AIParseError } from '@/lib/ai/errors';
+import { extractJsonObject, truncateForLog } from '@/lib/ai/json';
 import { logStore } from '@/lib/ai/logger';
 import type { ChatMessage, ContentPart } from '@/lib/ai/types';
 import { type DiaperAnalysis, diaperAnalysisSchema } from './schema';
@@ -14,7 +15,7 @@ export type { DiaperAnalysis } from './schema';
 
 const AGENT_NAME = 'diaper-vision';
 const MODEL = 'anthropic/claude-haiku-4-5';
-const PROMPT_VERSION = 'diaper-vision-v1';
+const PROMPT_VERSION = 'diaper-vision-v2';
 
 const SYSTEM_PROMPT = readFileSync(
   join(process.cwd(), 'src/lib/ai/agents/diaper-vision/prompt.md'),
@@ -109,11 +110,13 @@ export async function analyzeDiaperPhoto(
     throw err;
   }
 
-  let parsed: DiaperAnalysis;
-  try {
-    const json = JSON.parse(response.content || '{}');
-    parsed = diaperAnalysisSchema.parse(json);
-  } catch (err) {
+  const json = extractJsonObject(response.content ?? '');
+  const parseResult = json ? diaperAnalysisSchema.safeParse(json) : null;
+  if (!parseResult || !parseResult.success) {
+    const reason = parseResult
+      ? `schema mismatch: ${parseResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+      : 'no se pudo extraer JSON del content';
+    const snippet = truncateForLog(response.content ?? '');
     await logStore.record({
       agent: AGENT_NAME,
       model: response.model,
@@ -121,13 +124,14 @@ export async function analyzeDiaperPhoto(
       promptTokens: response.usage.promptTokens,
       completionTokens: response.usage.completionTokens,
       latencyMs: response.latencyMs,
-      error: err instanceof Error ? err.message : 'parse failed',
+      error: `parse failed (${reason}). raw: ${snippet}`,
       familyGroupId: context.familyGroupId ?? null,
       childId: context.childId ?? null,
       actorUserId: context.actorUserId ?? null,
     });
     throw new AIParseError('No pudimos interpretar la respuesta del análisis.');
   }
+  const parsed = parseResult.data;
 
   await logStore.record({
     agent: AGENT_NAME,
