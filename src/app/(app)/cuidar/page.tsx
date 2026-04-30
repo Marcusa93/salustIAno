@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { BookHeart, CalendarClock, Camera, Ruler } from 'lucide-react';
+import { BookHeart, CalendarClock, Camera, ClipboardCheck, Ruler } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -42,6 +42,14 @@ const OPTIONS: CuidarOption[] = [
     title: 'Mirá esto',
     description: 'Foto del pañal y SalustIA te dice color, consistencia y si conviene mostrarlo.',
     Icon: Camera,
+    badge: 'Beta',
+  },
+  {
+    href: '/cuidar/control',
+    title: 'Borrador para el control',
+    description:
+      'Resumen del último período (tomas, sueños, pañales, dudas) para llevar al pediatra.',
+    Icon: ClipboardCheck,
     badge: 'Beta',
   },
 ];

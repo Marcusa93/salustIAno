@@ -32,3 +32,12 @@ export {
   type DiaperAnalysis,
 } from './diaper-vision/schema';
 export type { DiaperVisionInput, DiaperVisionOutput } from './diaper-vision';
+
+export { generatePediatricPrep } from './pediatric-prep';
+export {
+  pediatricInputSchema,
+  pediatricSummarySchema,
+  type PediatricInput,
+  type PediatricSummary,
+} from './pediatric-prep/schema';
+export type { PediatricPrepOutput } from './pediatric-prep';
