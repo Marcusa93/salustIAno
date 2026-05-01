@@ -7,7 +7,7 @@ import { summarizeProposal } from '@/lib/ai/agents/salustia/proposals';
 import { Baby, BookHeart, Check, Loader2, Milk, Moon, X } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { executeProposalAction } from '../actions';
+import { executeProposalAction, logProposalDeclineAction } from '../actions';
 
 const KIND_META: Record<Proposal['kind'], { Icon: typeof Milk; label: string }> = {
   feeding: { Icon: Milk, label: 'Toma' },
@@ -47,6 +47,8 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
 
   function decline() {
     setState({ kind: 'declined' });
+    // Fire-and-forget: la auditoría de descartes no afecta UX.
+    void logProposalDeclineAction(proposal);
   }
 
   if (state.kind === 'confirmed') {

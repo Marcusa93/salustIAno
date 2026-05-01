@@ -6,12 +6,14 @@ import {
   createSleepAction,
 } from '@/app/(app)/cuidar/eventos/actions';
 import { salustiaChat } from '@/lib/ai/agents';
+import { detectMedicalIntent } from '@/lib/ai/agents/salustia/medical-intent';
 import {
   type Proposal,
   proposalSchema,
   summarizeProposal,
 } from '@/lib/ai/agents/salustia/proposals';
 import { AIConfigError, AIError, AINetworkError, AIProviderError } from '@/lib/ai/errors';
+import { logStore } from '@/lib/ai/logger';
 import type { ChatMessage } from '@/lib/ai/types';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
@@ -87,6 +89,27 @@ export async function sendMessageAction(history: ClientMessage[]): Promise<SendM
 
   const trimmed = history.slice(-MAX_HISTORY);
   const messages: ChatMessage[] = trimmed.map((m) => ({ role: m.role, content: m.content }));
+
+  // Pre-LLM medical intent guardrail. Si matchea, devolvemos canned reply
+  // sin pegar al modelo — y dejamos rastro en ai_logs para auditoría.
+  const lastUser = trimmed.findLast((m) => m.role === 'user');
+  if (lastUser) {
+    const detection = detectMedicalIntent(lastUser.content);
+    if (detection.matched) {
+      await logStore.record({
+        agent: 'salustia-medical-deflect',
+        model: '-',
+        promptVersion: 'medical-intent-v1',
+        error: `pattern matched: ${detection.pattern}`,
+      });
+      return {
+        ok: true,
+        reply: detection.reply,
+        proposals: [],
+        toolCallsMade: [],
+      };
+    }
+  }
 
   try {
     const result = await salustiaChat({ messages });
@@ -166,6 +189,7 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
         },
       };
     }
+    await logProposalConfirm(proposal.kind, result.id);
     return { ok: true, eventId: result.id, summary: summarizeProposal(proposal) };
   }
 
@@ -186,6 +210,7 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
         },
       };
     }
+    await logProposalConfirm(proposal.kind, result.id);
     return { ok: true, eventId: result.id, summary: summarizeProposal(proposal) };
   }
 
@@ -204,6 +229,7 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
         },
       };
     }
+    await logProposalConfirm(proposal.kind, result.id);
     return { ok: true, eventId: result.id, summary: summarizeProposal(proposal) };
   }
 
@@ -250,5 +276,40 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
   }
   revalidatePath('/home');
   revalidatePath('/timeline');
+  await logProposalConfirm(proposal.kind, noteData.id);
   return { ok: true, eventId: noteData.id, summary: summarizeProposal(proposal) };
+}
+
+/**
+ * Audita confirmaciones humanas de propuestas. Útil para distinguir, en
+ * ai_logs, qué accionó el LLM (propose_*) vs qué confirmó la familia.
+ * El campo `error` se reusa como metadata legible — no es realmente un error.
+ */
+async function logProposalConfirm(kind: Proposal['kind'], eventId: string): Promise<void> {
+  await logStore.record({
+    agent: 'salustia-proposal-confirm',
+    model: '-',
+    promptVersion: 'salustia-v2-confirm',
+    error: `kind=${kind} event_id=${eventId}`,
+  });
+}
+
+/**
+ * Auditoría cuando la familia descarta una propuesta del LLM. La UI llama
+ * acá del lado cliente al hacer click en "No". No insertamos nada en la
+ * base; solo dejamos rastro en ai_logs para detectar patrones (ej. el
+ * modelo propone mucho y la familia rechaza casi todo → ajustar prompt).
+ */
+export async function logProposalDeclineAction(
+  rawProposal: unknown,
+): Promise<{ ok: true } | { ok: false }> {
+  const parsed = proposalSchema.safeParse(rawProposal);
+  if (!parsed.success) return { ok: false };
+  await logStore.record({
+    agent: 'salustia-proposal-decline',
+    model: '-',
+    promptVersion: 'salustia-v2-decline',
+    error: `kind=${parsed.data.kind}`,
+  });
+  return { ok: true };
 }
