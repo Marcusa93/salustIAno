@@ -1,4 +1,9 @@
-import { loginSchema, signupSchema } from '@/lib/validators/auth';
+import {
+  loginSchema,
+  requestResetSchema,
+  resetPasswordSchema,
+  signupSchema,
+} from '@/lib/validators/auth';
 import { describe, expect, it } from 'vitest';
 
 describe('loginSchema', () => {
@@ -77,5 +82,69 @@ describe('signupSchema', () => {
       expect(passwordError).toBeTruthy();
       expect(passwordError).toMatch(/8/);
     }
+  });
+});
+
+describe('requestResetSchema', () => {
+  it('acepta email válido', () => {
+    expect(requestResetSchema.safeParse({ email: 'marco@example.com' }).success).toBe(true);
+  });
+
+  it('rechaza email vacío', () => {
+    expect(requestResetSchema.safeParse({ email: '' }).success).toBe(false);
+  });
+
+  it('rechaza email malformado', () => {
+    expect(requestResetSchema.safeParse({ email: 'no-email' }).success).toBe(false);
+  });
+});
+
+describe('resetPasswordSchema', () => {
+  const valid = {
+    password: 'Contraseña123',
+    passwordConfirm: 'Contraseña123',
+  };
+
+  it('acepta password fuerte y confirmación coincidente', () => {
+    expect(resetPasswordSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('rechaza si las contraseñas no coinciden', () => {
+    const result = resetPasswordSchema.safeParse({
+      ...valid,
+      passwordConfirm: 'Otra123',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const err = result.error.flatten().fieldErrors.passwordConfirm?.[0];
+      expect(err).toMatch(/coincid/i);
+    }
+  });
+
+  it('rechaza password sin mayúscula', () => {
+    expect(
+      resetPasswordSchema.safeParse({
+        password: 'contraseña123',
+        passwordConfirm: 'contraseña123',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rechaza password sin número', () => {
+    expect(
+      resetPasswordSchema.safeParse({
+        password: 'Contraseña',
+        passwordConfirm: 'Contraseña',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rechaza password corto', () => {
+    expect(
+      resetPasswordSchema.safeParse({
+        password: 'Cort1',
+        passwordConfirm: 'Cort1',
+      }).success,
+    ).toBe(false);
   });
 });

@@ -76,7 +76,7 @@ export function LoginForm({ next, errorParam, confirmedPending = false }: LoginF
         <div className="flex items-center justify-between">
           <Label htmlFor="login-password">Contraseña</Label>
           <Link
-            href="#"
+            href="/recuperar"
             tabIndex={-1}
             className="text-muted-foreground text-xs underline-offset-4 transition-colors hover:text-foreground"
           >
