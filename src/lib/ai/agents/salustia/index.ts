@@ -8,11 +8,15 @@ import { AIError } from '@/lib/ai/errors';
 import { logStore } from '@/lib/ai/logger';
 import type { ChatMessage } from '@/lib/ai/types';
 import { createClient } from '@/lib/supabase/server';
+import type { Proposal } from './proposals';
 import { TOOL_DEFINITIONS, TOOL_HANDLERS, type ToolContext } from './tools';
+
+export type { Proposal } from './proposals';
+export { proposalSchema, summarizeProposal } from './proposals';
 
 const AGENT_NAME = 'salustia';
 const MODEL = 'anthropic/claude-haiku-4-5';
-const PROMPT_VERSION = 'salustia-v1';
+const PROMPT_VERSION = 'salustia-v2';
 const MAX_ITERATIONS = 5;
 
 const SYSTEM_PROMPT = readFileSync(
@@ -30,6 +34,12 @@ export interface SalustiaInput {
 
 export interface SalustiaOutput {
   reply: string;
+  /**
+   * Lista de propuestas que SalustIA armó durante este turno. La UI las
+   * muestra como cards de confirmación debajo del mensaje. Vacío si el
+   * turno fue puramente de lectura.
+   */
+  proposals: Proposal[];
   meta: {
     model: string;
     promptVersion: string;
@@ -70,6 +80,7 @@ async function resolveToolContext(): Promise<ToolContext> {
     supabase,
     userId: userData.user.id,
     childId: child?.id ?? null,
+    proposals: [],
   };
 }
 
@@ -144,6 +155,7 @@ export async function chat(
 
         return {
           reply: response.content || '',
+          proposals: toolCtx.proposals,
           meta: {
             model: lastModel,
             promptVersion: PROMPT_VERSION,

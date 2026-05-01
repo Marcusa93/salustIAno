@@ -3,15 +3,23 @@ import { describe, expect, it } from 'vitest';
 import { TOOL_DEFINITIONS, TOOL_HANDLERS } from '@/lib/ai/agents/salustia/tools';
 
 describe('SalustIA tool definitions', () => {
-  it('exporta cinco tools de read', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(5);
-    expect(TOOL_DEFINITIONS.map((t) => t.function.name)).toEqual([
-      'get_today_summary',
-      'get_child_info',
-      'list_recent_events',
-      'search_care_guides',
-      'list_pending_milestones',
-    ]);
+  it('exporta read tools + propose tools', () => {
+    const names = TOOL_DEFINITIONS.map((t) => t.function.name);
+    // 5 read + 4 propose = 9
+    expect(TOOL_DEFINITIONS).toHaveLength(9);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'get_today_summary',
+        'get_child_info',
+        'list_recent_events',
+        'search_care_guides',
+        'list_pending_milestones',
+        'propose_feeding',
+        'propose_sleep',
+        'propose_diaper',
+        'propose_note',
+      ]),
+    );
   });
 
   it('cada tool tiene description y parameters JSON Schema', () => {
@@ -47,6 +55,7 @@ describe('SalustIA tool handlers — error paths', () => {
     supabase: {} as never,
     userId: 'user-1',
     childId: null,
+    proposals: [],
   };
 
   it('get_today_summary devuelve error cuando no hay child', async () => {
@@ -74,5 +83,108 @@ describe('SalustIA tool handlers — error paths', () => {
     const result = await TOOL_HANDLERS.list_recent_events?.({}, noChildCtx);
     const parsed = JSON.parse(result as string);
     expect(parsed.ok).toBe(false);
+  });
+});
+
+describe('SalustIA propose tools', () => {
+  function makeCtx() {
+    return {
+      supabase: {} as never,
+      userId: 'user-1',
+      childId: 'child-1',
+      proposals: [] as Array<{ kind: string }>,
+    };
+  }
+
+  it('propose_feeding rechaza si no hay child', async () => {
+    const ctx = { ...makeCtx(), childId: null };
+    const result = await TOOL_HANDLERS.propose_feeding?.(
+      { occurred_at: '2026-05-01T12:00', type: 'breastfeeding' },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toMatch(/perfil/i);
+  });
+
+  it('propose_feeding empuja un Proposal válido al buffer', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_feeding?.(
+      {
+        occurred_at: '2026-05-01T12:00',
+        type: 'bottle',
+        amount_ml: 90,
+      },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(true);
+    expect(ctx.proposals).toHaveLength(1);
+    expect(ctx.proposals[0]?.kind).toBe('feeding');
+  });
+
+  it('propose_feeding rebota args incoherentes (breastfeeding con amount_ml)', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_feeding?.(
+      {
+        occurred_at: '2026-05-01T12:00',
+        type: 'breastfeeding',
+        amount_ml: 90,
+      },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(false);
+    expect(ctx.proposals).toHaveLength(0);
+  });
+
+  it('propose_sleep acepta sueño en curso (sin ended_at)', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_sleep?.(
+      { started_at: '2026-05-01T14:00' },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(true);
+    expect(ctx.proposals).toHaveLength(1);
+  });
+
+  it('propose_sleep rebota ended_at anterior a started_at', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_sleep?.(
+      { started_at: '2026-05-01T14:00', ended_at: '2026-05-01T13:00' },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('propose_diaper acepta args válidos', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_diaper?.(
+      { occurred_at: '2026-05-01T15:00', type: 'both' },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(true);
+    expect(ctx.proposals[0]?.kind).toBe('diaper');
+  });
+
+  it('propose_note rechaza content vacío', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_note?.({ content: '' }, ctx as never);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('propose_note acepta una nota memory', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_note?.(
+      { content: 'Hoy se rió por primera vez' },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(true);
+    expect(ctx.proposals[0]?.kind).toBe('note');
   });
 });

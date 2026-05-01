@@ -3,25 +3,37 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import type { Proposal } from '@/lib/ai/agents/salustia/proposals';
 import { cn } from '@/lib/utils';
 import { Loader2, Send, Sparkles } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { type ClientMessage, sendMessageAction } from '../actions';
+import { ProposalCard } from './proposal-card';
 
 const SUGGESTIONS = [
   '¿Cómo va el día?',
   '¿Cuándo es el próximo control?',
-  '¿Qué dijo la pediatra sobre dormir?',
+  'Anotá una toma de pecho hace 1 hora',
   'Mostrame las últimas tomas',
 ];
+
+/**
+ * Estado local del chat — más rico que ClientMessage porque guarda
+ * proposals adjuntas a los mensajes del assistant para renderizar las
+ * cards de confirmación. Cuando mandamos al server convertimos a
+ * ClientMessage[] (que solo tiene role + content).
+ */
+type ChatEntry =
+  | { role: 'user'; content: string }
+  | { role: 'assistant'; content: string; proposals: Proposal[] };
 
 interface ChatThreadProps {
   childName: string | null;
 }
 
 export function ChatThread({ childName }: ChatThreadProps) {
-  const [messages, setMessages] = useState<ClientMessage[]>([]);
+  const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [draft, setDraft] = useState('');
   const [pending, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -33,24 +45,33 @@ export function ChatThread({ childName }: ChatThreadProps) {
       top: scrollRef.current.scrollHeight,
       behavior: 'smooth',
     });
-  }, []);
+  }, [entries.length]);
 
   function send(text: string) {
     const value = text.trim();
     if (!value) return;
 
-    const next: ClientMessage[] = [...messages, { role: 'user', content: value }];
-    setMessages(next);
+    const nextEntries: ChatEntry[] = [...entries, { role: 'user', content: value }];
+    setEntries(nextEntries);
     setDraft('');
 
+    // Server solo necesita role + content — pelamos las proposals.
+    const wireMessages: ClientMessage[] = nextEntries.map((e) =>
+      e.role === 'user'
+        ? { role: 'user', content: e.content }
+        : { role: 'assistant', content: e.content },
+    );
+
     startTransition(async () => {
-      const result = await sendMessageAction(next);
+      const result = await sendMessageAction(wireMessages);
       if (!result.ok) {
         toast.error(result.error.message);
         return;
       }
-      setMessages((prev) => [...prev, { role: 'assistant', content: result.reply }]);
-      // Devolvemos el foco al input para seguir conversando rápido.
+      setEntries((prev) => [
+        ...prev,
+        { role: 'assistant', content: result.reply, proposals: result.proposals },
+      ]);
       requestAnimationFrame(() => inputRef.current?.focus());
     });
   }
@@ -70,7 +91,7 @@ export function ChatThread({ childName }: ChatThreadProps) {
         className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto pb-4"
         aria-live="polite"
       >
-        {messages.length === 0 && (
+        {entries.length === 0 && (
           <Card className="flex flex-col items-start gap-3 p-5">
             <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Sparkles className="size-5" aria-hidden />
@@ -83,8 +104,8 @@ export function ChatThread({ childName }: ChatThreadProps) {
                   : ', soy SalustIA.'}
               </p>
               <p className="text-muted-foreground text-sm">
-                Puedo contarte cómo va el día, qué controles vienen, qué les dijo la pediatra. Por
-                ahora solo consulto — no anoto datos todavía.
+                Te cuento cómo va el día, qué controles vienen, o anotás una
+                toma/sueño/pañal/momento hablándome — siempre con tu confirmación antes de guardar.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -102,8 +123,12 @@ export function ChatThread({ childName }: ChatThreadProps) {
           </Card>
         )}
 
-        {messages.map((m, i) => (
-          <MessageBubble key={`${m.role}-${i}`} message={m} />
+        {entries.map((e, i) => (
+          <div key={`${e.role}-${i}`} className="flex flex-col gap-2">
+            <MessageBubble entry={e} />
+            {e.role === 'assistant' &&
+              e.proposals.map((p, j) => <ProposalCard key={`${i}-${j}-${p.kind}`} proposal={p} />)}
+          </div>
         ))}
 
         {pending && (
@@ -147,8 +172,9 @@ export function ChatThread({ childName }: ChatThreadProps) {
   );
 }
 
-function MessageBubble({ message }: { message: ClientMessage }) {
-  const isUser = message.role === 'user';
+function MessageBubble({ entry }: { entry: ChatEntry }) {
+  const isUser = entry.role === 'user';
+  if (!entry.content) return null;
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <Card
@@ -157,7 +183,7 @@ function MessageBubble({ message }: { message: ClientMessage }) {
           isUser ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground',
         )}
       >
-        {message.content}
+        {entry.content}
       </Card>
     </div>
   );

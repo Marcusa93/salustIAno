@@ -2,15 +2,21 @@ import 'server-only';
 
 import type { ToolDefinition } from '@/lib/ai/types';
 import type { createClient } from '@/lib/supabase/server';
+import { type Proposal, proposalSchema, summarizeProposal } from './proposals';
 
 /**
  * Contexto que SalustIA pasa a cada tool handler. El cliente Supabase es
  * el SSR del usuario actual — RLS garantiza que solo vea sus datos.
+ *
+ * `proposals` es un buffer side-channel: las tools propose_* lo llenan
+ * y el chat loop lo lee al final para devolver las propuestas al cliente.
+ * Las tools de READ nunca tocan este array.
  */
 export interface ToolContext {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
   childId: string | null;
+  proposals: Proposal[];
 }
 
 export type ToolHandler = (args: unknown, ctx: ToolContext) => Promise<string>;
@@ -90,6 +96,130 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       description:
         'Lista los hitos médicos pendientes (controles, ecografías, vacunas) ordenados por fecha. Excluye los ya completados.',
       parameters: { type: 'object', properties: {} },
+    },
+  },
+  // ===== Tools de PROPUESTA — no escriben, solo proponen para confirmación =====
+  {
+    type: 'function',
+    function: {
+      name: 'propose_feeding',
+      description:
+        'Cuando la familia quiere ANOTAR una toma (no preguntar por una existente), llamá a esta tool con los datos. NO escribe nada — solo propone, y la familia confirma con un botón en el chat. Usá occurred_at en formato ISO (ej. "2026-05-01T15:30") en hora local de Argentina. Si no especifican hora, usá "ahora" (vos completás con la hora actual). Si la cantidad es ambigua, dejala vacía.',
+      parameters: {
+        type: 'object',
+        properties: {
+          occurred_at: {
+            type: 'string',
+            description:
+              'Fecha y hora ISO local (ej. "2026-05-01T15:30"). Si dicen "hace una hora" o "ahora", calculalo vos.',
+          },
+          type: {
+            type: 'string',
+            enum: ['breastfeeding', 'bottle', 'solid'],
+            description: 'pecho, biberón o sólido.',
+          },
+          side: {
+            type: 'string',
+            enum: ['left', 'right', 'both'],
+            description: 'Solo para breastfeeding. Opcional.',
+          },
+          duration_minutes: {
+            type: 'integer',
+            description: 'Solo si lo mencionan. Opcional.',
+          },
+          amount_ml: {
+            type: 'integer',
+            description: 'Solo para bottle. Opcional.',
+          },
+          foods: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Solo para solid. Lista de alimentos. Opcional.',
+          },
+          reaction: {
+            type: 'string',
+            enum: ['none', 'mild', 'strong'],
+            description: 'Si mencionan reacción. Default none.',
+          },
+          notes: { type: 'string', description: 'Texto libre opcional.' },
+        },
+        required: ['occurred_at', 'type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_sleep',
+      description:
+        'Cuando la familia quiere ANOTAR un sueño o siesta. Si dicen "se durmió" sin hora de despertar, dejá ended_at vacío (queda en curso). Si dicen "durmió de tal a tal hora", completá los dos. NO escribe — solo propone para confirmar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          started_at: { type: 'string', description: 'ISO local (ej. "2026-05-01T14:00").' },
+          ended_at: {
+            type: 'string',
+            description: 'ISO local. Opcional — si todavía está durmiendo, dejalo vacío.',
+          },
+          quality: {
+            type: 'string',
+            enum: ['good', 'regular', 'bad', 'unknown'],
+            description: 'Cómo durmió. Default unknown.',
+          },
+          is_nap: {
+            type: 'boolean',
+            description: 'true si fue siesta corta, false para sueño largo o nocturno.',
+          },
+          notes: { type: 'string', description: 'Texto libre opcional.' },
+        },
+        required: ['started_at'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_diaper',
+      description:
+        'Cuando la familia quiere ANOTAR un pañal. NO escribe — solo propone para confirmar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          occurred_at: {
+            type: 'string',
+            description: 'ISO local. Si dicen "ahora", usá la hora actual.',
+          },
+          type: {
+            type: 'string',
+            enum: ['wet', 'dirty', 'both', 'dry'],
+            description: 'pis, caca, ambos o seco.',
+          },
+          notes: { type: 'string', description: 'Texto libre opcional. Color, consistencia, etc.' },
+        },
+        required: ['occurred_at', 'type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_note',
+      description:
+        'Cuando la familia quiere ANOTAR un momento, una preocupación o un hito. NO escribe — solo propone para confirmar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          occurred_at: { type: 'string', description: 'ISO local. Default ahora.' },
+          category: {
+            type: 'string',
+            enum: ['memory', 'observation', 'milestone', 'other'],
+            description:
+              'memory: recuerdo. observation: cosa observada (algo que la familia notó pero no necesariamente preocupante). milestone: hito (primera sonrisa, primer rollo). other: otra cosa. Default memory.',
+          },
+          content: { type: 'string', description: 'El texto del momento. Obligatorio.' },
+        },
+        required: ['content'],
+      },
     },
   },
 ];
@@ -240,10 +370,43 @@ const listPendingMilestones: ToolHandler = async (_args, ctx) => {
   return jsonOk({ milestones: data ?? [] });
 };
 
+// ============================================================================
+// Handlers de PROPUESTA — no escriben, solo arman Proposal y empujan a ctx.proposals.
+// El LLM ve el summary y la confirmación de "lo dejé propuesto"; la familia
+// confirma desde la UI.
+// ============================================================================
+
+function proposeHandlerFor(kind: 'feeding' | 'sleep' | 'diaper' | 'note'): ToolHandler {
+  return async (rawArgs, ctx) => {
+    if (!ctx.childId) {
+      return jsonError(
+        'Todavía no hay perfil de bebé creado. La familia tiene que crearlo desde Familia.',
+      );
+    }
+    const candidate = { kind, ...((rawArgs ?? {}) as Record<string, unknown>) };
+    const parsed = proposalSchema.safeParse(candidate);
+    if (!parsed.success) {
+      const reason = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+      return jsonError(`Args inválidos: ${reason}`);
+    }
+    ctx.proposals.push(parsed.data);
+    return jsonOk({
+      proposed: true,
+      summary: summarizeProposal(parsed.data),
+      message:
+        'Propuesta lista. La familia va a ver una card de confirmación abajo del mensaje. NO la des por anotada todavía — esperá la confirmación humana.',
+    });
+  };
+}
+
 export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   get_today_summary: getTodaySummary,
   get_child_info: getChildInfo,
   list_recent_events: listRecentEvents,
   search_care_guides: searchCareGuides,
   list_pending_milestones: listPendingMilestones,
+  propose_feeding: proposeHandlerFor('feeding'),
+  propose_sleep: proposeHandlerFor('sleep'),
+  propose_diaper: proposeHandlerFor('diaper'),
+  propose_note: proposeHandlerFor('note'),
 };
