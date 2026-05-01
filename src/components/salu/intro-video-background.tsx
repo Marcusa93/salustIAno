@@ -24,13 +24,10 @@ export function IntroVideoBackground({ className }: { className?: string }) {
   return (
     <div
       aria-hidden
-      className={cn(
-        'pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-background',
-        className,
-      )}
+      className={cn('pointer-events-none absolute inset-0 overflow-hidden', className)}
     >
       <video
-        className="motion-reduce:hidden h-full w-full object-cover opacity-90"
+        className="motion-reduce:hidden h-full w-full object-cover"
         src="/intro.mp4"
         poster="/intro-poster.jpg"
         autoPlay
@@ -44,11 +41,10 @@ export function IntroVideoBackground({ className }: { className?: string }) {
       <img
         src="/intro-poster.jpg"
         alt=""
-        className="hidden h-full w-full object-cover opacity-90 motion-reduce:block"
+        className="hidden h-full w-full object-cover motion-reduce:block"
       />
-      {/* Overlay para legibilidad: gradient + tinte cálido sutil */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/70 to-background/95" />
-      <div className="absolute inset-0 bg-primary/5 mix-blend-multiply" />
+      {/* Overlay sutil para legibilidad — el frosted-blur del card hace el resto */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/10 to-background/50" />
     </div>
   );
 }
