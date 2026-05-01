@@ -4,7 +4,14 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env';
 import type { Database } from '@/types/database';
 
-const PUBLIC_ROUTES = new Set<string>(['/login', '/signup', '/auth/callback', '/auth/confirm']);
+const PUBLIC_ROUTES = new Set<string>([
+  '/login',
+  '/signup',
+  '/recuperar',
+  '/restablecer',
+  '/auth/callback',
+  '/auth/confirm',
+]);
 
 const AUTH_ROUTES = new Set<string>(['/login', '/signup']);
 
