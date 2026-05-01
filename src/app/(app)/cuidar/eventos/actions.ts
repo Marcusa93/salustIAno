@@ -216,6 +216,140 @@ export async function createDiaperAction(
   return { ok: true, id: data.id };
 }
 
+/**
+ * Actualiza un pañal existente. RLS gobierna quién puede; acá solo
+ * defendemos forma del input y damos un mensaje amigable si Supabase
+ * rebota. Soft delete y created_by no se tocan.
+ */
+export async function updateDiaperAction(
+  id: string,
+  input: DiaperEventInput,
+): Promise<EventResult<DiaperEventInput>> {
+  const parsed = diaperEventSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, errors: flatten<DiaperEventInput>(parsed.error) };
+  }
+
+  const supabase = await createClient();
+
+  const updatePayload = {
+    occurred_at: parsed.data.occurred_at,
+    type: parsed.data.type,
+    notes: emptyToNull(parsed.data.notes),
+    photo_analysis: parsed.data.photo_analysis ?? null,
+  };
+
+  const { data, error } = await supabase
+    .from('diaper_events')
+    // biome-ignore lint/suspicious/noExplicitAny: types stale por photo_analysis (ver insert arriba).
+    .update(updatePayload as any)
+    .eq('id', id)
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, errors: { root: 'No pudimos actualizar el pañal.' } };
+  }
+  if (!data) {
+    return { ok: false, errors: { root: 'Ese pañal ya no existe o no podés editarlo.' } };
+  }
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true, id: data.id };
+}
+
+// ============================================================================
+// Update — feeding + sleep
+// ============================================================================
+
+/**
+ * Actualiza una toma existente. Misma forma que createFeedingAction —
+ * Zod replica el CHECK del schema (coherencia type-side-amount-foods).
+ */
+export async function updateFeedingAction(
+  id: string,
+  input: FeedingEventInput,
+): Promise<EventResult<FeedingEventInput>> {
+  const parsed = feedingEventSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, errors: flatten<FeedingEventInput>(parsed.error) };
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('feeding_events')
+    .update({
+      occurred_at: parsed.data.occurred_at,
+      type: parsed.data.type,
+      side: emptyToNull(parsed.data.side),
+      duration_minutes: parsed.data.duration_minutes ?? null,
+      amount_ml: parsed.data.amount_ml ?? null,
+      foods: parsed.data.foods && parsed.data.foods.length > 0 ? parsed.data.foods : null,
+      reaction: parsed.data.reaction,
+      notes: emptyToNull(parsed.data.notes),
+    })
+    .eq('id', id)
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, errors: { root: 'No pudimos actualizar la toma.' } };
+  }
+  if (!data) {
+    return { ok: false, errors: { root: 'Esa toma ya no existe o no podés editarla.' } };
+  }
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true, id: data.id };
+}
+
+/**
+ * Actualiza un sueño existente. Para cerrar uno en curso seguí usando
+ * closeSleepAction — esa tiene la guarda WHERE ended_at IS NULL contra
+ * carreras. Esta función edita libremente cualquier campo.
+ */
+export async function updateSleepAction(
+  id: string,
+  input: SleepSessionInput,
+): Promise<EventResult<SleepSessionInput>> {
+  const parsed = sleepSessionSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, errors: flatten<SleepSessionInput>(parsed.error) };
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('sleep_sessions')
+    .update({
+      started_at: parsed.data.started_at,
+      ended_at: emptyToNull(parsed.data.ended_at),
+      quality: parsed.data.quality,
+      is_nap: parsed.data.is_nap,
+      notes: emptyToNull(parsed.data.notes),
+    })
+    .eq('id', id)
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, errors: { root: 'No pudimos actualizar el sueño.' } };
+  }
+  if (!data) {
+    return { ok: false, errors: { root: 'Ese sueño ya no existe o no podés editarlo.' } };
+  }
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true, id: data.id };
+}
+
 // ============================================================================
 // Delete (genérico — recibe table name + id, RLS controla quién puede)
 // ============================================================================
