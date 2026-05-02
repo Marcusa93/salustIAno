@@ -16,7 +16,7 @@ export function SoftBackdrop({ className }: { className?: string }) {
   return (
     <div
       aria-hidden
-      className={cn('pointer-events-none fixed inset-0 -z-10 overflow-hidden', className)}
+      className={cn('pointer-events-none fixed inset-0 z-0 overflow-hidden', className)}
     >
       {/* Blob primary, top-right */}
       <div

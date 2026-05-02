@@ -10,7 +10,7 @@ import type * as React from 'react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex min-h-screen flex-col bg-background">
+    <div className="relative flex min-h-screen flex-col">
       <SoftBackdrop />
       <header className="sticky top-0 z-40 border-border/40 border-b bg-background/70 backdrop-blur-xl supports-backdrop-blur:bg-background/60">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
@@ -23,7 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 gap-6 px-4 sm:px-6">
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 gap-6 px-4 sm:px-6">
         <DesktopSidebar />
         <main className="min-w-0 flex-1 py-8 pb-20 md:pb-8">{children}</main>
       </div>
