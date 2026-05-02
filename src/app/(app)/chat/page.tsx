@@ -23,13 +23,31 @@ export default async function ChatPage() {
   ]);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex items-start gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Sparkles className="size-6" aria-hidden />
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-14">
+      <header className="animate-stagger-up flex items-start gap-4">
+        <div className="relative flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/10">
+          <Sparkles className="size-6 animate-breathe" aria-hidden />
+          {/* Chispitas orbitando */}
+          <span
+            aria-hidden
+            className="absolute inset-0 origin-center"
+            style={{ animation: 'salu-orbit 9s linear infinite' }}
+          >
+            <span className="absolute top-0 left-1/2 size-1 -translate-x-1/2 -translate-y-1 rounded-full bg-primary/60" />
+          </span>
+          <span
+            aria-hidden
+            className="absolute inset-0 origin-center"
+            style={{ animation: 'salu-orbit 7s linear infinite reverse', animationDelay: '-2s' }}
+          >
+            <span className="absolute top-1/2 left-0 size-1 -translate-x-1 -translate-y-1/2 rounded-full bg-accent-foreground/40" />
+          </span>
         </div>
         <div className="flex flex-col gap-1">
-          <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
+          <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
+            Asistente
+          </span>
+          <h1 className="font-display text-[clamp(2rem,5vw,3rem)] text-foreground leading-[1.05] tracking-tight">
             SalustIA
           </h1>
           <p className="text-muted-foreground">

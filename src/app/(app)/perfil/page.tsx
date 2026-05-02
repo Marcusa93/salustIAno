@@ -15,8 +15,15 @@ const actions = [
 
 export default function PerfilPage() {
   return (
-    <div className="flex max-w-md flex-col gap-8">
-      <h1 className="font-heading font-semibold text-3xl tracking-tight">Mi cuenta</h1>
+    <div className="flex max-w-md flex-col gap-10 py-10 sm:py-14">
+      <header className="animate-stagger-up flex flex-col gap-2">
+        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
+          Mi cuenta
+        </span>
+        <h1 className="font-display text-[clamp(2rem,5vw,3rem)] text-foreground leading-[1.05] tracking-tight">
+          Tu espacio.
+        </h1>
+      </header>
 
       <Card>
         <CardContent className="flex flex-col items-center gap-3 py-6">

@@ -54,12 +54,14 @@ export default async function FamiliaPage() {
   const initial = (displayName?.[0] ?? userData.user?.email?.[0] ?? 'M').toUpperCase();
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-2">
-        <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
+      <header className="animate-stagger-up flex flex-col gap-2">
+        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
           Familia
+        </span>
+        <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
+          Quiénes somos, quién está en camino.
         </h1>
-        <p className="text-muted-foreground">Quiénes somos, quién está en camino.</p>
       </header>
 
       <section className="flex flex-col gap-3">

@@ -129,14 +129,16 @@ export default async function TimelinePage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-3">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
+      <header className="animate-stagger-up flex flex-col gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-2">
-            <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
+            <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
               Timeline
+            </span>
+            <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
+              El día a día de {child.name}.
             </h1>
-            <p className="text-muted-foreground">El día a día de {child.name}.</p>
           </div>
           <Button render={<Link href="/notas/nuevo" />} size="sm">
             <BookHeart className="size-4" aria-hidden />
