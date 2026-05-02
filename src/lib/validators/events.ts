@@ -224,6 +224,11 @@ export const diaperEventSchema = z.object({
    * foto. NULL/undefined si fue carga manual.
    */
   photo_analysis: diaperPhotoAnalysisSchema.nullish(),
+  /**
+   * Path al objeto en el bucket diaper-photos. Lo arma uploadDiaperPhotoAction
+   * antes del insert. NULL/undefined si el evento se cargó sin foto.
+   */
+  photo_path: z.string().min(1).max(500).nullish(),
 });
 
 export type DiaperEventInput = z.infer<typeof diaperEventSchema>;

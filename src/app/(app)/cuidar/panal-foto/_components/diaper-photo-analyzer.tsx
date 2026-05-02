@@ -31,12 +31,12 @@ export function analysisToNoteText(a: DiaperAnalysis): string {
 
 interface DiaperPhotoAnalyzerProps {
   /**
-   * Si se pasa, aparece el botón "Usar esta descripción en las notas"
-   * cuando hay un análisis. Recibe el análisis estructurado completo —
-   * el caller decide qué hacer (típicamente: pegar texto en notes +
-   * guardar el JSON en photo_analysis del evento).
+   * Si se pasa, aparece el botón "Usar este análisis en el pañal" cuando
+   * hay un análisis. Recibe el análisis + el File original — el caller
+   * típicamente sube la foto al storage y guarda el JSON + path en el
+   * evento.
    */
-  onUseAnalysis?: (analysis: DiaperAnalysis) => void;
+  onUseAnalysis?: (analysis: DiaperAnalysis, file: File) => void;
   /**
    * Variante compacta (sin textarea de contexto, preview más chica).
    * Pensada para uso dentro de Sheets/modales.
@@ -164,7 +164,12 @@ export function DiaperPhotoAnalyzer({ onUseAnalysis, compact = false }: DiaperPh
         )}
       </Button>
 
-      {analysis && <AnalysisCard analysis={analysis} onUseAnalysis={onUseAnalysis} />}
+      {analysis && (
+        <AnalysisCard
+          analysis={analysis}
+          onUseAnalysis={onUseAnalysis && file ? (a) => onUseAnalysis(a, file) : undefined}
+        />
+      )}
     </div>
   );
 }

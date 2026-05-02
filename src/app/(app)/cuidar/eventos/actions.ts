@@ -175,6 +175,107 @@ export async function createFeedingAction(
 }
 
 // ============================================================================
+// Diaper photo upload
+// ============================================================================
+
+const BUCKET = 'diaper-photos';
+const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB
+
+export type UploadPhotoResult = { ok: true; path: string } | { ok: false; error: string };
+
+/**
+ * Sube una foto de pañal al bucket privado `diaper-photos`. Path con
+ * convención `{family_group_id}/{child_id}/{timestamp}-{rand}.{ext}` —
+ * el primer segmento permite que la RLS de Storage filtre por familia.
+ *
+ * Devuelve el path al objeto, o un error legible. El caller pasa este
+ * path a createDiaperAction como `photo_path`.
+ */
+export async function uploadDiaperPhotoAction(formData: FormData): Promise<UploadPhotoResult> {
+  const file = formData.get('photo');
+  if (!(file instanceof File)) {
+    return { ok: false, error: 'No recibimos la foto.' };
+  }
+  if (file.size === 0 || file.size > MAX_PHOTO_BYTES) {
+    return { ok: false, error: 'La foto pesa demasiado o está vacía.' };
+  }
+  if (!ALLOWED_MIME.includes(file.type)) {
+    return { ok: false, error: 'Formato de imagen no soportado.' };
+  }
+
+  const supabase = await createClient();
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData.user) {
+    return { ok: false, error: 'Sesión expirada.' };
+  }
+
+  // Resolvemos family_group_id del usuario actual. Necesario porque la
+  // RLS del bucket lo requiere como primer segmento del path.
+  const { data: membership } = await supabase
+    .from('family_memberships')
+    .select('family_group_id')
+    .eq('user_id', userData.user.id)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!membership?.family_group_id) {
+    return { ok: false, error: 'No encontramos tu grupo familiar.' };
+  }
+
+  const { data: child } = await supabase
+    .from('child_profiles')
+    .select('id')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!child?.id) {
+    return { ok: false, error: 'No hay perfil de bebé creado.' };
+  }
+
+  // Convención: family/child/timestamp-rand.ext
+  const ext =
+    (file.name.split('.').pop() ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const rand = Math.random().toString(36).slice(2, 8);
+  const path = `${membership.family_group_id}/${child.id}/${Date.now()}-${rand}.${ext}`;
+
+  const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file, {
+    contentType: file.type,
+    cacheControl: '3600',
+    upsert: false,
+  });
+
+  if (uploadErr) {
+    return { ok: false, error: 'No pudimos subir la foto.' };
+  }
+
+  return { ok: true, path };
+}
+
+/**
+ * Devuelve un signed URL al objeto en `diaper-photos`. Lo usamos desde el
+ * cliente para abrir la foto cuando la familia hace click en "Ver foto".
+ * El URL expira a los 5 minutos — suficiente para abrirlo, pero corto si
+ * por alguna razón se filtra a un log.
+ */
+export async function getDiaperPhotoUrlAction(
+  path: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  if (typeof path !== 'string' || path.length === 0 || path.length > 500) {
+    return { ok: false, error: 'Path inválido.' };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 300);
+  if (error || !data?.signedUrl) {
+    return { ok: false, error: 'No pudimos abrir la foto.' };
+  }
+  return { ok: true, url: data.signedUrl };
+}
+
+// ============================================================================
 // Diaper
 // ============================================================================
 
@@ -189,15 +290,16 @@ export async function createDiaperAction(
   const ctx = await getActorContext();
   if ('error' in ctx) return { ok: false, errors: { root: ctx.error } };
 
-  // Cast: photo_analysis se agregó en la migration 20260430120000.
-  // Hasta que se regeneren los Supabase types con el nuevo column, TS no
-  // sabe que existe. El runtime ya lo acepta en cuanto la migration corre.
+  // Cast: photo_analysis (migration 20260430120000) y photo_path
+  // (migration 20260501100000) — los Supabase types están stale hasta
+  // que regeneremos. El runtime los acepta en cuanto las migrations corran.
   const insertPayload = {
     child_id: ctx.childId,
     occurred_at: parsed.data.occurred_at,
     type: parsed.data.type,
     notes: emptyToNull(parsed.data.notes),
     photo_analysis: parsed.data.photo_analysis ?? null,
+    photo_path: parsed.data.photo_path ?? null,
     created_by: ctx.userId,
   };
   const { data, error } = await ctx.supabase
@@ -237,6 +339,7 @@ export async function updateDiaperAction(
     type: parsed.data.type,
     notes: emptyToNull(parsed.data.notes),
     photo_analysis: parsed.data.photo_analysis ?? null,
+    photo_path: parsed.data.photo_path ?? null,
   };
 
   const { data, error } = await supabase

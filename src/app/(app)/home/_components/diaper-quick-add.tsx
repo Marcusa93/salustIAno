@@ -1,6 +1,6 @@
 'use client';
 
-import { createDiaperAction } from '@/app/(app)/cuidar/eventos/actions';
+import { createDiaperAction, uploadDiaperPhotoAction } from '@/app/(app)/cuidar/eventos/actions';
 import {
   DiaperPhotoAnalyzer,
   analysisToNoteText,
@@ -56,6 +56,7 @@ export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
   const [open, setOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [analysis, setAnalysis] = useState<DiaperAnalysis | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   const {
     register,
@@ -74,10 +75,26 @@ export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
   });
 
   async function onSubmit(values: DiaperEventInput) {
+    // Si la familia adjuntó foto y la usó para análisis, primero la subimos
+    // a storage y obtenemos el path. Si falla el upload, NO bloqueamos el
+    // guardado del evento — guardamos sin foto y avisamos.
+    let photoPath: string | undefined;
+    if (photoFile) {
+      const fd = new FormData();
+      fd.append('photo', photoFile);
+      const upload = await uploadDiaperPhotoAction(fd);
+      if (upload.ok) {
+        photoPath = upload.path;
+      } else {
+        toast.error(`Foto no subida (${upload.error}). Guardamos el pañal sin foto.`);
+      }
+    }
+
     const result = await createDiaperAction({
       ...values,
       occurred_at: new Date(values.occurred_at).toISOString(),
       photo_analysis: analysis ?? undefined,
+      photo_path: photoPath,
     });
     if (!result.ok) {
       toast.error(result.errors.root ?? 'No pudimos guardar el pañal.');
@@ -86,6 +103,7 @@ export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
     toast.success('Pañal anotado.');
     reset({ occurred_at: nowLocalISO(), type: 'wet', notes: '' });
     setAnalysis(null);
+    setPhotoFile(null);
     setPhotoOpen(false);
     setOpen(false);
   }
@@ -172,8 +190,9 @@ export function DiaperQuickAdd({ trigger }: DiaperQuickAddProps) {
               >
                 <DiaperPhotoAnalyzer
                   compact
-                  onUseAnalysis={(a) => {
+                  onUseAnalysis={(a, f) => {
                     setAnalysis(a);
+                    setPhotoFile(f);
                     setValue('notes', analysisToNoteText(a), {
                       shouldDirty: true,
                       shouldValidate: true,

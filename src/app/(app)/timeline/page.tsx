@@ -17,6 +17,7 @@ import {
 import { AlertTriangle, Baby, BookHeart, Camera, Milk, Moon, Pencil, Sun } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { DiaperPhotoLink } from '../cuidar/eventos/_components/diaper-photo-link';
 import { EditDiaperSheet } from '../cuidar/eventos/_components/edit-diaper-sheet';
 import { EditFeedingSheet } from '../cuidar/eventos/_components/edit-feeding-sheet';
 import { EditSleepSheet } from '../cuidar/eventos/_components/edit-sleep-sheet';
@@ -206,6 +207,10 @@ function TimelineEntry({ row }: { row: TimelineRow }) {
     row.event_type === 'diaper' && row.payload.photo_analysis
       ? (row.payload.photo_analysis as { alarm?: boolean; alarm_reason?: string })
       : null;
+  const photoPath =
+    row.event_type === 'diaper' && typeof row.payload.photo_path === 'string'
+      ? (row.payload.photo_path as string)
+      : null;
   return (
     <Card
       className={cn(
@@ -255,6 +260,7 @@ function TimelineEntry({ row }: { row: TimelineRow }) {
             }
           />
         )}
+        {photoPath && <DiaperPhotoLink path={photoPath} />}
         <EditButton row={row} />
       </div>
     </Card>
