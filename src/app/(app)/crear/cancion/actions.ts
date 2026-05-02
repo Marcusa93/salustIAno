@@ -11,6 +11,8 @@ import {
   AIProviderError,
   AIValidationError,
 } from '@/lib/ai/errors';
+import { logStore } from '@/lib/ai/logger';
+import { createClient } from '@/lib/supabase/server';
 import type { LullabyFormState } from './shared';
 
 /**
@@ -95,19 +97,23 @@ export async function createLullabyAction(input: unknown): Promise<LullabyFormSt
 }
 
 export type GenerateAudioResult =
-  | { ok: true; audioUrl: string; latencyMs: number }
+  | { ok: true; audioUrl: string; lullabyId: string; latencyMs: number }
   | {
       ok: false;
       error: { type: 'config' | 'network' | 'provider' | 'validation'; message: string };
     };
 
+const LULLABIES_BUCKET = 'lullabies';
+
 /**
- * Toma una nana ya generada por el agente lullaby y le pide a AIMLAPI
- * (modelo minimax/music-1.5) que la cante. Polling interno; el cliente
- * espera 50-60s con un loading state. Devuelve URL del MP3.
+ * Genera audio para la nana, descarga el MP3 del CDN AIMLAPI y lo
+ * persiste en Supabase Storage + tabla `lullabies`. Devuelve un signed
+ * URL que el cliente puede reproducir.
  *
- * Re-valida la nana server-side (defensa en profundidad — el cliente
- * podría mandar cualquier cosa).
+ * El motivo de persistir end-to-end aquí es que el URL de AIMLAPI expira
+ * en horas — si la familia quiere escuchar la nana mañana, necesita
+ * estar en Storage propio. Cada generación cuesta ~$0.04 USD; persistir
+ * elimina re-generaciones.
  */
 export async function generateLullabyAudioAction(
   rawLullaby: unknown,
@@ -120,9 +126,139 @@ export async function generateLullabyAudioAction(
     };
   }
 
+  // Resolver user + family + child antes de gastar plata en AIMLAPI.
+  const supabase = await createClient();
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData.user) {
+    return { ok: false, error: { type: 'validation', message: 'Sesión expirada.' } };
+  }
+
+  const { data: membership } = await supabase
+    .from('family_memberships')
+    .select('family_group_id')
+    .eq('user_id', userData.user.id)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!membership?.family_group_id) {
+    return {
+      ok: false,
+      error: { type: 'validation', message: 'No encontramos tu grupo familiar.' },
+    };
+  }
+
+  const { data: child } = await supabase
+    .from('child_profiles')
+    .select('id')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!child?.id) {
+    return {
+      ok: false,
+      error: { type: 'validation', message: 'No hay perfil de bebé creado.' },
+    };
+  }
+
   try {
-    const result = await generateLullabyAudio(parsed.data);
-    return { ok: true, audioUrl: result.audioUrl, latencyMs: result.meta.latencyMs };
+    // 1. Generar audio en AIMLAPI (paga aquí).
+    const audio = await generateLullabyAudio(parsed.data, {
+      actorUserId: userData.user.id,
+      childId: child.id as string,
+    });
+
+    // 2. Descargar el MP3 del CDN antes de que expire.
+    const audioResponse = await fetch(audio.audioUrl);
+    if (!audioResponse.ok) {
+      throw new AIProviderError(audioResponse.status, 'No pudimos descargar el audio generado.');
+    }
+    const audioBlob = await audioResponse.blob();
+    const audioBuffer = await audioBlob.arrayBuffer();
+
+    // 3. Subir a Supabase Storage en {family}/{child}/{ts}-{rand}.mp3.
+    const rand = Math.random().toString(36).slice(2, 8);
+    const path = `${membership.family_group_id}/${child.id}/${Date.now()}-${rand}.mp3`;
+    const { error: uploadErr } = await supabase.storage
+      .from(LULLABIES_BUCKET)
+      .upload(path, audioBuffer, {
+        contentType: 'audio/mpeg',
+        cacheControl: '31536000', // 1 año — el contenido es inmutable.
+        upsert: false,
+      });
+
+    if (uploadErr) {
+      await logStore.record({
+        agent: 'lullaby-persist',
+        model: '-',
+        promptVersion: 'lullaby-persist-v1',
+        error: `storage upload failed: ${uploadErr.message}`,
+        actorUserId: userData.user.id,
+        childId: child.id as string,
+      });
+      // La nana se generó pero no se persistió. Devolvemos el URL temporal
+      // para que la familia pueda al menos escucharla esta vez.
+      return {
+        ok: true,
+        audioUrl: audio.audioUrl,
+        lullabyId: '',
+        latencyMs: audio.meta.latencyMs,
+      };
+    }
+
+    // 4. Insertar fila en lullabies. Cast por types stale.
+    // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar.
+    const sb = supabase as any;
+    const { data: row, error: insertErr } = await sb
+      .from('lullabies')
+      .insert({
+        child_id: child.id,
+        family_group_id: membership.family_group_id,
+        title: parsed.data.title,
+        intro: parsed.data.intro,
+        verses: parsed.data.verses,
+        chorus: parsed.data.chorus,
+        closing: parsed.data.closing,
+        mood: parsed.data.mood,
+        audio_path: path,
+        generation_meta: audio.meta,
+        created_by: userData.user.id,
+      })
+      .select('id')
+      .single();
+
+    if (insertErr || !row) {
+      await logStore.record({
+        agent: 'lullaby-persist',
+        model: '-',
+        promptVersion: 'lullaby-persist-v1',
+        error: `insert failed: ${insertErr?.message ?? 'unknown'}`,
+        actorUserId: userData.user.id,
+        childId: child.id as string,
+      });
+      // Mismo fallback: ya tenemos el audio en Storage, solo falta la fila.
+      // Devolvemos el URL temporal del CDN para esta sesión.
+      return {
+        ok: true,
+        audioUrl: audio.audioUrl,
+        lullabyId: '',
+        latencyMs: audio.meta.latencyMs,
+      };
+    }
+
+    // 5. Generar signed URL desde Supabase para reproducción inmediata.
+    const { data: signed } = await supabase.storage
+      .from(LULLABIES_BUCKET)
+      .createSignedUrl(path, 3600);
+
+    return {
+      ok: true,
+      audioUrl: signed?.signedUrl ?? audio.audioUrl,
+      lullabyId: row.id as string,
+      latencyMs: audio.meta.latencyMs,
+    };
   } catch (err) {
     if (err instanceof AIConfigError) {
       return {
@@ -144,4 +280,88 @@ export async function generateLullabyAudioAction(
       error: { type: 'provider', message: 'Algo salió mal generando el audio. Probá de nuevo.' },
     };
   }
+}
+
+// ============================================================================
+// Biblioteca — listado + signed URLs + delete
+// ============================================================================
+
+export interface LullabyLibraryEntry {
+  id: string;
+  title: string;
+  intro: string;
+  verses: string[];
+  chorus: string;
+  closing: string;
+  mood: 'dulce' | 'jugueton' | 'calmo' | 'valiente';
+  audioPath: string | null;
+  createdAt: string;
+}
+
+/**
+ * Devuelve la biblioteca de canciones del usuario actual (filtro por
+ * familia vía RLS). Sin signed URLs: las generamos sólo cuando se
+ * reproduce, igual que con las fotos de pañal.
+ */
+export async function listLullabiesAction(): Promise<LullabyLibraryEntry[]> {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { data, error } = await sb
+    .from('lullabies')
+    .select('id, title, intro, verses, chorus, closing, mood, audio_path, created_at')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(60);
+
+  if (error || !data) return [];
+
+  return (data as Array<Record<string, unknown>>).map((r) => ({
+    id: r.id as string,
+    title: r.title as string,
+    intro: r.intro as string,
+    verses: (r.verses as string[]) ?? [],
+    chorus: (r.chorus as string) ?? '',
+    closing: (r.closing as string) ?? '',
+    mood: r.mood as LullabyLibraryEntry['mood'],
+    audioPath: (r.audio_path as string | null) ?? null,
+    createdAt: r.created_at as string,
+  }));
+}
+
+export async function getLullabyAudioUrlAction(
+  audioPath: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  if (typeof audioPath !== 'string' || audioPath.length === 0 || audioPath.length > 500) {
+    return { ok: false, error: 'Path inválido.' };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from(LULLABIES_BUCKET)
+    .createSignedUrl(audioPath, 3600);
+  if (error || !data?.signedUrl) {
+    return { ok: false, error: 'No pudimos abrir la canción.' };
+  }
+  return { ok: true, url: data.signedUrl };
+}
+
+export async function deleteLullabyAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (typeof id !== 'string' || id.length === 0) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+  const supabase = await createClient();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { error } = await sb
+    .from('lullabies')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No pudimos borrar la canción.' };
+  return { ok: true };
 }

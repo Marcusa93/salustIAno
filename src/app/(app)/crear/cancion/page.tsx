@@ -2,13 +2,16 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { LullabyForm } from './lullaby-form';
+import { listLullabiesAction } from './actions';
+import { CancionTabs } from './cancion-tabs';
 
 export const metadata: Metadata = {
   title: 'Canción para Salu',
 };
 
-export default function CrearCancionPage() {
+export default async function CrearCancionPage() {
+  const library = await listLullabiesAction();
+
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
       <header className="flex flex-col gap-3">
@@ -21,13 +24,13 @@ export default function CrearCancionPage() {
             Canción para Salu
           </h1>
           <p className="max-w-prose text-muted-foreground">
-            Decime para qué momento, con qué tono, y SalustIA arma una canción cantable. Cuna,
-            despertar, baño, paseo — lo que estés viviendo.
+            Decime para qué momento, con qué tono, y SalustIA arma una canción cantable. Quedan
+            guardadas en la biblioteca — no se vuelven a generar.
           </p>
         </div>
       </header>
 
-      <LullabyForm />
+      <CancionTabs initialLibrary={library} />
     </div>
   );
 }
