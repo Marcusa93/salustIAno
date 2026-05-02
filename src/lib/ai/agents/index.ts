@@ -41,3 +41,14 @@ export {
   type PediatricSummary,
 } from './pediatric-prep/schema';
 export type { PediatricPrepOutput } from './pediatric-prep';
+
+export { generateLullaby } from './lullaby';
+export {
+  lullabyInputSchema,
+  lullabyOutputSchema,
+  type LullabyInput,
+  type LullabyOutput,
+  MOMENT_LABELS as LULLABY_MOMENT_LABELS,
+  MOOD_LABELS as LULLABY_MOOD_LABELS,
+  LENGTH_LABELS as LULLABY_LENGTH_LABELS,
+} from './lullaby-schema';

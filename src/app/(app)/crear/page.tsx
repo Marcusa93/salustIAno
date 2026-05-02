@@ -25,11 +25,10 @@ const OPTIONS: CreateOption[] = [
     Icon: BookOpen,
   },
   {
-    title: 'Canción personalizada',
-    description: 'Letra y melodía pensada para Salu. En camino.',
+    href: '/crear/cancion',
+    title: 'Canción para Salu',
+    description: 'Una nana cantable, hecha para el momento que estés viviendo.',
     Icon: Music,
-    badge: 'Próximamente',
-    disabled: true,
   },
 ];
 
