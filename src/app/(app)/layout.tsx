@@ -2,6 +2,7 @@ import { BottomNav } from '@/components/salu/bottom-nav';
 import { DesktopSidebar } from '@/components/salu/desktop-sidebar';
 import { MobileMenu } from '@/components/salu/mobile-menu';
 import { SaluLogo } from '@/components/salu/salu-logo';
+import { SoftBackdrop } from '@/components/salu/soft-backdrop';
 import { UserMenu } from '@/components/salu/user-menu';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
@@ -9,8 +10,9 @@ import type * as React from 'react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-40 border-border border-b bg-background/95 backdrop-blur supports-backdrop-blur:bg-background/80">
+    <div className="relative flex min-h-screen flex-col bg-background">
+      <SoftBackdrop />
+      <header className="sticky top-0 z-40 border-border/40 border-b bg-background/70 backdrop-blur-xl supports-backdrop-blur:bg-background/60">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
           <MobileMenu />
           <Link href="/home" aria-label="Ir al inicio">

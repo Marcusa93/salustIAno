@@ -197,19 +197,15 @@ export default async function HomePage() {
   );
 
   return (
-    <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-primary/[0.06] via-primary/[0.02] to-transparent"
-      />
-      <header className="flex flex-col gap-1.5">
-        <span className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
+      <header className="flex flex-col gap-2">
+        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
           {todayLabel}
         </span>
-        <h1 className="font-display text-4xl text-foreground tracking-tight sm:text-5xl">
+        <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
           Hola{displayName ? `, ${displayName}` : ''}.
         </h1>
-        <p className="text-base text-muted-foreground sm:text-lg">
+        <p className="max-w-md text-base text-muted-foreground sm:text-lg">
           {child.birth_date
             ? `${child.name}, ${formatAge(ageDays)}.`
             : `Esperando a ${child.name}.`}
@@ -219,15 +215,15 @@ export default async function HomePage() {
       {/* SalustIA */}
       <Link
         href="/chat"
-        className="rounded-xl outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+        className="rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
       >
-        <Card className="flex items-center gap-4 border-primary/20 bg-primary/5 p-4 transition-all hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <Card className="relative flex items-center gap-4 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-accent/30 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/10">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/10">
             <Sparkles className="size-5" aria-hidden />
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="font-medium text-foreground">Preguntale a SalustIA</span>
-            <span className="text-muted-foreground text-xs">
+            <span className="text-muted-foreground text-sm">
               Cómo va el día, qué controles vienen, qué dijo la pediatra.
             </span>
           </div>

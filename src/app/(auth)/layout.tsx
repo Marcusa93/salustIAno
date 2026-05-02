@@ -15,7 +15,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       </header>
 
       <main className="flex flex-1 flex-col items-center justify-center px-6 pb-8">
-        <div className="w-full max-w-sm animate-page-enter rounded-2xl border border-border/50 bg-card/85 p-6 shadow-xl shadow-black/5 backdrop-blur-md sm:p-8">
+        <div className="w-full max-w-sm animate-page-enter rounded-3xl border border-white/40 bg-card/75 p-7 shadow-[0_30px_80px_-30px_rgba(15,23,42,0.30),0_8px_24px_-12px_rgba(15,23,42,0.20)] backdrop-blur-2xl sm:p-9 dark:border-white/10 dark:bg-card/60">
           {children}
         </div>
       </main>
