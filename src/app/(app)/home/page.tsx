@@ -1,3 +1,5 @@
+import { CradleIllustration } from '@/components/salu/illustrations/cradle';
+import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timeline-empty';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
@@ -116,25 +118,29 @@ export default async function HomePage() {
   // Si no hay perfil del bebé, mostramos un onboarding suave.
   if (!child) {
     return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
         <header className="flex flex-col gap-2">
-          <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
+          <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
             Hola{displayName ? `, ${displayName}` : ''}.
           </h1>
-          <p className="text-muted-foreground">Acá te esperamos cuando creemos el perfil.</p>
+          <p className="text-base text-muted-foreground sm:text-lg">
+            Acá te esperamos cuando creemos el perfil.
+          </p>
         </header>
-        <Card className="flex flex-col items-center gap-4 p-10 text-center">
-          <div className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Baby className="size-6" aria-hidden />
+        <Card className="flex flex-col items-center gap-6 p-10 text-center sm:p-12">
+          <div className="text-primary">
+            <CradleIllustration size={140} />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <h2 className="font-medium text-foreground text-lg">Empezá por el perfil del bebé.</h2>
-            <p className="max-w-md text-muted-foreground text-sm">
+          <div className="flex flex-col gap-2">
+            <h2 className="font-display text-2xl text-foreground tracking-tight sm:text-3xl">
+              Empezá por el perfil del bebé.
+            </h2>
+            <p className="max-w-md text-muted-foreground text-sm leading-relaxed sm:text-base">
               Cargalo con lo que ya sabés (nombre, pediatra, fecha esperada). Después, cuando lo
               tengas en brazos, anotás tomas, sueños y pañales en dos toques.
             </p>
           </div>
-          <Button render={<Link href="/familia/bebe/nuevo" />}>
+          <Button render={<Link href="/familia/bebe/nuevo" />} size="lg">
             <Plus className="size-4" aria-hidden />
             Crear perfil
           </Button>
@@ -316,8 +322,13 @@ export default async function HomePage() {
           </Link>
         </div>
         {recents.length === 0 ? (
-          <Card className="p-6 text-center text-muted-foreground text-sm">
-            Todavía no hay registros. Anotá la primera toma cuando ocurra.
+          <Card className="flex flex-col items-center gap-3 p-8 text-center">
+            <div className="text-primary">
+              <TimelineEmptyIllustration size={120} />
+            </div>
+            <p className="max-w-xs text-muted-foreground text-sm leading-relaxed">
+              Todavía no hay registros. Anotá la primera toma cuando ocurra.
+            </p>
           </Card>
         ) : (
           <ul className="flex flex-col gap-2">

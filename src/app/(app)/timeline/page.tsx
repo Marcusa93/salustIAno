@@ -1,3 +1,5 @@
+import { CradleIllustration } from '@/components/salu/illustrations/cradle';
+import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timeline-empty';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
@@ -97,7 +99,9 @@ export default async function TimelinePage({ searchParams }: PageProps) {
           <p className="text-muted-foreground">Cuando registres eventos, van a aparecer acá.</p>
         </header>
         <Card className="flex flex-col items-center gap-4 p-10 text-center">
-          <BookHeart className="size-10 text-muted-foreground" aria-hidden />
+          <div className="text-primary">
+            <CradleIllustration size={120} />
+          </div>
           <p className="text-muted-foreground text-sm">
             Creá el perfil del bebé para empezar a registrar.
           </p>
@@ -169,9 +173,11 @@ export default async function TimelinePage({ searchParams }: PageProps) {
           No pudimos cargar el timeline.
         </Card>
       ) : rows.length === 0 ? (
-        <Card className="flex flex-col items-center gap-4 p-10 text-center">
-          <BookHeart className="size-10 text-muted-foreground" aria-hidden />
-          <p className="text-muted-foreground text-sm">
+        <Card className="flex flex-col items-center gap-4 p-10 text-center sm:p-12">
+          <div className="text-primary">
+            <TimelineEmptyIllustration size={140} />
+          </div>
+          <p className="max-w-sm text-muted-foreground leading-relaxed">
             Todavía no hay registros. Anotá algo desde Casa.
           </p>
         </Card>
