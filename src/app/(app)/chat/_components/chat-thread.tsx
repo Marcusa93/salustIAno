@@ -5,10 +5,15 @@ import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import type { Proposal } from '@/lib/ai/agents/salustia/proposals';
 import { cn } from '@/lib/utils';
-import { Loader2, Send, Sparkles } from 'lucide-react';
+import { Loader2, Send, Sparkles, Trash2 } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { type ClientMessage, sendMessageAction } from '../actions';
+import {
+  type ChatHistoryEntry,
+  type ClientMessage,
+  clearChatHistoryAction,
+  sendMessageAction,
+} from '../actions';
 import { ProposalCard } from './proposal-card';
 
 const SUGGESTIONS = [
@@ -30,14 +35,39 @@ type ChatEntry =
 
 interface ChatThreadProps {
   childName: string | null;
+  /**
+   * Mensajes persistidos del usuario, hidratados server-side. Sin
+   * proposals (solo role + content) — las proposals son transitorias.
+   */
+  initialHistory?: ChatHistoryEntry[];
 }
 
-export function ChatThread({ childName }: ChatThreadProps) {
-  const [entries, setEntries] = useState<ChatEntry[]>([]);
+export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) {
+  const [entries, setEntries] = useState<ChatEntry[]>(() =>
+    initialHistory.map((m) =>
+      m.role === 'assistant'
+        ? { role: 'assistant', content: m.content, proposals: [] }
+        : { role: 'user', content: m.content },
+    ),
+  );
   const [draft, setDraft] = useState('');
   const [pending, startTransition] = useTransition();
+  const [clearing, startClearTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  function clearHistory() {
+    if (!window.confirm('¿Borrar la conversación con SalustIA? No se puede deshacer.')) return;
+    startClearTransition(async () => {
+      const result = await clearChatHistoryAction();
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setEntries([]);
+      toast.success('Conversación limpia.');
+    });
+  }
 
   // Auto-scroll al fondo cuando llega un mensaje nuevo.
   useEffect(() => {
@@ -85,6 +115,25 @@ export function ChatThread({ childName }: ChatThreadProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {entries.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={clearHistory}
+            disabled={clearing || pending}
+          >
+            {clearing ? (
+              <Loader2 className="size-3 animate-spin" aria-hidden />
+            ) : (
+              <Trash2 className="size-3" aria-hidden />
+            )}
+            Limpiar conversación
+          </Button>
+        </div>
+      )}
+
       {/* Thread */}
       <div
         ref={scrollRef}
