@@ -13,15 +13,26 @@ export function CradleIllustration({ size = 160 }: { size?: number }) {
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      {/* Luna arriba a la derecha — accent peach soft fill */}
-      <circle cx="160" cy="40" r="14" fill="oklch(0.93 0.035 60)" />
-      <circle cx="166" cy="38" r="12" fill="oklch(0.985 0.006 90)" />
+      {/* Luna arriba a la derecha — accent peach soft fill, respirando */}
+      <g
+        className="animate-breathe"
+        style={{ transformOrigin: '163px 39px', transformBox: 'fill-box' }}
+      >
+        <circle cx="160" cy="40" r="14" fill="oklch(0.93 0.035 60)" />
+        <circle cx="166" cy="38" r="12" fill="oklch(0.985 0.006 90)" />
+      </g>
 
-      {/* Tres estrellitas dispersas */}
+      {/* Tres estrellitas dispersas — titilando con stagger */}
       <g stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity="0.6">
-        <path d="M40 30 L40 38 M36 34 L44 34" />
-        <path d="M180 80 L180 84 M178 82 L182 82" />
-        <path d="M30 70 L30 76 M27 73 L33 73" />
+        <g className="animate-twinkle" style={{ animationDelay: '0s' }}>
+          <path d="M40 30 L40 38 M36 34 L44 34" />
+        </g>
+        <g className="animate-twinkle" style={{ animationDelay: '0.8s' }}>
+          <path d="M180 80 L180 84 M178 82 L182 82" />
+        </g>
+        <g className="animate-twinkle" style={{ animationDelay: '1.6s' }}>
+          <path d="M30 70 L30 76 M27 73 L33 73" />
+        </g>
       </g>
 
       {/* Cuna — base curva con barrotes verticales */}

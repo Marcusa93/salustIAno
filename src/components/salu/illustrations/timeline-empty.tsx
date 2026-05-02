@@ -13,11 +13,23 @@ export function TimelineEmptyIllustration({ size = 160 }: { size?: number }) {
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      {/* Sol — accent peach soft */}
-      <circle cx="55" cy="60" r="22" fill="oklch(0.93 0.035 60)" opacity="0.7" />
-      <circle cx="55" cy="60" r="14" fill="oklch(0.985 0.006 90)" />
-      {/* Rayos de sol — finos */}
-      <g stroke="oklch(0.6 0.085 235)" strokeWidth="1.5" strokeLinecap="round" opacity="0.4">
+      {/* Sol — accent peach soft, respirando */}
+      <g
+        className="animate-breathe"
+        style={{ transformOrigin: '55px 60px', transformBox: 'fill-box' }}
+      >
+        <circle cx="55" cy="60" r="22" fill="oklch(0.93 0.035 60)" opacity="0.7" />
+        <circle cx="55" cy="60" r="14" fill="oklch(0.985 0.006 90)" />
+      </g>
+      {/* Rayos de sol — titilando suavemente */}
+      <g
+        stroke="oklch(0.6 0.085 235)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity="0.4"
+        className="animate-twinkle"
+        style={{ transformOrigin: '55px 60px', transformBox: 'fill-box' }}
+      >
         <path d="M55 26 L55 32" />
         <path d="M28 60 L34 60" />
         <path d="M82 60 L76 60" />
@@ -27,18 +39,22 @@ export function TimelineEmptyIllustration({ size = 160 }: { size?: number }) {
         <path d="M75 80 L70 75" />
       </g>
 
-      {/* Nube — primary muted soft */}
-      <g fill="oklch(0.92 0.012 235)">
+      {/* Nube — primary muted soft, derivando lentísimo */}
+      <g fill="oklch(0.92 0.012 235)" className="animate-drift-x">
         <circle cx="135" cy="58" r="14" />
         <circle cx="148" cy="55" r="11" />
         <circle cx="155" cy="62" r="13" />
         <circle cx="142" cy="65" r="14" />
       </g>
 
-      {/* Pájaros mínimos en el cielo */}
+      {/* Pájaros mínimos en el cielo — flotando arriba/abajo */}
       <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.5">
-        <path d="M105 35 Q108 32 111 35 Q114 32 117 35" />
-        <path d="M120 25 Q123 22 126 25" />
+        <g className="animate-float-y" style={{ animationDelay: '0s' }}>
+          <path d="M105 35 Q108 32 111 35 Q114 32 117 35" />
+        </g>
+        <g className="animate-float-y" style={{ animationDelay: '1.5s' }}>
+          <path d="M120 25 Q123 22 126 25" />
+        </g>
       </g>
 
       {/* Línea de horizonte ondulada */}

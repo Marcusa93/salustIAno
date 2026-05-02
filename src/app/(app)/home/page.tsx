@@ -1,3 +1,4 @@
+import { AnimatedCount } from '@/components/salu/animated-count';
 import { CradleIllustration } from '@/components/salu/illustrations/cradle';
 import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timeline-empty';
 import { Button } from '@/components/ui/button';
@@ -74,12 +75,12 @@ function formatAge(days: number | null): string {
 }
 
 const QUICK_BUTTON_CLS =
-  'group/qb relative flex h-auto flex-col items-center justify-center gap-2 rounded-2xl border border-border/60 bg-gradient-to-br from-card to-card/40 p-5 text-foreground shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+  'group/qb relative flex h-auto flex-col items-center justify-center gap-2 rounded-2xl border border-border/60 bg-gradient-to-br from-card to-card/40 p-5 text-foreground shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 active:translate-y-0 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
 function quickButtonContent(Icon: typeof Milk, label: string, todayCount?: number) {
   return (
     <span className={QUICK_BUTTON_CLS}>
-      <span className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover/qb:bg-primary/15">
+      <span className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover/qb:scale-110 group-hover/qb:bg-primary/15">
         <Icon className="size-5" aria-hidden />
       </span>
       <span className="font-medium text-sm">{label}</span>
@@ -204,7 +205,7 @@ export default async function HomePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
-      <header className="flex flex-col gap-2">
+      <header className="animate-stagger-up flex flex-col gap-2" style={{ animationDelay: '0ms' }}>
         <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
           {todayLabel}
         </span>
@@ -221,11 +222,27 @@ export default async function HomePage() {
       {/* SalustIA */}
       <Link
         href="/chat"
-        className="rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+        className="animate-stagger-up rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+        style={{ animationDelay: '60ms' }}
       >
         <Card className="relative flex items-center gap-4 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-accent/30 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/10">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/10">
-            <Sparkles className="size-5" aria-hidden />
+          <div className="relative flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/10">
+            <Sparkles className="size-5 animate-breathe" aria-hidden />
+            {/* Chispitas orbitando — guiño SalustIA está viva */}
+            <span
+              aria-hidden
+              className="absolute inset-0 origin-center"
+              style={{ animation: 'salu-orbit 9s linear infinite' }}
+            >
+              <span className="absolute top-0 left-1/2 size-1 -translate-x-1/2 -translate-y-1 rounded-full bg-primary/60" />
+            </span>
+            <span
+              aria-hidden
+              className="absolute inset-0 origin-center"
+              style={{ animation: 'salu-orbit 7s linear infinite reverse', animationDelay: '-2s' }}
+            >
+              <span className="absolute top-1/2 left-0 size-1 -translate-x-1 -translate-y-1/2 rounded-full bg-accent-foreground/40" />
+            </span>
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="font-medium text-foreground">Preguntale a SalustIA</span>
@@ -238,7 +255,10 @@ export default async function HomePage() {
 
       {/* Está durmiendo */}
       {activeSleep && (
-        <Card className="flex items-center gap-4 border-primary/30 bg-primary/5 p-4">
+        <Card
+          className="animate-stagger-up flex items-center gap-4 border-primary/30 bg-primary/5 p-4"
+          style={{ animationDelay: '120ms' }}
+        >
           <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
             <Moon className="size-5" aria-hidden />
           </div>
@@ -264,7 +284,10 @@ export default async function HomePage() {
       )}
 
       {/* Quick add */}
-      <section className="flex flex-col gap-3">
+      <section
+        className="animate-stagger-up flex flex-col gap-3"
+        style={{ animationDelay: '180ms' }}
+      >
         <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
           Anotar
         </h2>
@@ -297,7 +320,10 @@ export default async function HomePage() {
       </section>
 
       {/* Hoy */}
-      <section className="flex flex-col gap-3">
+      <section
+        className="animate-stagger-up flex flex-col gap-3"
+        style={{ animationDelay: '240ms' }}
+      >
         <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
           Hoy
         </h2>
@@ -309,7 +335,10 @@ export default async function HomePage() {
       </section>
 
       {/* Recientes */}
-      <section className="flex flex-col gap-3">
+      <section
+        className="animate-stagger-up flex flex-col gap-3"
+        style={{ animationDelay: '300ms' }}
+      >
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
             Recientes
@@ -356,14 +385,13 @@ function SummaryCard({
   return (
     <Card className="flex flex-col items-center gap-1.5 border-border/60 bg-gradient-to-b from-card to-muted/20 p-4 shadow-sm">
       <Icon className="size-5 text-primary/80" aria-hidden />
-      <span
+      <AnimatedCount
+        value={count}
         className={cn(
           'font-display text-3xl tracking-tight transition-colors',
           count > 0 ? 'text-foreground' : 'text-muted-foreground/40',
         )}
-      >
-        {count}
-      </span>
+      />
       <span className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
         {label}
       </span>
