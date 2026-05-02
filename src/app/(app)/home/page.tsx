@@ -55,6 +55,10 @@ function formatRelativeTime(iso: string, now: Date = new Date()): string {
   return days >= 0 ? `Hace ${days} día${days === 1 ? '' : 's'}` : 'Mañana';
 }
 
+function capitalize(s: string): string {
+  return s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
 function formatAge(days: number | null): string {
   if (days === null) return '—';
   if (days < 0)
@@ -68,13 +72,20 @@ function formatAge(days: number | null): string {
 }
 
 const QUICK_BUTTON_CLS =
-  'flex h-auto flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 text-foreground transition-all hover:-translate-y-0.5 hover:bg-muted/40 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+  'group/qb relative flex h-auto flex-col items-center justify-center gap-2 rounded-2xl border border-border/60 bg-gradient-to-br from-card to-card/40 p-5 text-foreground shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
-function quickButtonContent(Icon: typeof Milk, label: string) {
+function quickButtonContent(Icon: typeof Milk, label: string, todayCount?: number) {
   return (
     <span className={QUICK_BUTTON_CLS}>
-      <Icon className="size-6 text-primary" aria-hidden />
+      <span className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover/qb:bg-primary/15">
+        <Icon className="size-5" aria-hidden />
+      </span>
       <span className="font-medium text-sm">{label}</span>
+      {todayCount !== undefined && todayCount > 0 && (
+        <span className="text-[10px] font-medium text-muted-foreground tracking-wide">
+          {todayCount} hoy
+        </span>
+      )}
     </span>
   );
 }
@@ -177,14 +188,28 @@ export default async function HomePage() {
   };
 
   const ageDays = chronologicalAgeDays(child.birth_date);
+  const todayLabel = capitalize(
+    new Date().toLocaleDateString('es-AR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    }),
+  );
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-2">
-        <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
+    <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-primary/[0.06] via-primary/[0.02] to-transparent"
+      />
+      <header className="flex flex-col gap-1.5">
+        <span className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
+          {todayLabel}
+        </span>
+        <h1 className="font-display text-4xl text-foreground tracking-tight sm:text-5xl">
           Hola{displayName ? `, ${displayName}` : ''}.
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-base text-muted-foreground sm:text-lg">
           {child.birth_date
             ? `${child.name}, ${formatAge(ageDays)}.`
             : `Esperando a ${child.name}.`}
@@ -238,18 +263,30 @@ export default async function HomePage() {
 
       {/* Quick add */}
       <section className="flex flex-col gap-3">
-        <h2 className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
+        <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
           Anotar
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <FeedingQuickAdd
-            trigger={<button type="button">{quickButtonContent(Milk, 'Tomó')}</button>}
+            trigger={
+              <button type="button">
+                {quickButtonContent(Milk, 'Tomó', todaySummary.feeding)}
+              </button>
+            }
           />
           <SleepQuickAdd
-            trigger={<button type="button">{quickButtonContent(Moon, 'Durmió')}</button>}
+            trigger={
+              <button type="button">
+                {quickButtonContent(Moon, 'Durmió', todaySummary.sleep)}
+              </button>
+            }
           />
           <DiaperQuickAdd
-            trigger={<button type="button">{quickButtonContent(Baby, 'Pañal')}</button>}
+            trigger={
+              <button type="button">
+                {quickButtonContent(Baby, 'Pañal', todaySummary.diaper)}
+              </button>
+            }
           />
           <Link href="/notas/nuevo" className="contents">
             {quickButtonContent(BookHeart, 'Momento')}
@@ -259,7 +296,9 @@ export default async function HomePage() {
 
       {/* Hoy */}
       <section className="flex flex-col gap-3">
-        <h2 className="font-medium text-muted-foreground text-sm uppercase tracking-wider">Hoy</h2>
+        <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
+          Hoy
+        </h2>
         <div className="grid grid-cols-3 gap-3">
           <SummaryCard label="Tomas" count={todaySummary.feeding} Icon={Milk} />
           <SummaryCard label="Sueños" count={todaySummary.sleep} Icon={Moon} />
@@ -270,10 +309,13 @@ export default async function HomePage() {
       {/* Recientes */}
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
+          <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
             Recientes
           </h2>
-          <Link href={'/timeline' as Route} className="text-primary text-sm hover:underline">
+          <Link
+            href={'/timeline' as Route}
+            className="font-medium text-primary text-sm hover:underline"
+          >
             Ver todo
           </Link>
         </div>
@@ -305,10 +347,19 @@ function SummaryCard({
   Icon: typeof Milk;
 }) {
   return (
-    <Card className="flex flex-col items-center gap-1 p-4">
-      <Icon className="size-5 text-primary" aria-hidden />
-      <span className="font-display text-2xl text-foreground">{count}</span>
-      <span className="text-muted-foreground text-xs">{label}</span>
+    <Card className="flex flex-col items-center gap-1.5 border-border/60 bg-gradient-to-b from-card to-muted/20 p-4 shadow-sm">
+      <Icon className="size-5 text-primary/80" aria-hidden />
+      <span
+        className={cn(
+          'font-display text-3xl tracking-tight transition-colors',
+          count > 0 ? 'text-foreground' : 'text-muted-foreground/40',
+        )}
+      >
+        {count}
+      </span>
+      <span className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
+        {label}
+      </span>
     </Card>
   );
 }
@@ -322,8 +373,8 @@ function EventRow({ row }: { row: TimelineRow }) {
   return (
     <Card
       className={cn(
-        'flex items-center gap-3 p-3',
-        photoAnalysis?.alarm && 'border-destructive/40 bg-destructive/5',
+        'flex items-center gap-3 border-border/60 p-3.5 transition-colors hover:bg-muted/30',
+        photoAnalysis?.alarm && 'border-destructive/40 bg-destructive/5 hover:bg-destructive/10',
       )}
     >
       <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
