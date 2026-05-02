@@ -11,6 +11,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url().default('http://localhost:3000'),
   OPENROUTER_API_KEY: z.string().min(1).optional(),
   OPENROUTER_DEFAULT_MODEL: z.string().min(1).default('anthropic/claude-haiku-4-5'),
+  AIMLAPI_API_KEY: z.string().min(1).optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 

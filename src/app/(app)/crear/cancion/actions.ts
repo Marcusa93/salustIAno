@@ -1,6 +1,8 @@
 'use server';
 
 import { generateLullaby, lullabyInputSchema } from '@/lib/ai/agents';
+import { lullabyOutputSchema } from '@/lib/ai/agents/lullaby-schema';
+import { generateLullabyAudio } from '@/lib/ai/audio/lullaby-audio';
 import {
   AIConfigError,
   AIGuardrailError,
@@ -88,6 +90,58 @@ export async function createLullabyAction(input: unknown): Promise<LullabyFormSt
     return {
       status: 'error',
       error: { type: 'provider', message: 'Algo salió mal generando la canción. Probá de nuevo.' },
+    };
+  }
+}
+
+export type GenerateAudioResult =
+  | { ok: true; audioUrl: string; latencyMs: number }
+  | {
+      ok: false;
+      error: { type: 'config' | 'network' | 'provider' | 'validation'; message: string };
+    };
+
+/**
+ * Toma una nana ya generada por el agente lullaby y le pide a AIMLAPI
+ * (modelo minimax/music-1.5) que la cante. Polling interno; el cliente
+ * espera 50-60s con un loading state. Devuelve URL del MP3.
+ *
+ * Re-valida la nana server-side (defensa en profundidad — el cliente
+ * podría mandar cualquier cosa).
+ */
+export async function generateLullabyAudioAction(
+  rawLullaby: unknown,
+): Promise<GenerateAudioResult> {
+  const parsed = lullabyOutputSchema.safeParse(rawLullaby);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { type: 'validation', message: 'La canción no se reconoce. Generá una nueva.' },
+    };
+  }
+
+  try {
+    const result = await generateLullabyAudio(parsed.data);
+    return { ok: true, audioUrl: result.audioUrl, latencyMs: result.meta.latencyMs };
+  } catch (err) {
+    if (err instanceof AIConfigError) {
+      return {
+        ok: false,
+        error: { type: 'config', message: 'Falta configurar AIMLAPI. Avisale al admin.' },
+      };
+    }
+    if (err instanceof AINetworkError) {
+      return {
+        ok: false,
+        error: { type: 'network', message: 'No pudimos conectar con el generador de audio.' },
+      };
+    }
+    if (err instanceof AIProviderError) {
+      return { ok: false, error: { type: 'provider', message: err.message } };
+    }
+    return {
+      ok: false,
+      error: { type: 'provider', message: 'Algo salió mal generando el audio. Probá de nuevo.' },
     };
   }
 }

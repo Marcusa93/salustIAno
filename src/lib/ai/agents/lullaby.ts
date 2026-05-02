@@ -22,7 +22,7 @@ export type { LullabyInput, LullabyOutput };
 
 const AGENT_NAME = 'lullaby';
 const MODEL = 'anthropic/claude-opus-4-7';
-const PROMPT_VERSION = 'lullaby-v1';
+const PROMPT_VERSION = 'lullaby-v2';
 
 const SYSTEM_PROMPT = readFileSync(join(process.cwd(), 'src/lib/ai/prompts/lullaby.md'), 'utf8');
 
