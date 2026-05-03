@@ -6,7 +6,9 @@ import { BookHeart, ChevronLeft, Pencil } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { listNotePhotosAction } from '../actions';
 import { DeleteNoteButton } from './_components/delete-note-button';
+import { NotePhotos } from './_components/note-photos';
 
 export const metadata: Metadata = {
   title: 'Nota',
@@ -41,6 +43,7 @@ export default async function NoteDetailPage({ params }: PageProps) {
   if (error || !note) notFound();
 
   const { data: userData } = await supabase.auth.getUser();
+  const photos = await listNotePhotosAction(note.id);
 
   // Edit/delete: el autor o un admin (RLS lo impone; la UI lo refleja).
   let canEdit = false;
@@ -98,6 +101,8 @@ export default async function NoteDetailPage({ params }: PageProps) {
           {note.content}
         </div>
       </Card>
+
+      <NotePhotos noteId={note.id} initial={photos} canEdit={canEdit} />
 
       {canEdit && (
         <div className="flex flex-wrap gap-2 border-border border-t pt-4">
