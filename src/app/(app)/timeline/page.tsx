@@ -16,7 +16,17 @@ import {
   SLEEP_QUALITY_LABELS,
   type SleepQuality,
 } from '@/lib/validators/events';
-import { AlertTriangle, Baby, BookHeart, Camera, Milk, Moon, Pencil, Sun } from 'lucide-react';
+import {
+  AlertTriangle,
+  Baby,
+  BookHeart,
+  CalendarDays,
+  Camera,
+  Milk,
+  Moon,
+  Pencil,
+  Sun,
+} from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { DiaperPhotoLink } from '../cuidar/eventos/_components/diaper-photo-link';
@@ -140,10 +150,16 @@ export default async function TimelinePage({ searchParams }: PageProps) {
               El día a día de {child.name}.
             </h1>
           </div>
-          <Button render={<Link href="/notas/nuevo" />} size="sm">
-            <BookHeart className="size-4" aria-hidden />
-            Anotar momento
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button render={<Link href={'/timeline/mes' as Route} />} size="sm" variant="outline">
+              <CalendarDays className="size-4" aria-hidden />
+              Vista mensual
+            </Button>
+            <Button render={<Link href="/notas/nuevo" />} size="sm">
+              <BookHeart className="size-4" aria-hidden />
+              Anotar momento
+            </Button>
+          </div>
         </div>
       </header>
 
