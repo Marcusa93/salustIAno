@@ -3,12 +3,28 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import type { CreateMemberInput } from '@/lib/validators/family-member';
-import { Loader2, Plus, Trash2, UserPlus, Users } from 'lucide-react';
+import type { CreateMemberInput, MemberRole } from '@/lib/validators/family-member';
+import { KeyRound, Loader2, MoreVertical, Plus, Trash2, UserPlus, Users } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { type MemberEntry, createMemberAction, removeMemberAction } from '../miembros/actions';
+import {
+  type MemberEntry,
+  createMemberAction,
+  removeMemberAction,
+  resetMemberPasswordAction,
+  updateMemberRoleAction,
+} from '../miembros/actions';
 import { CreateMemberSheet } from './create-member-sheet';
 
 const ROLE_LABEL: Record<MemberEntry['role'], string> = {
@@ -86,10 +102,18 @@ export function MembersSection({ initialMembers, isAdmin }: MembersSectionProps)
             <MemberCard
               key={m.membershipId}
               member={m}
-              canRemove={isAdmin && !m.isSelf && m.role !== 'admin'}
+              canManage={isAdmin && !m.isSelf && m.role !== 'admin'}
               onRemoved={() =>
                 setMembers((prev) => prev.filter((x) => x.membershipId !== m.membershipId))
               }
+              onRoleChanged={(newRole) =>
+                setMembers((prev) =>
+                  prev.map((x) =>
+                    x.membershipId === m.membershipId ? { ...x, role: newRole } : x,
+                  ),
+                )
+              }
+              onPasswordReset={(password, email) => setPendingPassword({ password, email })}
             />
           ))}
         </ul>
@@ -131,14 +155,18 @@ export function MembersSection({ initialMembers, isAdmin }: MembersSectionProps)
 
 function MemberCard({
   member,
-  canRemove,
+  canManage,
   onRemoved,
+  onRoleChanged,
+  onPasswordReset,
 }: {
   member: MemberEntry;
-  canRemove: boolean;
+  canManage: boolean;
   onRemoved: () => void;
+  onRoleChanged: (newRole: MemberRole) => void;
+  onPasswordReset: (tempPassword: string, email: string) => void;
 }) {
-  const [removing, startRemove] = useTransition();
+  const [pending, startPending] = useTransition();
 
   function handleRemove() {
     if (
@@ -148,7 +176,7 @@ function MemberCard({
     ) {
       return;
     }
-    startRemove(async () => {
+    startPending(async () => {
       const result = await removeMemberAction(member.membershipId);
       if (!result.ok) {
         toast.error(result.error);
@@ -156,6 +184,39 @@ function MemberCard({
       }
       onRemoved();
       toast.success('Miembro eliminado.');
+    });
+  }
+
+  function handleRoleChange(role: string) {
+    if (role === member.role) return;
+    if (role !== 'caregiver' && role !== 'family' && role !== 'viewer') return;
+    startPending(async () => {
+      const result = await updateMemberRoleAction(member.membershipId, role);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      onRoleChanged(role);
+      toast.success('Rol actualizado.');
+    });
+  }
+
+  function handleResetPassword() {
+    if (
+      !window.confirm(
+        `¿Resetear la contraseña de ${member.displayName ?? member.email ?? 'este miembro'}? La nueva contraseña va a aparecer una sola vez.`,
+      )
+    ) {
+      return;
+    }
+    startPending(async () => {
+      const result = await resetMemberPasswordAction(member.membershipId);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      onPasswordReset(result.tempPassword, result.email);
+      toast.success('Contraseña reseteada. Copiala antes de cerrar.');
     });
   }
 
@@ -187,21 +248,40 @@ function MemberCard({
         >
           {ROLE_LABEL[member.role]}
         </span>
-        {canRemove && (
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            onClick={handleRemove}
-            disabled={removing}
-            aria-label={`Sacar a ${member.displayName ?? member.email ?? 'miembro'} de la familia`}
-          >
-            {removing ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <Trash2 className="size-4" aria-hidden />
-            )}
-          </Button>
+        {canManage && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={`Opciones para ${member.displayName ?? member.email ?? 'este miembro'}`}
+              disabled={pending}
+              className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <MoreVertical className="size-4" aria-hidden />
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[180px]">
+              <DropdownMenuLabel>Cambiar rol</DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={member.role} onValueChange={handleRoleChange}>
+                <DropdownMenuRadioItem value="caregiver">Cuidador/a</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="family">Familia</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="viewer">Solo ver</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleResetPassword}>
+                <KeyRound />
+                Resetear contraseña
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleRemove}
+                className="text-destructive data-highlighted:bg-destructive/10 data-highlighted:text-destructive"
+              >
+                <Trash2 />
+                Sacar de la familia
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </Card>
     </li>

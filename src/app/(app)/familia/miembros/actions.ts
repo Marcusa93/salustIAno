@@ -2,7 +2,12 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { type CreateMemberInput, createMemberSchema } from '@/lib/validators/family-member';
+import {
+  type CreateMemberInput,
+  type MemberRole,
+  createMemberSchema,
+  memberRoleSchema,
+} from '@/lib/validators/family-member';
 import { revalidatePath } from 'next/cache';
 
 export interface MemberEntry {
@@ -347,4 +352,109 @@ export async function removeMemberAction(
 
   revalidatePath('/familia');
   return { ok: true };
+}
+
+/**
+ * Cambia el rol de un miembro existente. Reglas:
+ *   - Solo admin puede.
+ *   - No podés cambiar tu propio rol (te quedaría sin admins la familia).
+ *   - No podés cambiar el rol de otro admin (mismo motivo).
+ *   - El nuevo rol no puede ser 'admin' (se asigna por otra vía: signup).
+ */
+export async function updateMemberRoleAction(
+  membershipId: string,
+  newRole: MemberRole,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parsed = memberRoleSchema.safeParse(newRole);
+  if (!parsed.success) return { ok: false, error: 'Rol inválido.' };
+
+  const ctx = await getCallerAdminContext();
+  if (!ctx) return { ok: false, error: 'Solo un admin puede cambiar roles.' };
+
+  const adminClient = createAdminClient();
+  const { data: target } = await adminClient
+    .from('family_memberships')
+    .select('id, user_id, role, family_group_id, deleted_at')
+    .eq('id', membershipId)
+    .maybeSingle();
+
+  if (!target || target.deleted_at) {
+    return { ok: false, error: 'No encontramos esa membresía.' };
+  }
+  if (target.family_group_id !== ctx.familyGroupId) {
+    return { ok: false, error: 'Esa membresía no es de tu familia.' };
+  }
+  if (target.user_id === ctx.userId) {
+    return { ok: false, error: 'No podés cambiarte el rol a vos misma.' };
+  }
+  if (target.role === 'admin') {
+    return { ok: false, error: 'No podés cambiar el rol de otro admin.' };
+  }
+
+  const { error } = await adminClient
+    .from('family_memberships')
+    .update({ role: parsed.data })
+    .eq('id', membershipId);
+
+  if (error) return { ok: false, error: 'No pudimos cambiar el rol.' };
+
+  revalidatePath('/familia');
+  return { ok: true };
+}
+
+/**
+ * Resetea la contraseña del miembro y vuelve a marcar
+ * `must_change_password=true` para forzarle el flow de bienvenida la próxima
+ * vez que entre. Devuelve la pass nueva una sola vez para que el admin la
+ * pase por un canal seguro.
+ *
+ * No se puede resetear la propia contraseña ni la de otro admin.
+ */
+export async function resetMemberPasswordAction(
+  membershipId: string,
+): Promise<{ ok: true; tempPassword: string; email: string } | { ok: false; error: string }> {
+  const ctx = await getCallerAdminContext();
+  if (!ctx) return { ok: false, error: 'Solo un admin puede resetear contraseñas.' };
+
+  const adminClient = createAdminClient();
+  const { data: target } = await adminClient
+    .from('family_memberships')
+    .select('id, user_id, role, family_group_id, deleted_at')
+    .eq('id', membershipId)
+    .maybeSingle();
+
+  if (!target || target.deleted_at) {
+    return { ok: false, error: 'No encontramos esa membresía.' };
+  }
+  if (target.family_group_id !== ctx.familyGroupId) {
+    return { ok: false, error: 'Esa membresía no es de tu familia.' };
+  }
+  if (target.user_id === ctx.userId) {
+    return { ok: false, error: 'Reseteá tu propia contraseña desde tu perfil.' };
+  }
+  if (target.role === 'admin') {
+    return { ok: false, error: 'No podés resetear la contraseña de otro admin.' };
+  }
+
+  // Buscar el email + el user_metadata existente para no pisar otros campos.
+  const { data: existing, error: getErr } = await adminClient.auth.admin.getUserById(
+    target.user_id,
+  );
+  if (getErr || !existing.user?.email) {
+    return { ok: false, error: 'No encontramos la cuenta del miembro.' };
+  }
+
+  const tempPassword = generateTempPassword();
+  const previousMeta = (existing.user.user_metadata as Record<string, unknown> | null) ?? {};
+  const { error: updateErr } = await adminClient.auth.admin.updateUserById(target.user_id, {
+    password: tempPassword,
+    user_metadata: { ...previousMeta, must_change_password: true },
+  });
+
+  if (updateErr) {
+    return { ok: false, error: 'No pudimos resetear la contraseña.' };
+  }
+
+  revalidatePath('/familia');
+  return { ok: true, tempPassword, email: existing.user.email };
 }
