@@ -126,7 +126,9 @@ export async function generateLullabyAudioAction(
     };
   }
 
-  // Resolver user + family + child antes de gastar plata en AIMLAPI.
+  // Resolver user + family + child. El child es opcional — si todavía
+  // no nació o no se creó el perfil, generamos el audio igual y
+  // devolvemos URL temporal sin persistir en biblioteca.
   const supabase = await createClient();
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userData.user) {
@@ -141,13 +143,6 @@ export async function generateLullabyAudioAction(
     .limit(1)
     .maybeSingle();
 
-  if (!membership?.family_group_id) {
-    return {
-      ok: false,
-      error: { type: 'validation', message: 'No encontramos tu grupo familiar.' },
-    };
-  }
-
   const { data: child } = await supabase
     .from('child_profiles')
     .select('id')
@@ -156,19 +151,27 @@ export async function generateLullabyAudioAction(
     .limit(1)
     .maybeSingle();
 
-  if (!child?.id) {
-    return {
-      ok: false,
-      error: { type: 'validation', message: 'No hay perfil de bebé creado.' },
-    };
-  }
+  // Si falta family o child, no persistimos pero igual generamos.
+  const canPersist = !!membership?.family_group_id && !!child?.id;
 
   try {
-    // 1. Generar audio en AIMLAPI (paga aquí).
+    // 1. Generar audio en AIMLAPI (paga aquí — pase lo que pase).
     const audio = await generateLullabyAudio(parsed.data, {
       actorUserId: userData.user.id,
-      childId: child.id as string,
+      childId: (child?.id as string | undefined) ?? null,
     });
+
+    // Si no podemos persistir (sin perfil aún), devolvemos URL temporal
+    // del CDN. Expira en horas, pero la familia escucha la canción ahora
+    // y cuando creen el perfil pueden generar de nuevo y queda en biblioteca.
+    if (!canPersist) {
+      return {
+        ok: true,
+        audioUrl: audio.audioUrl,
+        lullabyId: '',
+        latencyMs: audio.meta.latencyMs,
+      };
+    }
 
     // 2. Descargar el MP3 del CDN antes de que expire.
     const audioResponse = await fetch(audio.audioUrl);
@@ -180,7 +183,7 @@ export async function generateLullabyAudioAction(
 
     // 3. Subir a Supabase Storage en {family}/{child}/{ts}-{rand}.mp3.
     const rand = Math.random().toString(36).slice(2, 8);
-    const path = `${membership.family_group_id}/${child.id}/${Date.now()}-${rand}.mp3`;
+    const path = `${membership?.family_group_id}/${child?.id}/${Date.now()}-${rand}.mp3`;
     const { error: uploadErr } = await supabase.storage
       .from(LULLABIES_BUCKET)
       .upload(path, audioBuffer, {
@@ -196,7 +199,7 @@ export async function generateLullabyAudioAction(
         promptVersion: 'lullaby-persist-v1',
         error: `storage upload failed: ${uploadErr.message}`,
         actorUserId: userData.user.id,
-        childId: child.id as string,
+        childId: (child?.id as string | undefined) ?? null,
       });
       // La nana se generó pero no se persistió. Devolvemos el URL temporal
       // para que la familia pueda al menos escucharla esta vez.
@@ -214,8 +217,8 @@ export async function generateLullabyAudioAction(
     const { data: row, error: insertErr } = await sb
       .from('lullabies')
       .insert({
-        child_id: child.id,
-        family_group_id: membership.family_group_id,
+        child_id: child?.id,
+        family_group_id: membership?.family_group_id,
         title: parsed.data.title,
         intro: parsed.data.intro,
         verses: parsed.data.verses,
@@ -236,7 +239,7 @@ export async function generateLullabyAudioAction(
         promptVersion: 'lullaby-persist-v1',
         error: `insert failed: ${insertErr?.message ?? 'unknown'}`,
         actorUserId: userData.user.id,
-        childId: child.id as string,
+        childId: (child?.id as string | undefined) ?? null,
       });
       // Mismo fallback: ya tenemos el audio en Storage, solo falta la fila.
       // Devolvemos el URL temporal del CDN para esta sesión.

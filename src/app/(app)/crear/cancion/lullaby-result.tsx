@@ -26,6 +26,7 @@ export const LullabyResult = forwardRef(function LullabyResult(
   ref: Ref<HTMLHeadingElement>,
 ) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioIsTemporary, setAudioIsTemporary] = useState(false);
   const [audioPending, startAudio] = useTransition();
 
   function copyAsText() {
@@ -37,6 +38,7 @@ export const LullabyResult = forwardRef(function LullabyResult(
 
   function generateAudio() {
     setAudioUrl(null);
+    setAudioIsTemporary(false);
     startAudio(async () => {
       const result = await generateLullabyAudioAction(lullaby);
       if (!result.ok) {
@@ -44,7 +46,18 @@ export const LullabyResult = forwardRef(function LullabyResult(
         return;
       }
       setAudioUrl(result.audioUrl);
-      toast.success('Canción lista.');
+      // Si lullabyId vino vacío, no se persistió en biblioteca (sin perfil
+      // de bebé creado todavía, o falló el storage). Avisamos al usuario
+      // que el audio es temporal.
+      const persisted = result.lullabyId.length > 0;
+      setAudioIsTemporary(!persisted);
+      if (persisted) {
+        toast.success('Canción lista — guardada en biblioteca.');
+      } else {
+        toast.success(
+          'Canción lista. (Descargala si querés guardarla — todavía no hay perfil del bebé)',
+        );
+      }
     });
   }
 
@@ -96,6 +109,13 @@ export const LullabyResult = forwardRef(function LullabyResult(
             <audio src={audioUrl} controls preload="none" className="w-full rounded-lg">
               <track kind="captions" />
             </audio>
+            {audioIsTemporary && (
+              <p className="rounded-lg border border-accent/40 bg-accent/30 px-3 py-2 text-accent-foreground text-xs leading-relaxed">
+                Audio temporal — todavía no hay perfil de bebé creado, así que no quedó en la
+                biblioteca. Descargá el MP3 si la querés guardar, o creá el perfil de Salu para que
+                las próximas se guarden solas.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
