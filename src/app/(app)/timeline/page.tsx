@@ -25,6 +25,7 @@ import {
   Milk,
   Moon,
   Pencil,
+  Printer,
   Sun,
 } from 'lucide-react';
 import type { Metadata, Route } from 'next';
@@ -151,6 +152,14 @@ export default async function TimelinePage({ searchParams }: PageProps) {
             </h1>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              render={<Link href={'/timeline/imprimir' as Route} />}
+              size="sm"
+              variant="outline"
+            >
+              <Printer className="size-4" aria-hidden />
+              Imprimir / PDF
+            </Button>
             <Button render={<Link href={'/timeline/mes' as Route} />} size="sm" variant="outline">
               <CalendarDays className="size-4" aria-hidden />
               Vista mensual
