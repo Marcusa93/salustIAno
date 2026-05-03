@@ -1,5 +1,6 @@
 import { BottomNav } from '@/components/salu/bottom-nav';
 import { DesktopSidebar } from '@/components/salu/desktop-sidebar';
+import { InstallHint } from '@/components/salu/install-hint';
 import { MobileMenu } from '@/components/salu/mobile-menu';
 import { SaluLogo } from '@/components/salu/salu-logo';
 import { SoftBackdrop } from '@/components/salu/soft-backdrop';
@@ -34,6 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </footer>
 
       <BottomNav />
+      <InstallHint />
     </div>
   );
 }

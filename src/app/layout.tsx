@@ -1,5 +1,5 @@
 import { Toaster } from '@/components/ui/sonner';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { ThemeProvider } from 'next-themes';
 import { Fraunces, Geist, Geist_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
@@ -33,6 +33,15 @@ export const metadata: Metadata = {
   },
   description:
     'Salu es la casa donde vamos a guardar todo lo de Salustiano cuando llegue. Hecho con cuidado en Tucumán.',
+  applicationName: 'Salu',
+  appleWebApp: {
+    capable: true,
+    title: 'Salu',
+    statusBarStyle: 'default',
+  },
+  formatDetection: {
+    telephone: false,
+  },
   openGraph: {
     title: 'Salu — un lugar para Salustiano',
     description:
@@ -47,6 +56,24 @@ export const metadata: Metadata = {
     description:
       'Salu es la casa donde vamos a guardar todo lo de Salustiano cuando llegue. Hecho con cuidado en Tucumán.',
   },
+};
+
+/**
+ * Viewport + theme color. Next ≥ 14 los pide separados de `metadata` para
+ * que la metadata estática quede sin runtime. El theme_color del manifest
+ * lo respeta el splash; este `themeColor` controla la barra del navegador
+ * (Android Chrome) y la barra de estado del PWA cuando está abierto.
+ */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f4efe2' },
+    { media: '(prefers-color-scheme: dark)', color: '#1a2436' },
+  ],
+  // PWA-friendly: evitar que el usuario haga zoom accidental al tipear.
+  // Mantenemos viewport-fit=cover para que el safe-area-inset funcione.
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
