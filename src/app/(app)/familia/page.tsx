@@ -2,9 +2,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
-import { Baby, Plus, Users } from 'lucide-react';
+import { Baby, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { MembersSection } from './_components/members-section';
+import { listMembersAction } from './miembros/actions';
 
 export const metadata: Metadata = {
   title: 'Familia',
@@ -29,13 +31,14 @@ function formatBirth(birthDate: string | null): string {
 export default async function FamiliaPage() {
   const supabase = await createClient();
 
-  const [{ data: userData }, { data: children }] = await Promise.all([
+  const [{ data: userData }, { data: children }, members] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from('child_profiles')
       .select('id, name, birth_date, is_preterm')
       .is('deleted_at', null)
       .order('created_at', { ascending: true }),
+    listMembersAction(),
   ]);
 
   let isAdmin = false;
@@ -147,25 +150,7 @@ export default async function FamiliaPage() {
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
-          Miembros
-        </h2>
-        <Card className="flex flex-col items-center gap-4 p-10 text-center opacity-60">
-          <div className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <Users className="size-6" aria-hidden />
-          </div>
-          <div className="flex flex-col gap-1">
-            <p className="font-medium text-foreground text-sm">
-              Próximamente: invitar a la familia
-            </p>
-            <p className="max-w-md text-muted-foreground text-xs">
-              Vas a poder sumar a mamá, abuelos y tíos como caregivers o family. Cada uno con
-              permisos según lo que necesite ver y hacer.
-            </p>
-          </div>
-        </Card>
-      </section>
+      <MembersSection initialMembers={members} isAdmin={isAdmin} />
     </div>
   );
 }
