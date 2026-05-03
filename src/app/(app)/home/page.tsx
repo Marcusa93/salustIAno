@@ -38,8 +38,10 @@ import { EditSleepSheet } from '../cuidar/eventos/_components/edit-sleep-sheet';
 import { CloseSleepSheet } from './_components/close-sleep-sheet';
 import { DailySummaryCard } from './_components/daily-summary-card';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
+import { FamilyActivityCard } from './_components/family-activity-card';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
 import { SleepQuickAdd } from './_components/sleep-quick-add';
+import { getTodayActivityByMemberAction } from './family-activity-actions';
 
 export const metadata: Metadata = {
   title: 'Casa',
@@ -163,8 +165,8 @@ export default async function HomePage() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const [{ data: recentEvents }, { data: todayEvents }, { data: activeSleeps }] = await Promise.all(
-    [
+  const [{ data: recentEvents }, { data: todayEvents }, { data: activeSleeps }, todayActivity] =
+    await Promise.all([
       supabase.rpc('get_timeline', {
         p_child_id: child.id,
         p_event_types: ['feeding', 'sleep', 'diaper'],
@@ -186,8 +188,8 @@ export default async function HomePage() {
         .is('deleted_at', null)
         .order('started_at', { ascending: false })
         .limit(1),
-    ],
-  );
+      getTodayActivityByMemberAction(),
+    ]);
 
   const recents = (recentEvents ?? []) as TimelineRow[];
   const today = (todayEvents ?? []) as TimelineRow[];
@@ -350,6 +352,13 @@ export default async function HomePage() {
           <SummaryCard label="Pañales" count={todaySummary.diaper} Icon={Baby} />
         </div>
       </section>
+
+      {/* Actividad por miembro de la familia hoy. Si nadie hizo nada, no se renderiza. */}
+      {todayActivity.length > 0 && (
+        <div className="animate-stagger-up" style={{ animationDelay: '270ms' }}>
+          <FamilyActivityCard activity={todayActivity} />
+        </div>
+      )}
 
       {/* Recientes */}
       <section
