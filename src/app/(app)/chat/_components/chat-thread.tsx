@@ -1,5 +1,6 @@
 'use client';
 
+import { SpeakButton } from '@/components/salu/speak-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -227,6 +228,11 @@ export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) 
         {entries.map((e, i) => (
           <div key={`${e.role}-${i}`} className="flex flex-col gap-2">
             <MessageBubble entry={e} />
+            {e.role === 'assistant' && e.content.length > 0 && (
+              <div className="-mt-1 flex items-center justify-start pl-1">
+                <SpeakButton text={e.content} />
+              </div>
+            )}
             {e.role === 'assistant' &&
               e.proposals.map((p, j) => <ProposalCard key={`${i}-${j}-${p.kind}`} proposal={p} />)}
           </div>
