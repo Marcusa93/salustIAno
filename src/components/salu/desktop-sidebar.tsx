@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Baby, BookHeart, Home, Sparkles, Users } from 'lucide-react';
+import { Baby, BookHeart, Home, ImageIcon, Sparkles, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -9,6 +9,7 @@ const items = [
   { href: '/home', label: 'Home', icon: Home },
   { href: '/cuidar', label: 'Cuidar', icon: Baby },
   { href: '/timeline', label: 'Recordar', icon: BookHeart },
+  { href: '/album', label: 'Álbum', icon: ImageIcon },
   { href: '/crear', label: 'Crear', icon: Sparkles },
   { href: '/familia', label: 'Familia', icon: Users },
 ] as const;

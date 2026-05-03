@@ -1,16 +1,18 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Baby, BookHeart, Home, Sparkles, Users } from 'lucide-react';
+import { Baby, BookHeart, Home, ImageIcon, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+// Bottom nav mobile: 5 ítems (Familia se accede desde el user menu para
+// no abarrotar). Album entra acá porque es uso frecuente.
 const items = [
   { href: '/home', label: 'Home', icon: Home },
   { href: '/cuidar', label: 'Cuidar', icon: Baby },
-  { href: '/timeline', label: 'Recordar', icon: BookHeart },
+  { href: '/timeline', label: 'Timeline', icon: BookHeart },
+  { href: '/album', label: 'Álbum', icon: ImageIcon },
   { href: '/crear', label: 'Crear', icon: Sparkles },
-  { href: '/familia', label: 'Familia', icon: Users },
 ] as const;
 
 export function BottomNav() {

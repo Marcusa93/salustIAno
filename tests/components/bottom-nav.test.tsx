@@ -15,7 +15,7 @@ beforeAll(() => {
 describe('BottomNav', () => {
   it('renderiza 5 ítems de navegación', () => {
     render(<BottomNav />);
-    const labels = ['Home', 'Cuidar', 'Recordar', 'Crear', 'Familia'];
+    const labels = ['Home', 'Cuidar', 'Timeline', 'Álbum', 'Crear'];
     for (const label of labels) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
