@@ -4,10 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MOOD_LABELS } from '@/lib/ai/agents/lullaby-schema';
 import { cn } from '@/lib/utils';
-import { Loader2, Music, Pause, Play, Trash2 } from 'lucide-react';
+import { Link2, Loader2, Music, Pause, Play, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { type LullabyLibraryEntry, deleteLullabyAction, getLullabyAudioUrlAction } from './actions';
+import {
+  type LullabyLibraryEntry,
+  deleteLullabyAction,
+  getLullabyAudioUrlAction,
+  shareLullabyAction,
+} from './actions';
 
 const MOODS = ['dulce', 'jugueton', 'calmo', 'valiente'] as const;
 
@@ -202,6 +207,7 @@ function LullabyItem({
             </span>
           </button>
         </div>
+        <ShareButton id={entry.id} />
         <Button
           type="button"
           size="icon-xs"
@@ -248,6 +254,42 @@ function LullabyItem({
         </div>
       )}
     </Card>
+  );
+}
+
+function ShareButton({ id }: { id: string }) {
+  const [pending, startShare] = useTransition();
+  function handleShare() {
+    startShare(async () => {
+      const result = await shareLullabyAction(id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const fullUrl = `${window.location.origin}${result.url}`;
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        toast.success('Link copiado. Compartilo con quien quieras.');
+      } catch {
+        toast.success(`Link generado: ${fullUrl}`);
+      }
+    });
+  }
+  return (
+    <Button
+      type="button"
+      size="icon-xs"
+      variant="ghost"
+      onClick={handleShare}
+      disabled={pending}
+      aria-label="Compartir canción"
+    >
+      {pending ? (
+        <Loader2 className="size-3 animate-spin" aria-hidden />
+      ) : (
+        <Link2 className="size-3" aria-hidden />
+      )}
+    </Button>
   );
 }
 

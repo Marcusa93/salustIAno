@@ -207,6 +207,42 @@ export async function listStoriesAction(): Promise<StoryLibraryEntry[]> {
   }));
 }
 
+export async function shareStoryAction(
+  id: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  if (typeof id !== 'string' || id.length === 0) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+  const supabase = await createClient();
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const token = Array.from(bytes, (b) => chars[b % chars.length]).join('');
+
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { error } = await sb
+    .from('stories')
+    .update({ share_token: token, shared_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) return { ok: false, error: 'No pudimos generar el link.' };
+  return { ok: true, url: `/compartir/cuento/${token}` };
+}
+
+export async function revokeStoryShareAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { error } = await sb
+    .from('stories')
+    .update({ share_token: null, shared_at: null })
+    .eq('id', id);
+  if (error) return { ok: false, error: 'No pudimos revocar el link.' };
+  return { ok: true };
+}
+
 export async function deleteStoryAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {

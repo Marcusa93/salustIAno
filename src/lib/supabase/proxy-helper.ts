@@ -60,7 +60,12 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const isAuthenticated = data?.claims != null;
 
   const { pathname } = request.nextUrl;
-  const isPublic = PUBLIC_ROUTES.has(pathname) || pathname === '/';
+  // Las rutas /compartir/cancion/[token] y /compartir/cuento/[token] son
+  // públicas — accedidas con un token random sin necesidad de auth para
+  // que cualquier persona con el link (familia extensa) pueda escuchar
+  // o leer.
+  const isShareRoute = pathname.startsWith('/compartir/');
+  const isPublic = PUBLIC_ROUTES.has(pathname) || pathname === '/' || isShareRoute;
   const isAuthRoute = AUTH_ROUTES.has(pathname);
 
   if (!isAuthenticated && !isPublic) {

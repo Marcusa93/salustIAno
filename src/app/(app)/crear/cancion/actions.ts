@@ -351,6 +351,49 @@ export async function getLullabyAudioUrlAction(
   return { ok: true, url: data.signedUrl };
 }
 
+export async function shareLullabyAction(
+  id: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  if (typeof id !== 'string' || id.length === 0) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+  const supabase = await createClient();
+  const token = generateShareToken();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { error } = await sb
+    .from('lullabies')
+    .update({ share_token: token, shared_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) return { ok: false, error: 'No pudimos generar el link.' };
+  return {
+    ok: true,
+    url: `/compartir/cancion/${token}`,
+  };
+}
+
+export async function revokeLullabyShareAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { error } = await sb
+    .from('lullabies')
+    .update({ share_token: null, shared_at: null })
+    .eq('id', id);
+  if (error) return { ok: false, error: 'No pudimos revocar el link.' };
+  return { ok: true };
+}
+
+function generateShareToken(): string {
+  // 32 chars alfanuméricos. URL-safe, ~190 bits de entropía.
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+}
+
 export async function deleteLullabyAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {

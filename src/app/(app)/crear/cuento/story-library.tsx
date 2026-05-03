@@ -3,10 +3,10 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { BookOpen, ChevronDown, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { BookOpen, ChevronDown, Link2, Loader2, Trash2 } from 'lucide-react';
+import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { type StoryLibraryEntry, deleteStoryAction } from './actions';
+import { type StoryLibraryEntry, deleteStoryAction, shareStoryAction } from './actions';
 
 export function StoryLibrary({ entries }: { entries: StoryLibraryEntry[] }) {
   const [items, setItems] = useState(entries);
@@ -74,6 +74,7 @@ export function StoryLibrary({ entries }: { entries: StoryLibraryEntry[] }) {
                     : ''}
                 </span>
               </button>
+              <ShareStoryButton id={entry.id} />
               <Button
                 type="button"
                 size="icon-xs"
@@ -101,6 +102,42 @@ export function StoryLibrary({ entries }: { entries: StoryLibraryEntry[] }) {
         );
       })}
     </div>
+  );
+}
+
+function ShareStoryButton({ id }: { id: string }) {
+  const [pending, startShare] = useTransition();
+  function handleShare() {
+    startShare(async () => {
+      const result = await shareStoryAction(id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const fullUrl = `${window.location.origin}${result.url}`;
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        toast.success('Link copiado. Compartilo con quien quieras.');
+      } catch {
+        toast.success(`Link generado: ${fullUrl}`);
+      }
+    });
+  }
+  return (
+    <Button
+      type="button"
+      size="icon-xs"
+      variant="ghost"
+      onClick={handleShare}
+      disabled={pending}
+      aria-label="Compartir cuento"
+    >
+      {pending ? (
+        <Loader2 className="size-3 animate-spin" aria-hidden />
+      ) : (
+        <Link2 className="size-3" aria-hidden />
+      )}
+    </Button>
   );
 }
 
