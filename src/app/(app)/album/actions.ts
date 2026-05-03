@@ -316,6 +316,95 @@ export async function updatePhotoAction(
   return { ok: true };
 }
 
+/**
+ * Re-etiqueta una foto existente con el agente photo-tagger. Útil para fotos
+ * subidas antes de que existiera el tagging IA, o cuando los tags actuales
+ * no son los que la familia esperaba.
+ *
+ * Pisa los tags y el caption (no merge) — si la familia tenía tags propios,
+ * el caller debería avisar antes. Para preservar lo manual, podríamos
+ * agregar después un parámetro `merge: true`.
+ */
+export async function retagPhotoAction(
+  id: string,
+): Promise<{ ok: true; tags: string[]; caption: string | null } | { ok: false; error: string }> {
+  if (typeof id !== 'string' || id.length === 0) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return { ok: false, error: 'Sesión expirada.' };
+
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { data: row } = await sb
+    .from('media_items')
+    .select('id, storage_path, family_group_id, child_id, mime_type, taken_at')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (!row) return { ok: false, error: 'Foto no encontrada.' };
+
+  const mime = (row.mime_type as string | null) ?? '';
+  if (!VISION_FRIENDLY_MIME.has(mime)) {
+    return {
+      ok: false,
+      error: 'No podemos analizar este formato. Probá con JPG, PNG o WebP.',
+    };
+  }
+
+  // Bajamos la imagen del Storage. Como ya validamos que el caller es family
+  // member (RLS sobre media_items), la descarga del path correspondiente
+  // está OK.
+  const { data: blob, error: downloadErr } = await supabase.storage
+    .from(BUCKET)
+    .download(row.storage_path as string);
+
+  if (downloadErr || !blob) {
+    return { ok: false, error: 'No pudimos abrir la foto para analizarla.' };
+  }
+
+  const arrayBuffer = await blob.arrayBuffer();
+  if (arrayBuffer.byteLength > MAX_TAGGABLE_BYTES) {
+    return { ok: false, error: 'La foto es demasiado grande para auto-etiquetar.' };
+  }
+
+  const dataUrl = `data:${mime};base64,${Buffer.from(arrayBuffer).toString('base64')}`;
+
+  let tags: string[];
+  let caption: string;
+  try {
+    const result = await tagPhoto(
+      {
+        imageDataUrl: dataUrl,
+        ...(row.taken_at ? { takenAtIso: row.taken_at as string } : {}),
+      },
+      {
+        familyGroupId: row.family_group_id as string,
+        ...(row.child_id ? { childId: row.child_id as string } : {}),
+        actorUserId: userData.user.id,
+      },
+    );
+    tags = result.tags;
+    caption = result.caption;
+  } catch {
+    return { ok: false, error: 'El modelo no pudo procesar la foto. Probá de nuevo.' };
+  }
+
+  const captionToSave = caption.trim().length > 0 ? caption.trim() : null;
+  const { error: updateErr } = await sb
+    .from('media_items')
+    .update({ tags, caption: captionToSave })
+    .eq('id', id);
+
+  if (updateErr) return { ok: false, error: 'No pudimos guardar las nuevas etiquetas.' };
+
+  revalidatePath('/album');
+  return { ok: true, tags, caption: captionToSave };
+}
+
 export async function deletePhotoAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {

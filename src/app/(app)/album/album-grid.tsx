@@ -13,6 +13,7 @@ import {
   type PhotoEntry,
   deletePhotoAction,
   getPhotoUrlAction,
+  retagPhotoAction,
   updatePhotoAction,
   uploadPhotosAction,
 } from './actions';
@@ -309,6 +310,7 @@ function PhotoModal({
   const [url, setUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState(photo.caption ?? '');
   const [tagsInput, setTagsInput] = useState(photo.tags.join(', '));
+  const [retagging, startRetag] = useTransition();
 
   useEffect(() => {
     let mounted = true;
@@ -348,6 +350,29 @@ function PhotoModal({
   function handleDelete() {
     if (!window.confirm('¿Borrar esta foto del álbum? No se puede deshacer.')) return;
     onDelete();
+  }
+
+  function handleRetag() {
+    if (
+      photo.tags.length > 0 &&
+      !window.confirm(
+        '¿Pisar las etiquetas actuales con las que sugiera la IA? Lo que escribiste a mano se pierde.',
+      )
+    ) {
+      return;
+    }
+    startRetag(async () => {
+      const result = await retagPhotoAction(photo.id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const newCaption = result.caption ?? '';
+      setCaption(newCaption);
+      setTagsInput(result.tags.join(', '));
+      onUpdate({ tags: result.tags, caption: newCaption });
+      toast.success('Etiquetas actualizadas con IA.');
+    });
   }
 
   return (
@@ -436,7 +461,21 @@ function PhotoModal({
             )}
           </div>
 
-          <div className="mt-auto pt-2">
+          <div className="mt-auto flex flex-wrap gap-2 pt-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={handleRetag}
+              disabled={retagging}
+            >
+              {retagging ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Sparkles className="size-4" aria-hidden />
+              )}
+              {retagging ? 'Analizando…' : 'Auto-etiquetar'}
+            </Button>
             <Button type="button" size="sm" variant="destructive" onClick={handleDelete}>
               <Trash2 className="size-4" aria-hidden />
               Borrar foto
