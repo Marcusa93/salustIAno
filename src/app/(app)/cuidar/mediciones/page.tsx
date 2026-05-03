@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { ChevronLeft, Plus, Ruler } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { MeasurementsChart } from './_components/measurements-chart';
 
 export const metadata: Metadata = {
   title: 'Mediciones',
@@ -145,6 +146,16 @@ export default async function MeasurementsListPage() {
         </Card>
       ) : (
         <>
+          {/* Gráfico de evolución */}
+          <MeasurementsChart
+            points={rows.map((m) => ({
+              measuredAt: m.measured_at,
+              weightGrams: m.weight_grams ?? null,
+              heightCm: m.height_cm ?? null,
+              headCm: m.head_circumference_cm ?? null,
+            }))}
+          />
+
           {/* Resumen de últimos valores */}
           <div className="grid gap-3 sm:grid-cols-3">
             <SummaryCard

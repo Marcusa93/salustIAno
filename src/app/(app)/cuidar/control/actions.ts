@@ -234,6 +234,17 @@ export async function generatePediatricSummaryAction(
       childId: child.id as string,
       actorUserId: userData.user.id,
     });
+
+    // Persistir best-effort: si falla, igual devolvemos el summary.
+    void persistSummary({
+      childId: child.id as string,
+      familyGroupId: null, // se resuelve adentro
+      daysBack: daysBack as AllowedDays,
+      summary: result.summary,
+      meta: result.meta,
+      userId: userData.user.id,
+    });
+
     return {
       ok: true,
       summary: result.summary,
@@ -276,4 +287,107 @@ export async function generatePediatricSummaryAction(
       error: { type: 'provider', message: 'Algo salió mal. Probá de nuevo.' },
     };
   }
+}
+
+/**
+ * Best-effort persistencia del borrador. Si falla, no rompe la respuesta
+ * porque el user ya tiene el summary en pantalla.
+ */
+async function persistSummary(args: {
+  childId: string | null;
+  familyGroupId: string | null;
+  daysBack: AllowedDays;
+  summary: PediatricSummary;
+  meta: { model: string; promptVersion: string; totalTokens: number; latencyMs: number };
+  userId: string;
+}): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const { data: membership } = await supabase
+      .from('family_memberships')
+      .select('family_group_id')
+      .eq('user_id', args.userId)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    if (!membership?.family_group_id) return;
+
+    // biome-ignore lint/suspicious/noExplicitAny: types stale.
+    const sb = supabase as any;
+    await sb.from('pediatric_summaries').insert({
+      child_id: args.childId,
+      family_group_id: membership.family_group_id,
+      days_back: args.daysBack,
+      period_label: args.summary.period_label,
+      headline: args.summary.headline,
+      metrics: args.summary.metrics,
+      observations: args.summary.observations,
+      questions: args.summary.questions_for_pediatrician,
+      pending_milestones: args.summary.pending_milestones,
+      generation_meta: args.meta,
+      created_by: args.userId,
+    });
+  } catch {
+    // swallow — best-effort.
+  }
+}
+
+// ============================================================================
+// Histórico de borradores
+// ============================================================================
+
+export interface PediatricSummaryEntry {
+  id: string;
+  daysBack: number;
+  periodLabel: string;
+  headline: string;
+  metrics: PediatricSummary['metrics'];
+  observations: string[];
+  questions: string[];
+  pendingMilestones: string[];
+  createdAt: string;
+}
+
+export async function listPediatricSummariesAction(): Promise<PediatricSummaryEntry[]> {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { data, error } = await sb
+    .from('pediatric_summaries')
+    .select(
+      'id, days_back, period_label, headline, metrics, observations, questions, pending_milestones, created_at',
+    )
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error || !data) return [];
+
+  return (data as Array<Record<string, unknown>>).map((r) => ({
+    id: r.id as string,
+    daysBack: r.days_back as number,
+    periodLabel: r.period_label as string,
+    headline: r.headline as string,
+    metrics: r.metrics as PediatricSummary['metrics'],
+    observations: (r.observations as string[]) ?? [],
+    questions: (r.questions as string[]) ?? [],
+    pendingMilestones: (r.pending_milestones as string[]) ?? [],
+    createdAt: r.created_at as string,
+  }));
+}
+
+export async function deletePediatricSummaryAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { error } = await sb
+    .from('pediatric_summaries')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) return { ok: false, error: 'No pudimos borrar el borrador.' };
+  return { ok: true };
 }
