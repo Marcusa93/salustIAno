@@ -90,6 +90,56 @@ export async function createSleepAction(
 }
 
 /**
+ * Devuelve la última toma activa del bebé para "duplicar" — útil cuando
+ * la familia quiere registrar una toma similar a la previa (mismo tipo
+ * + lado + duración aprox). El componente cliente la usa para
+ * pre-rellenar el form de FeedingQuickAdd.
+ */
+export async function lastFeedingAction(): Promise<
+  { ok: true; feeding: FeedingEventInput | null } | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const { data: child } = await supabase
+    .from('child_profiles')
+    .select('id')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!child?.id) {
+    return { ok: true, feeding: null };
+  }
+
+  const { data, error } = await supabase
+    .from('feeding_events')
+    .select('type, side, duration_minutes, amount_ml, foods, reaction, notes')
+    .eq('child_id', child.id)
+    .is('deleted_at', null)
+    .order('occurred_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: 'No pudimos buscar la última toma.' };
+  if (!data) return { ok: true, feeding: null };
+
+  return {
+    ok: true,
+    feeding: {
+      // occurred_at lo dejamos para que el cliente ponga "ahora"
+      occurred_at: '',
+      type: data.type as FeedingEventInput['type'],
+      side: (data.side as FeedingEventInput['side']) ?? '',
+      duration_minutes: (data.duration_minutes as number | null) ?? undefined,
+      amount_ml: (data.amount_ml as number | null) ?? undefined,
+      foods: (data.foods as string[] | null) ?? undefined,
+      reaction: (data.reaction as FeedingEventInput['reaction']) ?? 'none',
+      notes: (data.notes as string | null) ?? '',
+    },
+  };
+}
+
+/**
  * Cierra un sueño en curso (`ended_at IS NULL`). Defensa en profundidad:
  *   - Validación zod (ended > started, < 24h).
  *   - WHERE ended_at IS NULL evita reescribir un sueño ya cerrado por otro

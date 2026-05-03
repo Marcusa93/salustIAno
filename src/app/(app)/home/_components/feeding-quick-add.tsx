@@ -1,6 +1,6 @@
 'use client';
 
-import { createFeedingAction } from '@/app/(app)/cuidar/eventos/actions';
+import { createFeedingAction, lastFeedingAction } from '@/app/(app)/cuidar/eventos/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,9 +31,9 @@ import {
   feedingTypeEnum,
 } from '@/lib/validators/events';
 import { zodResolver } from '@/lib/zod-compat';
-import { Loader2, Milk } from 'lucide-react';
+import { Loader2, Milk, RotateCcw } from 'lucide-react';
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -54,6 +54,7 @@ interface FeedingQuickAddProps {
 
 export function FeedingQuickAdd({ trigger }: FeedingQuickAddProps) {
   const [open, setOpen] = useState(false);
+  const [duplicating, startDuplicate] = useTransition();
 
   const form = useForm<FeedingEventInput>({
     resolver: zodResolver(feedingEventSchema),
@@ -70,11 +71,42 @@ export function FeedingQuickAdd({ trigger }: FeedingQuickAddProps) {
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = form;
 
   // Vemos el type para mostrar/ocultar campos correspondientes.
   const watchedType = useWatch({ control, name: 'type' });
+
+  function fillFromLast() {
+    startDuplicate(async () => {
+      const result = await lastFeedingAction();
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      if (!result.feeding) {
+        toast.info('Todavía no hay tomas previas. Cargá la primera y después podrás duplicarla.');
+        return;
+      }
+      const f = result.feeding;
+      // Reseteamos pero conservamos el "ahora" en occurred_at.
+      reset({
+        occurred_at: nowLocalISO(),
+        type: f.type,
+        side: f.side,
+        duration_minutes: f.duration_minutes,
+        amount_ml: f.amount_ml,
+        foods: f.foods,
+        reaction: f.reaction,
+        notes: f.notes,
+      });
+      // Algunos campos numéricos no se asientan con reset; aseguramos.
+      if (f.duration_minutes !== undefined) setValue('duration_minutes', f.duration_minutes);
+      if (f.amount_ml !== undefined) setValue('amount_ml', f.amount_ml);
+      toast.success('Tomamos los datos de la toma anterior.');
+    });
+  }
 
   async function onSubmit(values: FeedingEventInput) {
     const result = await createFeedingAction({
@@ -106,6 +138,23 @@ export function FeedingQuickAdd({ trigger }: FeedingQuickAddProps) {
           </SheetTitle>
           <SheetDescription>Pecho, biberón o sólido.</SheetDescription>
         </SheetHeader>
+
+        <div className="flex justify-end px-4 pt-1">
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            onClick={fillFromLast}
+            disabled={duplicating || isSubmitting}
+          >
+            {duplicating ? (
+              <Loader2 className="size-3 animate-spin" aria-hidden />
+            ) : (
+              <RotateCcw className="size-3" aria-hidden />
+            )}
+            Como la última toma
+          </Button>
+        </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 px-4 pb-6 pt-2">
           <div className="flex flex-col gap-1.5">

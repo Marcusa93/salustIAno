@@ -8,11 +8,15 @@ import { cn } from '@/lib/utils';
 import { chronologicalAgeDays } from '@/lib/validators/child-profile';
 import {
   BREAST_SIDE_LABELS,
+  type BreastSide,
   DIAPER_TYPE_LABELS,
+  type DiaperPhotoAnalysis,
   type DiaperType,
   FEEDING_TYPE_LABELS,
+  type FeedingReaction,
   type FeedingType,
   SLEEP_QUALITY_LABELS,
+  type SleepQuality,
 } from '@/lib/validators/events';
 import {
   AlertTriangle,
@@ -21,12 +25,16 @@ import {
   Camera,
   Milk,
   Moon,
+  Pencil,
   Plus,
   Sparkles,
   Sun,
 } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { EditDiaperSheet } from '../cuidar/eventos/_components/edit-diaper-sheet';
+import { EditFeedingSheet } from '../cuidar/eventos/_components/edit-feeding-sheet';
+import { EditSleepSheet } from '../cuidar/eventos/_components/edit-sleep-sheet';
 import { CloseSleepSheet } from './_components/close-sleep-sheet';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
@@ -432,11 +440,78 @@ function EventRow({ row }: { row: TimelineRow }) {
         </span>
         {summary.detail && <span className="text-muted-foreground text-xs">{summary.detail}</span>}
       </div>
-      <span className="ml-auto text-muted-foreground text-xs">
-        {formatRelativeTime(row.occurred_at)}
-      </span>
+      <div className="ml-auto flex flex-col items-end gap-1">
+        <span className="text-muted-foreground text-xs">{formatRelativeTime(row.occurred_at)}</span>
+        <EventRowEditButton row={row} />
+      </div>
     </Card>
   );
+}
+
+/**
+ * Render del botón "editar" para una fila de Recientes — reusa los Sheets
+ * de edición de /timeline. Para measurement/note/media (no editables
+ * desde acá), devuelve null.
+ */
+function EventRowEditButton({ row }: { row: TimelineRow }) {
+  const trigger = (
+    <Button type="button" size="icon-xs" variant="ghost" aria-label="Editar">
+      <Pencil className="size-3" aria-hidden />
+    </Button>
+  );
+
+  if (row.event_type === 'diaper') {
+    return (
+      <EditDiaperSheet
+        eventId={row.id}
+        initial={{
+          occurred_at: row.occurred_at,
+          type: (row.payload.type as DiaperType) ?? 'wet',
+          notes: (row.payload.notes as string | null | undefined) ?? null,
+          photo_analysis:
+            (row.payload.photo_analysis as DiaperPhotoAnalysis | null | undefined) ?? null,
+        }}
+        trigger={trigger}
+      />
+    );
+  }
+
+  if (row.event_type === 'feeding') {
+    return (
+      <EditFeedingSheet
+        eventId={row.id}
+        initial={{
+          occurred_at: row.occurred_at,
+          type: (row.payload.type as FeedingType) ?? 'breastfeeding',
+          side: (row.payload.side as BreastSide | null | undefined) ?? null,
+          duration_minutes: (row.payload.duration_minutes as number | null | undefined) ?? null,
+          amount_ml: (row.payload.amount_ml as number | null | undefined) ?? null,
+          foods: (row.payload.foods as string[] | null | undefined) ?? null,
+          reaction: (row.payload.reaction as FeedingReaction | undefined) ?? 'none',
+          notes: (row.payload.notes as string | null | undefined) ?? null,
+        }}
+        trigger={trigger}
+      />
+    );
+  }
+
+  if (row.event_type === 'sleep') {
+    return (
+      <EditSleepSheet
+        eventId={row.id}
+        initial={{
+          started_at: (row.payload.started_at as string) ?? row.occurred_at,
+          ended_at: (row.payload.ended_at as string | null | undefined) ?? null,
+          quality: (row.payload.quality as SleepQuality | undefined) ?? 'unknown',
+          is_nap: (row.payload.is_nap as boolean | undefined) ?? false,
+          notes: (row.payload.notes as string | null | undefined) ?? null,
+        }}
+        trigger={trigger}
+      />
+    );
+  }
+
+  return null;
 }
 
 function describeEvent(row: TimelineRow): {

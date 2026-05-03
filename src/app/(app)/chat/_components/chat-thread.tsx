@@ -98,10 +98,62 @@ export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) 
         toast.error(result.error.message);
         return;
       }
-      setEntries((prev) => [
-        ...prev,
-        { role: 'assistant', content: result.reply, proposals: result.proposals },
-      ]);
+      // Typing animation: agregamos la reply gradualmente, palabra por
+      // palabra, en lugar de poner todo el texto de golpe. Da sensación
+      // de stream sin tocar el server.
+      const reduced =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (reduced) {
+        setEntries((prev) => [
+          ...prev,
+          { role: 'assistant', content: result.reply, proposals: result.proposals },
+        ]);
+        requestAnimationFrame(() => inputRef.current?.focus());
+        return;
+      }
+
+      // Insertamos un mensaje vacío y vamos llenando.
+      setEntries((prev) => [...prev, { role: 'assistant', content: '', proposals: [] }]);
+
+      const words = result.reply.split(/(\s+)/); // mantiene espacios
+      let acc = '';
+      for (const w of words) {
+        acc += w;
+        setEntries((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === 'assistant') {
+            next[next.length - 1] = {
+              role: 'assistant',
+              content: acc,
+              proposals: [],
+            };
+          }
+          return next;
+        });
+        // Pausa entre palabras: ~25ms para palabras cortas, +5ms por
+        // cada char extra. Pausas mayores tras "." y "," (respiro).
+        const base = 22 + Math.min(40, w.length * 4);
+        const punctPause = /[.,;!?…]\s*$/.test(w) ? 110 : 0;
+        await new Promise((r) => setTimeout(r, base + punctPause));
+      }
+
+      // Al final, sumamos las proposals (estaban ocultas durante el typing).
+      setEntries((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last && last.role === 'assistant') {
+          next[next.length - 1] = {
+            role: 'assistant',
+            content: result.reply,
+            proposals: result.proposals,
+          };
+        }
+        return next;
+      });
+
       requestAnimationFrame(() => inputRef.current?.focus());
     });
   }
@@ -180,10 +232,23 @@ export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) 
           </div>
         ))}
 
-        {pending && (
-          <Card className="flex w-fit max-w-[75%] items-center gap-2 self-start bg-muted/40 px-4 py-2">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
-            <span className="text-muted-foreground text-sm">Pensando…</span>
+        {pending && lastIsUser(entries) && (
+          <Card className="flex w-fit max-w-[75%] items-center gap-2.5 self-start bg-muted/40 px-4 py-3">
+            <span className="flex items-center gap-1">
+              <span
+                className="size-1.5 animate-typing-dot rounded-full bg-muted-foreground"
+                style={{ animationDelay: '0s' }}
+              />
+              <span
+                className="size-1.5 animate-typing-dot rounded-full bg-muted-foreground"
+                style={{ animationDelay: '0.15s' }}
+              />
+              <span
+                className="size-1.5 animate-typing-dot rounded-full bg-muted-foreground"
+                style={{ animationDelay: '0.3s' }}
+              />
+            </span>
+            <span className="sr-only">SalustIA está pensando…</span>
           </Card>
         )}
       </div>
@@ -219,6 +284,11 @@ export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) 
       </form>
     </div>
   );
+}
+
+function lastIsUser(entries: ChatEntry[]): boolean {
+  const last = entries[entries.length - 1];
+  return !!last && last.role === 'user';
 }
 
 function MessageBubble({ entry }: { entry: ChatEntry }) {
