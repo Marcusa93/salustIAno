@@ -36,6 +36,7 @@ import { EditDiaperSheet } from '../cuidar/eventos/_components/edit-diaper-sheet
 import { EditFeedingSheet } from '../cuidar/eventos/_components/edit-feeding-sheet';
 import { EditSleepSheet } from '../cuidar/eventos/_components/edit-sleep-sheet';
 import { CloseSleepSheet } from './_components/close-sleep-sheet';
+import { DailySummaryCard } from './_components/daily-summary-card';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
 import { SleepQuickAdd } from './_components/sleep-quick-add';
@@ -260,6 +261,14 @@ export default async function HomePage() {
           </div>
         </Card>
       </Link>
+
+      {/* Resumen del día con IA */}
+      <div className="animate-stagger-up" style={{ animationDelay: '90ms' }}>
+        <DailySummaryCard
+          childId={child.id as string}
+          todayEventCount={todaySummary.feeding + todaySummary.sleep + todaySummary.diaper}
+        />
+      </div>
 
       {/* Está durmiendo */}
       {activeSleep && (
