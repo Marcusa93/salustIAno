@@ -10,6 +10,7 @@ import {
 import type { Route } from 'next';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { sendPushToFamily } from '../../perfil/push-actions';
 
 type ActionResult<TInput> =
   | { ok: true }
@@ -132,12 +133,28 @@ export async function updateMilestoneAction(
 
 /**
  * Marca un hito como completado o lo regresa a pendiente.
+ *
+ * Si pasamos de pendiente → completado, disparamos push a la familia para
+ * compartir la buena: "Hicieron la pesquisa neonatal" / "Mamá: control 1 mes".
+ * Si pasamos de completado → pendiente (un toggle equivocado), no avisamos.
  */
 export async function toggleMilestoneCompletedAction(
   id: string,
   completed: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
+
+  // Leemos info del milestone antes de actualizar — necesitamos title +
+  // family_group_id + estado previo para decidir si notificar.
+  const { data: existing } = await supabase
+    .from('medical_milestones')
+    .select('id, title, family_group_id, completed_at')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  const wasIncomplete = existing?.completed_at == null;
+
   const { error } = await supabase
     .from('medical_milestones')
     .update({ completed_at: completed ? new Date().toISOString() : null })
@@ -145,6 +162,35 @@ export async function toggleMilestoneCompletedAction(
 
   if (error) {
     return { ok: false, error: 'No pudimos actualizar el estado del hito.' };
+  }
+
+  // Push solo en la transición pendiente → completado.
+  if (completed && wasIncomplete && existing?.family_group_id) {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      let author = 'Alguien';
+      if (userData.user) {
+        const { data: membership } = await supabase
+          .from('family_memberships')
+          .select('display_name')
+          .eq('user_id', userData.user.id)
+          .is('deleted_at', null)
+          .maybeSingle();
+        author = (membership?.display_name as string | null) ?? 'Alguien';
+      }
+      await sendPushToFamily(
+        existing.family_group_id as string,
+        {
+          title: '✅ Control hecho',
+          body: `${author} marcó "${existing.title as string}" como completado.`,
+          url: `/cuidar/calendario/${id}`,
+          tag: `milestone-done-${id}`,
+        },
+        userData.user?.id,
+      );
+    } catch {
+      /* push best-effort, nunca bloquea */
+    }
   }
 
   revalidatePath('/cuidar/calendario');

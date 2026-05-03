@@ -12,6 +12,43 @@ import {
   sleepSessionSchema,
 } from '@/lib/validators/events';
 import { revalidatePath } from 'next/cache';
+import { sendPushToFamily } from '../../perfil/push-actions';
+
+/**
+ * Helper para resolver display_name + family_group_id del usuario actual y
+ * disparar pushes a la familia. Best-effort — nunca tira si push falla.
+ */
+async function notifyFamily(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  childId: string,
+  payload: { title: string; body: string; url?: string; tag?: string },
+): Promise<void> {
+  try {
+    const { data: child } = await supabase
+      .from('child_profiles')
+      .select('family_group_id')
+      .eq('id', childId)
+      .maybeSingle();
+    if (!child?.family_group_id) return;
+    await sendPushToFamily(child.family_group_id, payload, userId);
+  } catch {
+    /* push falla nunca debería bloquear el evento */
+  }
+}
+
+async function getActorDisplayName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string> {
+  const { data } = await supabase
+    .from('family_memberships')
+    .select('display_name')
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  return (data?.display_name as string | null) ?? 'Alguien';
+}
 
 type EventResult<TInput> =
   | { ok: true; id: string }
@@ -162,6 +199,19 @@ export async function closeSleepAction(
   };
   if (parsed.data.quality) update.quality = parsed.data.quality;
 
+  // Leemos started_at para calcular la duración antes de actualizar.
+  const { data: existing } = await supabase
+    .from('sleep_sessions')
+    .select('id, started_at, child_id, is_nap')
+    .eq('id', id)
+    .is('ended_at', null)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (!existing) {
+    return { ok: false, errors: { root: 'Ese sueño ya estaba cerrado o no existe.' } };
+  }
+
   const { data, error } = await supabase
     .from('sleep_sessions')
     .update(update)
@@ -176,6 +226,26 @@ export async function closeSleepAction(
   }
   if (!data) {
     return { ok: false, errors: { root: 'Ese sueño ya estaba cerrado o no existe.' } };
+  }
+
+  // Push best-effort: "Mamá: Salu se despertó (1h 20min)".
+  const { data: userData } = await supabase.auth.getUser();
+  if (userData.user) {
+    const startedAt = new Date(existing.started_at as string).getTime();
+    const endedAt = new Date(parsed.data.ended_at).getTime();
+    const minutes = Math.max(0, Math.round((endedAt - startedAt) / 60000));
+    const dur =
+      minutes < 60
+        ? `${minutes} min`
+        : `${Math.floor(minutes / 60)} h${minutes % 60 > 0 ? ` ${minutes % 60} min` : ''}`;
+    const isNap = (existing.is_nap as boolean) ?? false;
+    const author = await getActorDisplayName(supabase, userData.user.id);
+    await notifyFamily(supabase, userData.user.id, existing.child_id as string, {
+      title: `${author}: Salu se despertó`,
+      body: `Cerró ${isNap ? 'la siesta' : 'el sueño'} de ${dur}.`,
+      url: '/home',
+      tag: `sleep-close-${id}`,
+    });
   }
 
   revalidatePath('/home');
@@ -361,6 +431,23 @@ export async function createDiaperAction(
 
   if (error || !data) {
     return { ok: false, errors: { root: 'No pudimos guardar el pañal.' } };
+  }
+
+  // Push de alarma: si la IA marcó alarm:true en el análisis de la foto,
+  // notificamos a la familia para que alguien lo mire ya.
+  const photoAnalysis = parsed.data.photo_analysis as
+    | { alarm?: boolean; alarm_reason?: string }
+    | null
+    | undefined;
+  if (photoAnalysis?.alarm === true) {
+    const author = await getActorDisplayName(ctx.supabase, ctx.userId);
+    const reason = photoAnalysis.alarm_reason?.trim() || 'Conviene mostrar al pediatra.';
+    await notifyFamily(ctx.supabase, ctx.userId, ctx.childId, {
+      title: '⚠️ Pañal a revisar',
+      body: `${author} subió un pañal con señal de alerta: ${reason}`,
+      url: '/cuidar/panal-foto',
+      tag: `diaper-alarm-${data.id}`,
+    });
   }
 
   revalidatePath('/home');
