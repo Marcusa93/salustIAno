@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { BookHeart, CalendarClock, Camera, ClipboardCheck, Ruler } from 'lucide-react';
+import { BookHeart, CalendarClock, Camera, ClipboardCheck, Ruler, Sparkles } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -51,6 +51,14 @@ const OPTIONS: CuidarOption[] = [
       'Resumen del último período (tomas, sueños, pañales, dudas) para llevar al pediatra.',
     Icon: ClipboardCheck,
     badge: 'Beta',
+  },
+  {
+    href: '/cuidar/patrones',
+    title: 'Patrones del bebé',
+    description:
+      'IA observa tu rutina de los últimos 14 días y la cuenta en frases cortas — sin diagnósticos.',
+    Icon: Sparkles,
+    badge: 'IA',
   },
 ];
 
