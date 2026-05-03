@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
 import type { Metadata } from 'next';
+import { PushToggle } from './_components/push-toggle';
 import { PerfilForm } from './perfil-form';
 
 export const metadata: Metadata = { title: 'Mi cuenta' };
@@ -56,6 +57,8 @@ export default async function PerfilPage() {
       </Card>
 
       <PerfilForm initialDisplayName={displayName} />
+
+      <PushToggle />
     </div>
   );
 }

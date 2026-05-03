@@ -5,6 +5,7 @@ import { type NoteInput, noteSchema } from '@/lib/validators/note';
 import type { Route } from 'next';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { sendPushToFamily } from '../perfil/push-actions';
 
 type ActionResult<TInput> =
   | { ok: true }
@@ -66,6 +67,34 @@ export async function createNoteAction(input: NoteInput): Promise<ActionResult<N
 
   if (error || !data) {
     return { ok: false, errors: { root: 'No pudimos guardar la nota.' } };
+  }
+
+  // Notificación push al resto de la familia (best-effort, no bloquea).
+  // El display_name del autor lo resolvemos por la membership.
+  try {
+    const { data: membership } = await ctx.supabase
+      .from('family_memberships')
+      .select('display_name, family_group_id')
+      .eq('user_id', ctx.userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (membership?.family_group_id) {
+      const author = membership.display_name ?? 'Alguien';
+      const excerpt = parsed.data.content.slice(0, 80);
+      await sendPushToFamily(
+        membership.family_group_id,
+        {
+          title: `${author} dejó un momento`,
+          body: excerpt,
+          url: `/notas/${data.id}`,
+          tag: `note-${data.id}`,
+        },
+        ctx.userId,
+      );
+    }
+  } catch {
+    /* Push falla no debería bloquear la creación de la nota. */
   }
 
   revalidatePath('/timeline');

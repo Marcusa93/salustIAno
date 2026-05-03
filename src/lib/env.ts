@@ -12,6 +12,11 @@ const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(1).optional(),
   OPENROUTER_DEFAULT_MODEL: z.string().min(1).default('anthropic/claude-haiku-4-5'),
   AIMLAPI_API_KEY: z.string().min(1).optional(),
+  // Web Push (VAPID). Si no están seteadas, las suscripciones rechazan
+  // gracefully con un mensaje en lugar de crashear.
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+  VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+  VAPID_EMAIL: z.string().email().default('marco.rossi@derecho.unt.edu.ar'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 
