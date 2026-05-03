@@ -6,14 +6,32 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { ImageIcon, Loader2, Sparkles, Trash2, Upload, X } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  FolderOpen,
+  ImageIcon,
+  Link2,
+  Link2Off,
+  Loader2,
+  Plus,
+  Sparkles,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { type ChangeEvent, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import {
+  type AlbumEntry,
   type PhotoEntry,
+  assignPhotoToAlbumAction,
+  createManualAlbumAction,
   deletePhotoAction,
   getPhotoUrlAction,
   retagPhotoAction,
+  revokeAlbumShareAction,
+  shareAlbumAction,
   updatePhotoAction,
   uploadPhotosAction,
 } from './actions';
@@ -26,6 +44,7 @@ interface MonthGroup {
 
 interface AlbumGridProps {
   initialPhotos: PhotoEntry[];
+  initialAlbums: AlbumEntry[];
 }
 
 /**
@@ -36,12 +55,17 @@ interface AlbumGridProps {
  * Las URLs firmadas se piden lazy: solo cuando una thumbnail entra al
  * viewport (IntersectionObserver) y al abrir el modal.
  */
-export function AlbumGrid({ initialPhotos }: AlbumGridProps) {
+export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
   const [photos, setPhotos] = useState(initialPhotos);
+  const [albums, setAlbums] = useState(initialAlbums);
   const [active, setActive] = useState<PhotoEntry | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
   const [uploading, startUpload] = useTransition();
+  const [creatingAlbum, startCreateAlbum] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const activeAlbum = albums.find((a) => a.id === activeAlbumId) ?? null;
 
   // Tags únicos del set actual de fotos, ordenados por frecuencia descendente
   // y luego alfabéticamente. Mostramos hasta 12 chips para no abarrotar la UI.
@@ -57,9 +81,11 @@ export function AlbumGrid({ initialPhotos }: AlbumGridProps) {
   }, [photos]);
 
   const filteredPhotos = useMemo(() => {
-    if (!activeTag) return photos;
-    return photos.filter((p) => p.tags.includes(activeTag));
-  }, [photos, activeTag]);
+    let result = photos;
+    if (activeAlbumId) result = result.filter((p) => p.albumId === activeAlbumId);
+    if (activeTag) result = result.filter((p) => p.tags.includes(activeTag));
+    return result;
+  }, [photos, activeTag, activeAlbumId]);
 
   const groups = groupByMonth(filteredPhotos);
 
@@ -109,6 +135,29 @@ export function AlbumGrid({ initialPhotos }: AlbumGridProps) {
     });
   }
 
+  function handleCreateAlbum() {
+    const name = window.prompt('Nombre del álbum nuevo:');
+    if (!name || name.trim().length === 0) return;
+    startCreateAlbum(async () => {
+      const result = await createManualAlbumAction(name);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setAlbums((prev) => [result.album, ...prev]);
+      setActiveAlbumId(result.album.id);
+      toast.success(`Álbum "${result.album.name}" creado.`);
+    });
+  }
+
+  function handleAssignPhotoToAlbum(photoId: string, albumId: string | null) {
+    setPhotos((prev) => prev.map((p) => (p.id === photoId ? { ...p, albumId } : p)));
+    setActive((prev) => (prev && prev.id === photoId ? { ...prev, albumId } : prev));
+    void assignPhotoToAlbumAction(photoId, albumId).then((r) => {
+      if (!r.ok) toast.error(r.error);
+    });
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <input
@@ -124,19 +173,93 @@ export function AlbumGrid({ initialPhotos }: AlbumGridProps) {
         <p className="text-muted-foreground text-sm">
           {photos.length === 0
             ? 'Subí las primeras fotos de Salu.'
-            : activeTag
-              ? `${filteredPhotos.length} foto${filteredPhotos.length === 1 ? '' : 's'} con #${activeTag}.`
-              : `${photos.length} foto${photos.length === 1 ? '' : 's'} en ${groups.length} mes${groups.length === 1 ? '' : 'es'}.`}
+            : activeAlbum
+              ? `${filteredPhotos.length} foto${filteredPhotos.length === 1 ? '' : 's'} en ${activeAlbum.name}.`
+              : activeTag
+                ? `${filteredPhotos.length} foto${filteredPhotos.length === 1 ? '' : 's'} con #${activeTag}.`
+                : `${photos.length} foto${photos.length === 1 ? '' : 's'} en ${groups.length} mes${groups.length === 1 ? '' : 'es'}.`}
         </p>
-        <Button type="button" size="sm" onClick={handlePickFiles} disabled={uploading}>
-          {uploading ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-          ) : (
-            <Upload className="size-4" aria-hidden />
-          )}
-          {uploading ? 'Subiendo…' : 'Subir fotos'}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={handleCreateAlbum}
+            disabled={creatingAlbum}
+          >
+            {creatingAlbum ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Plus className="size-4" aria-hidden />
+            )}
+            Nuevo álbum
+          </Button>
+          <Button type="button" size="sm" onClick={handlePickFiles} disabled={uploading}>
+            {uploading ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Upload className="size-4" aria-hidden />
+            )}
+            {uploading ? 'Subiendo…' : 'Subir fotos'}
+          </Button>
+        </div>
       </div>
+
+      {albums.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 pr-1 font-medium text-[11px] text-muted-foreground uppercase tracking-[0.18em]">
+            <FolderOpen className="size-3" aria-hidden />
+            Álbumes
+          </span>
+          <button
+            type="button"
+            onClick={() => setActiveAlbumId(null)}
+            className={cn(
+              'rounded-full border px-2.5 py-0.5 font-medium text-[11px] transition-colors',
+              activeAlbumId === null
+                ? 'border-primary/30 bg-primary/10 text-primary'
+                : 'border-border/60 text-muted-foreground hover:border-border hover:text-foreground',
+            )}
+          >
+            Todos
+          </button>
+          {albums.map((al) => (
+            <button
+              key={al.id}
+              type="button"
+              onClick={() => setActiveAlbumId((prev) => (prev === al.id ? null : al.id))}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-medium text-[11px] transition-colors',
+                activeAlbumId === al.id
+                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  : 'border-border/60 text-muted-foreground hover:border-border hover:text-foreground',
+              )}
+            >
+              {al.shareToken && <Link2 className="size-3" aria-hidden />}
+              {al.name}
+              <span className="text-muted-foreground/70">{al.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activeAlbum && (
+        <AlbumShareBar
+          album={activeAlbum}
+          onShared={(shareToken, sharedAt) =>
+            setAlbums((prev) =>
+              prev.map((a) => (a.id === activeAlbum.id ? { ...a, shareToken, sharedAt } : a)),
+            )
+          }
+          onRevoked={() =>
+            setAlbums((prev) =>
+              prev.map((a) =>
+                a.id === activeAlbum.id ? { ...a, shareToken: null, sharedAt: null } : a,
+              ),
+            )
+          }
+        />
+      )}
 
       {tagChips.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -220,15 +343,120 @@ export function AlbumGrid({ initialPhotos }: AlbumGridProps) {
       {active && (
         <PhotoModal
           photo={active}
+          albums={albums}
           onClose={() => setActive(null)}
           onDelete={() => handleDelete(active.id)}
           onUpdate={(updates) => {
             handleUpdate(active.id, updates);
             setActive((prev) => (prev ? { ...prev, ...updates } : prev));
           }}
+          onAssignAlbum={(albumId) => handleAssignPhotoToAlbum(active.id, albumId)}
         />
       )}
     </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// AlbumShareBar: cuando hay álbum activo, ofrece compartir/revocar.
+// ----------------------------------------------------------------------------
+
+function AlbumShareBar({
+  album,
+  onShared,
+  onRevoked,
+}: {
+  album: AlbumEntry;
+  onShared: (shareToken: string, sharedAt: string) => void;
+  onRevoked: () => void;
+}) {
+  const [pending, startPending] = useTransition();
+  const [copied, setCopied] = useState(false);
+
+  const isShared = !!album.shareToken;
+  const fullUrl =
+    typeof window !== 'undefined' && album.shareToken
+      ? `${window.location.origin}/compartir/album/${album.shareToken}`
+      : '';
+
+  function handleShare() {
+    startPending(async () => {
+      const result = await shareAlbumAction(album.id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      // El action devuelve la URL relativa; reconstruimos el token desde ahí.
+      const token = result.url.split('/').pop() ?? '';
+      onShared(token, new Date().toISOString());
+      toast.success('Link generado.');
+    });
+  }
+
+  function handleRevoke() {
+    if (!window.confirm('¿Revocar el link? Quien lo tenga deja de poder ver el álbum.')) return;
+    startPending(async () => {
+      const result = await revokeAlbumShareAction(album.id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      onRevoked();
+      toast.success('Link revocado.');
+    });
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(fullUrl);
+      setCopied(true);
+      toast.success('Link copiado.');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('No pudimos copiar.');
+    }
+  }
+
+  return (
+    <Card className="flex flex-wrap items-center gap-3 border-primary/20 bg-primary/5 p-3">
+      {isShared ? (
+        <>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="font-medium text-foreground text-sm">{album.name}</span>
+            <span className="truncate text-muted-foreground text-xs">{fullUrl}</span>
+          </div>
+          <Button type="button" size="sm" variant="ghost" onClick={handleCopy}>
+            {copied ? (
+              <Check className="size-4" aria-hidden />
+            ) : (
+              <Copy className="size-4" aria-hidden />
+            )}
+            {copied ? 'Copiado' : 'Copiar'}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={handleRevoke} disabled={pending}>
+            <Link2Off className="size-4" aria-hidden />
+            Revocar
+          </Button>
+        </>
+      ) : (
+        <>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="font-medium text-foreground text-sm">{album.name}</span>
+            <span className="text-muted-foreground text-xs">
+              Compartilo con la familia extensa con un link público sin login.
+            </span>
+          </div>
+          <Button type="button" size="sm" onClick={handleShare} disabled={pending}>
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Link2 className="size-4" aria-hidden />
+            )}
+            Compartir álbum
+          </Button>
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -298,14 +526,18 @@ function Thumbnail({ photo, onClick }: { photo: PhotoEntry; onClick: () => void 
 
 function PhotoModal({
   photo,
+  albums,
   onClose,
   onDelete,
   onUpdate,
+  onAssignAlbum,
 }: {
   photo: PhotoEntry;
+  albums: AlbumEntry[];
   onClose: () => void;
   onDelete: () => void;
   onUpdate: (updates: { caption?: string; tags?: string[] }) => void;
+  onAssignAlbum: (albumId: string | null) => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState(photo.caption ?? '');
@@ -459,6 +691,23 @@ function PhotoModal({
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="ph-album">Álbum</Label>
+            <select
+              id="ph-album"
+              value={photo.albumId ?? ''}
+              onChange={(e) => onAssignAlbum(e.target.value === '' ? null : e.target.value)}
+              className="h-9 rounded-lg border border-input bg-transparent px-2.5 font-medium text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <option value="">Sin álbum</option>
+              {albums.map((al) => (
+                <option key={al.id} value={al.id}>
+                  {al.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="mt-auto flex flex-wrap gap-2 pt-2">

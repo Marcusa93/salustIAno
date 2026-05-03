@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { listPhotosAction } from './actions';
+import { listAlbumsAction, listPhotosAction } from './actions';
 import { AlbumGrid } from './album-grid';
 
 export const metadata: Metadata = {
@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AlbumPage() {
-  const photos = await listPhotosAction();
+  const [photos, albums] = await Promise.all([listPhotosAction(), listAlbumsAction()]);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
@@ -24,7 +24,7 @@ export default async function AlbumPage() {
         </p>
       </header>
 
-      <AlbumGrid initialPhotos={photos} />
+      <AlbumGrid initialPhotos={photos} initialAlbums={albums} />
     </div>
   );
 }

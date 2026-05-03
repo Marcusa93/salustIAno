@@ -22,6 +22,8 @@ export interface AlbumEntry {
   monthKey: string | null; // 'YYYY-MM-01'
   coverPath: string | null;
   count: number;
+  shareToken: string | null;
+  sharedAt: string | null;
 }
 
 export interface PhotoEntry {
@@ -217,7 +219,7 @@ export async function listAlbumsAction(): Promise<AlbumEntry[]> {
   const sb = supabase as any;
   const { data: albums } = await sb
     .from('albums')
-    .select('id, name, kind, month_key, cover_path')
+    .select('id, name, kind, month_key, cover_path, share_token, shared_at')
     .is('deleted_at', null)
     .order('month_key', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
@@ -244,7 +246,137 @@ export async function listAlbumsAction(): Promise<AlbumEntry[]> {
     monthKey: (a.month_key as string | null) ?? null,
     coverPath: (a.cover_path as string | null) ?? null,
     count: counts[a.id as string] ?? 0,
+    shareToken: (a.share_token as string | null) ?? null,
+    sharedAt: (a.shared_at as string | null) ?? null,
   }));
+}
+
+/**
+ * Crea un álbum manual (sin month_key, kind='manual'). El nombre lo elige
+ * la familia. El album_id se devuelve para poder navegar directo o asociar
+ * fotos enseguida.
+ */
+export async function createManualAlbumAction(
+  name: string,
+): Promise<{ ok: true; album: AlbumEntry } | { ok: false; error: string }> {
+  const trimmed = (name ?? '').trim();
+  if (trimmed.length === 0 || trimmed.length > 80) {
+    return { ok: false, error: 'El nombre tiene que tener entre 1 y 80 caracteres.' };
+  }
+
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return { ok: false, error: 'Sesión expirada.' };
+
+  const { data: membership } = await supabase
+    .from('family_memberships')
+    .select('family_group_id')
+    .eq('user_id', userData.user.id)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!membership?.family_group_id) {
+    return { ok: false, error: 'No encontramos tu grupo familiar.' };
+  }
+
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { data: created, error } = await sb
+    .from('albums')
+    .insert({
+      family_group_id: membership.family_group_id,
+      name: trimmed,
+      kind: 'manual',
+      created_by: userData.user.id,
+    })
+    .select('id, name, kind, month_key, cover_path, share_token, shared_at')
+    .single();
+
+  if (error || !created) return { ok: false, error: 'No pudimos crear el álbum.' };
+
+  revalidatePath('/album');
+  return {
+    ok: true,
+    album: {
+      id: created.id as string,
+      name: created.name as string,
+      kind: created.kind as AlbumEntry['kind'],
+      monthKey: (created.month_key as string | null) ?? null,
+      coverPath: (created.cover_path as string | null) ?? null,
+      count: 0,
+      shareToken: (created.share_token as string | null) ?? null,
+      sharedAt: (created.shared_at as string | null) ?? null,
+    },
+  };
+}
+
+/**
+ * Asigna una foto a un álbum (manual o existente) o la saca del álbum
+ * (`albumId === null` la deja huérfana).
+ */
+export async function assignPhotoToAlbumAction(
+  photoId: string,
+  albumId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (typeof photoId !== 'string' || photoId.length === 0) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+
+  const supabase = await createClient();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { error } = await sb.from('media_items').update({ album_id: albumId }).eq('id', photoId);
+
+  if (error) return { ok: false, error: 'No pudimos cambiar el álbum de la foto.' };
+  revalidatePath('/album');
+  return { ok: true };
+}
+
+/**
+ * Genera un share_token random de 32 chars y lo guarda en el álbum. La URL
+ * `/compartir/album/[token]` queda accesible sin auth (anon) gracias a las
+ * policies de la migration 017.
+ */
+export async function shareAlbumAction(
+  albumId: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  if (typeof albumId !== 'string' || albumId.length === 0) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const token = Array.from(bytes, (b) => chars[b % chars.length]).join('');
+
+  const supabase = await createClient();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { error } = await sb
+    .from('albums')
+    .update({ share_token: token, shared_at: new Date().toISOString() })
+    .eq('id', albumId);
+
+  if (error) return { ok: false, error: 'No pudimos generar el link.' };
+  revalidatePath('/album');
+  return { ok: true, url: `/compartir/album/${token}` };
+}
+
+export async function revokeAlbumShareAction(
+  albumId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+  const { error } = await sb
+    .from('albums')
+    .update({ share_token: null, shared_at: null })
+    .eq('id', albumId);
+
+  if (error) return { ok: false, error: 'No pudimos revocar el link.' };
+  revalidatePath('/album');
+  return { ok: true };
 }
 
 export async function listPhotosAction(albumId?: string | null): Promise<PhotoEntry[]> {
