@@ -12,6 +12,14 @@ import type * as React from 'react';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex min-h-screen flex-col">
+      {/* Skip-to-content para teclado / lectores de pantalla. Invisible hasta
+          que recibe foco; entonces salta a #main. */}
+      <a
+        href="#main"
+        className="sr-only fixed top-2 left-2 z-50 rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground text-sm shadow focus:not-sr-only focus:outline-2 focus:outline-ring focus:outline-offset-2"
+      >
+        Saltar al contenido
+      </a>
       <div className="print:hidden">
         <SoftBackdrop />
       </div>
@@ -30,7 +38,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="print:hidden">
           <DesktopSidebar />
         </div>
-        <main className="min-w-0 flex-1 py-8 pb-20 md:pb-8 print:py-0 print:pb-0">{children}</main>
+        <main id="main" className="min-w-0 flex-1 py-8 pb-20 md:pb-8 print:py-0 print:pb-0">
+          {children}
+        </main>
       </div>
 
       <Separator className="print:hidden" />
