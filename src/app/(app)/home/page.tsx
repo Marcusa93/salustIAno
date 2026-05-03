@@ -18,6 +18,7 @@ import {
   SLEEP_QUALITY_LABELS,
   type SleepQuality,
 } from '@/lib/validators/events';
+import type { MilestoneCategory } from '@/lib/validators/milestone';
 import {
   AlertTriangle,
   Baby,
@@ -41,6 +42,7 @@ import { DiaperQuickAdd } from './_components/diaper-quick-add';
 import { FamilyActivityCard } from './_components/family-activity-card';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
 import { SleepQuickAdd } from './_components/sleep-quick-add';
+import { UpcomingControlsCard } from './_components/upcoming-controls-card';
 import { getTodayActivityByMemberAction } from './family-activity-actions';
 
 export const metadata: Metadata = {
@@ -165,31 +167,48 @@ export default async function HomePage() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const [{ data: recentEvents }, { data: todayEvents }, { data: activeSleeps }, todayActivity] =
-    await Promise.all([
-      supabase.rpc('get_timeline', {
-        p_child_id: child.id,
-        p_event_types: ['feeding', 'sleep', 'diaper'],
-        p_limit: 8,
-        p_offset: 0,
-      }),
-      supabase.rpc('get_timeline', {
-        p_child_id: child.id,
-        p_event_types: ['feeding', 'sleep', 'diaper'],
-        p_from: todayStart.toISOString(),
-        p_limit: 200,
-        p_offset: 0,
-      }),
-      supabase
-        .from('sleep_sessions')
-        .select('id, started_at, is_nap')
-        .eq('child_id', child.id)
-        .is('ended_at', null)
-        .is('deleted_at', null)
-        .order('started_at', { ascending: false })
-        .limit(1),
-      getTodayActivityByMemberAction(),
-    ]);
+  // Próximos controles: vencidos o que caen en los próximos 14 días.
+  const upcomingHorizon = new Date();
+  upcomingHorizon.setDate(upcomingHorizon.getDate() + 14);
+
+  const [
+    { data: recentEvents },
+    { data: todayEvents },
+    { data: activeSleeps },
+    todayActivity,
+    { data: upcomingMilestones },
+  ] = await Promise.all([
+    supabase.rpc('get_timeline', {
+      p_child_id: child.id,
+      p_event_types: ['feeding', 'sleep', 'diaper'],
+      p_limit: 8,
+      p_offset: 0,
+    }),
+    supabase.rpc('get_timeline', {
+      p_child_id: child.id,
+      p_event_types: ['feeding', 'sleep', 'diaper'],
+      p_from: todayStart.toISOString(),
+      p_limit: 200,
+      p_offset: 0,
+    }),
+    supabase
+      .from('sleep_sessions')
+      .select('id, started_at, is_nap')
+      .eq('child_id', child.id)
+      .is('ended_at', null)
+      .is('deleted_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1),
+    getTodayActivityByMemberAction(),
+    supabase
+      .from('medical_milestones')
+      .select('id, title, category, due_at, completed_at')
+      .is('deleted_at', null)
+      .is('completed_at', null)
+      .lte('due_at', upcomingHorizon.toISOString())
+      .order('due_at', { ascending: true, nullsFirst: false })
+      .limit(3),
+  ]);
 
   const recents = (recentEvents ?? []) as TimelineRow[];
   const today = (todayEvents ?? []) as TimelineRow[];
@@ -271,6 +290,21 @@ export default async function HomePage() {
           todayEventCount={todaySummary.feeding + todaySummary.sleep + todaySummary.diaper}
         />
       </div>
+
+      {/* Próximos controles (vencidos + 14 días). Si no hay nada, no se renderiza. */}
+      {upcomingMilestones && upcomingMilestones.length > 0 && (
+        <div className="animate-stagger-up" style={{ animationDelay: '105ms' }}>
+          <UpcomingControlsCard
+            rows={(upcomingMilestones as Array<Record<string, unknown>>).map((m) => ({
+              id: m.id as string,
+              title: m.title as string,
+              category: m.category as MilestoneCategory,
+              due_at: (m.due_at as string | null) ?? null,
+              completed_at: (m.completed_at as string | null) ?? null,
+            }))}
+          />
+        </div>
+      )}
 
       {/* Está durmiendo */}
       {activeSleep && (
