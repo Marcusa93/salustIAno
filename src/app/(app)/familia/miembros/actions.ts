@@ -239,6 +239,8 @@ export async function createMemberAction(input: CreateMemberInput): Promise<Crea
   }
 
   // User nuevo: lo creamos con contraseña temporal y email confirmado.
+  // `must_change_password` queda en user_metadata — el proxy lo lee del JWT
+  // y fuerza redirect a /bienvenida hasta que la persona cambie la pass.
   const tempPassword = generateTempPassword();
   const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
     email: data.email,
@@ -247,6 +249,7 @@ export async function createMemberAction(input: CreateMemberInput): Promise<Crea
     user_metadata: {
       display_name: data.displayName,
       created_by_admin: ctx.userId,
+      must_change_password: true,
     },
   });
 

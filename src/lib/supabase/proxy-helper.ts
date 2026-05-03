@@ -16,6 +16,16 @@ const PUBLIC_ROUTES = new Set<string>([
 const AUTH_ROUTES = new Set<string>(['/login', '/signup']);
 
 /**
+ * Rutas en las que dejamos pasar a un user que tiene `must_change_password`
+ * sin redirigir a /bienvenida. Necesitamos:
+ *   - /bienvenida (la página misma del onboarding)
+ *   - /logout, /api/* (acción de logout y endpoints internos)
+ *   - rutas públicas (login, recuperar, etc.) por si terminan acá vía algún
+ *     redirect raro
+ */
+const ONBOARDING_ALLOWED_PREFIXES = ['/bienvenida', '/api', '/auth'];
+
+/**
  * Refresca la sesión de Supabase en cada request y aplica las redirecciones
  * básicas según el estado de autenticación.
  *
@@ -81,6 +91,30 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     homeUrl.pathname = '/home';
     homeUrl.search = '';
     return NextResponse.redirect(homeUrl);
+  }
+
+  // Onboarding forzado: si la persona fue creada por un admin con la
+  // contraseña temporal, le pedimos cambiarla antes de mostrarle el resto.
+  // El flag vive en user_metadata.must_change_password (admin lo set en
+  // createMemberAction; /bienvenida lo limpia tras cambiar la pass).
+  if (isAuthenticated && data?.claims) {
+    const meta = (data.claims as { user_metadata?: { must_change_password?: boolean } })
+      .user_metadata;
+    const mustChange = meta?.must_change_password === true;
+    const isAllowed = ONBOARDING_ALLOWED_PREFIXES.some((p) => pathname.startsWith(p));
+    if (mustChange && !isAllowed) {
+      const welcomeUrl = request.nextUrl.clone();
+      welcomeUrl.pathname = '/bienvenida';
+      welcomeUrl.search = '';
+      return NextResponse.redirect(welcomeUrl);
+    }
+    // Si ya no necesita cambiar la pass pero está en /bienvenida, lo sacamos.
+    if (!mustChange && pathname === '/bienvenida') {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = '/home';
+      homeUrl.search = '';
+      return NextResponse.redirect(homeUrl);
+    }
   }
 
   return response;
