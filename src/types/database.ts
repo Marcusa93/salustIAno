@@ -509,46 +509,58 @@ export type Database = {
       };
       media_items: {
         Row: {
+          album_id: string | null;
           caption: string | null;
-          child_id: string;
+          child_id: string | null;
           created_at: string;
           created_by: string | null;
           deleted_at: string | null;
+          family_group_id: string | null;
           height: number | null;
           id: string;
           mime_type: string;
+          note_id: string | null;
           size_bytes: number | null;
           storage_path: string;
+          tags: string[];
           taken_at: string | null;
           updated_at: string;
           width: number | null;
         };
         Insert: {
+          album_id?: string | null;
           caption?: string | null;
-          child_id: string;
+          child_id?: string | null;
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          family_group_id?: string | null;
           height?: number | null;
           id?: string;
           mime_type: string;
+          note_id?: string | null;
           size_bytes?: number | null;
           storage_path: string;
+          tags?: string[];
           taken_at?: string | null;
           updated_at?: string;
           width?: number | null;
         };
         Update: {
+          album_id?: string | null;
           caption?: string | null;
-          child_id?: string;
+          child_id?: string | null;
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          family_group_id?: string | null;
           height?: number | null;
           id?: string;
           mime_type?: string;
+          note_id?: string | null;
           size_bytes?: number | null;
           storage_path?: string;
+          tags?: string[];
           taken_at?: string | null;
           updated_at?: string;
           width?: number | null;
@@ -559,6 +571,117 @@ export type Database = {
             columns: ['child_id'];
             isOneToOne: false;
             referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'media_items_album_id_fkey';
+            columns: ['album_id'];
+            isOneToOne: false;
+            referencedRelation: 'albums';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'media_items_note_id_fkey';
+            columns: ['note_id'];
+            isOneToOne: false;
+            referencedRelation: 'notes';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      albums: {
+        Row: {
+          child_id: string | null;
+          cover_path: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          family_group_id: string;
+          id: string;
+          kind: 'manual' | 'monthly' | 'milestone';
+          month_key: string | null;
+          name: string;
+          shared_at: string | null;
+          share_token: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          child_id?: string | null;
+          cover_path?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id: string;
+          id?: string;
+          kind?: 'manual' | 'monthly' | 'milestone';
+          month_key?: string | null;
+          name: string;
+          shared_at?: string | null;
+          share_token?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          child_id?: string | null;
+          cover_path?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          id?: string;
+          kind?: 'manual' | 'monthly' | 'milestone';
+          month_key?: string | null;
+          name?: string;
+          shared_at?: string | null;
+          share_token?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'albums_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      push_subscriptions: {
+        Row: {
+          created_at: string;
+          endpoint: string;
+          family_group_id: string;
+          id: string;
+          invalidated_at: string | null;
+          keys: { p256dh: string; auth: string };
+          user_agent: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          endpoint: string;
+          family_group_id: string;
+          id?: string;
+          invalidated_at?: string | null;
+          keys: { p256dh: string; auth: string };
+          user_agent?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          endpoint?: string;
+          family_group_id?: string;
+          id?: string;
+          invalidated_at?: string | null;
+          keys?: { p256dh: string; auth: string };
+          user_agent?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'push_subscriptions_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
             referencedColumns: ['id'];
           },
         ];
