@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function ControlPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
-      <header className="animate-stagger-up flex flex-col gap-3">
+      <header className="animate-stagger-up flex flex-col gap-3 print:hidden">
         <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
           <ClipboardCheck className="size-6" aria-hidden />
         </div>
@@ -26,7 +26,7 @@ export default function ControlPage() {
         </p>
       </header>
 
-      <Card className="flex items-start gap-3 border-primary/20 bg-primary/5 p-4">
+      <Card className="flex items-start gap-3 border-primary/20 bg-primary/5 p-4 print:hidden">
         <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
         <div className="flex flex-col gap-1 text-sm">
           <p className="font-medium text-foreground">Es un borrador, no un diagnóstico.</p>

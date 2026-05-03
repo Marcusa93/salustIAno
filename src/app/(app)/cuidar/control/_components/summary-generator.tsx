@@ -4,10 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { PediatricSummary } from '@/lib/ai/agents';
 import { cn } from '@/lib/utils';
-import { Calendar, ClipboardCheck, Copy, Loader2, Sparkles } from 'lucide-react';
-import { type ReactNode, useState, useTransition } from 'react';
+import {
+  Calendar,
+  ClipboardCheck,
+  Copy,
+  History,
+  Loader2,
+  Printer,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
+import { type ReactNode, useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { generatePediatricSummaryAction } from '../actions';
+import {
+  type PediatricSummaryEntry,
+  deletePediatricSummaryAction,
+  generatePediatricSummaryAction,
+  listPediatricSummariesAction,
+} from '../actions';
 
 const PERIODS = [
   { days: 7, label: '7 días' },
@@ -19,6 +33,9 @@ export function SummaryGenerator() {
   const [days, setDays] = useState<7 | 14 | 30>(7);
   const [summary, setSummary] = useState<PediatricSummary | null>(null);
   const [pending, startTransition] = useTransition();
+  const [history, setHistory] = useState<PediatricSummaryEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   function handleGenerate() {
     startTransition(async () => {
@@ -28,12 +45,51 @@ export function SummaryGenerator() {
         return;
       }
       setSummary(result.summary);
+      // Invalidate history para que se recargue al abrir.
+      setHistoryLoaded(false);
+    });
+  }
+
+  // Lazy-load del histórico la primera vez que se abre el panel.
+  useEffect(() => {
+    if (!historyOpen || historyLoaded) return;
+    listPediatricSummariesAction().then((rows) => {
+      setHistory(rows);
+      setHistoryLoaded(true);
+    });
+  }, [historyOpen, historyLoaded]);
+
+  function handleViewHistorySummary(entry: PediatricSummaryEntry) {
+    // Reconstruimos el shape PediatricSummary desde la fila persistida.
+    setSummary({
+      period_label: entry.periodLabel,
+      headline: entry.headline,
+      metrics: entry.metrics,
+      observations: entry.observations,
+      questions_for_pediatrician: entry.questions,
+      pending_milestones: entry.pendingMilestones,
+    });
+    // Scroll to top of summary
+    requestAnimationFrame(() => {
+      document.querySelector('[data-summary-view]')?.scrollIntoView({ behavior: 'smooth' });
+    });
+  }
+
+  function handleDeleteHistory(id: string) {
+    if (!window.confirm('¿Borrar este borrador del histórico?')) return;
+    void deletePediatricSummaryAction(id).then((r) => {
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      setHistory((prev) => prev.filter((x) => x.id !== id));
+      toast.success('Borrador eliminado.');
     });
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <Card className="flex flex-col gap-4 p-5">
+      <Card className="flex flex-col gap-4 p-5 print:hidden">
         <div className="flex flex-col gap-2">
           <span className="font-medium text-foreground">¿Cuánto tiempo querés mirar?</span>
           <div className="flex flex-wrap gap-2">
@@ -76,6 +132,78 @@ export function SummaryGenerator() {
       </Card>
 
       {summary && <SummaryView summary={summary} />}
+
+      {/* Borradores anteriores (lazy-load on expand). */}
+      <Card className="flex flex-col gap-3 p-4 print:hidden">
+        <button
+          type="button"
+          onClick={() => setHistoryOpen((v) => !v)}
+          className="flex items-center gap-2 text-left font-medium text-foreground text-sm outline-none transition-colors hover:text-primary"
+        >
+          <History className="size-4" aria-hidden />
+          Borradores anteriores
+          <span className="ml-auto text-muted-foreground text-xs">
+            {historyOpen ? 'Ocultar' : 'Ver'}
+          </span>
+        </button>
+
+        {historyOpen && (
+          <div className="flex flex-col gap-2">
+            {!historyLoaded ? (
+              <div className="flex items-center gap-2 py-2 text-muted-foreground text-sm">
+                <Loader2 className="size-4 animate-spin" aria-hidden /> Cargando…
+              </div>
+            ) : history.length === 0 ? (
+              <p className="py-2 text-muted-foreground text-sm">
+                Todavía no generaste ningún borrador.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {history.map((entry) => (
+                  <li key={entry.id}>
+                    <div className="flex items-center gap-3 rounded-lg border border-border/50 bg-card/40 p-3">
+                      <div className="flex flex-1 flex-col gap-0.5">
+                        <span className="font-medium text-foreground text-sm">
+                          {entry.periodLabel}
+                        </span>
+                        <span className="line-clamp-1 text-muted-foreground text-xs">
+                          {entry.headline}
+                        </span>
+                        <span className="text-muted-foreground/70 text-[11px]">
+                          {new Date(entry.createdAt).toLocaleString('es-AR', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="ghost"
+                        onClick={() => handleViewHistorySummary(entry)}
+                      >
+                        Ver
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon-xs"
+                        variant="ghost"
+                        onClick={() => handleDeleteHistory(entry.id)}
+                        aria-label="Borrar"
+                      >
+                        <Trash2 className="size-3" aria-hidden />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
@@ -89,19 +217,40 @@ function SummaryView({ summary }: { summary: PediatricSummary }) {
     );
   }
 
+  function handlePrint() {
+    // Tailwind's `print:` modifiers ocultan nav/sidebar/footer; la hoja de
+    // print en globals.css fuerza fondo blanco. El user obtiene un PDF
+    // limpio sin tocar más layout.
+    window.print();
+  }
+
   return (
-    <Card className="flex flex-col gap-5 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <Card data-summary-view className="flex flex-col gap-5 p-6 print:border-none print:shadow-none">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div className="flex flex-col gap-1">
           <span className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
             {summary.period_label}
           </span>
           <p className="font-medium text-foreground text-lg leading-snug">{summary.headline}</p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={copyAsText}>
-          <Copy className="size-4" aria-hidden />
-          Copiar
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={copyAsText}>
+            <Copy className="size-4" aria-hidden />
+            Copiar
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={handlePrint}>
+            <Printer className="size-4" aria-hidden />
+            Imprimir / PDF
+          </Button>
+        </div>
+      </div>
+
+      {/* Header alternativo solo para print: hereda paleta sobria. */}
+      <div className="hidden print:flex print:flex-col print:gap-1">
+        <span className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
+          {summary.period_label}
+        </span>
+        <p className="font-semibold text-foreground text-xl leading-snug">{summary.headline}</p>
       </div>
 
       <Section title="Cómo viene la cosa">

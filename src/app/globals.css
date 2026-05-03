@@ -360,3 +360,26 @@
     animation: salu-breathe-opacity 2.4s ease-in-out infinite;
   }
 }
+
+/* ===========================================================================
+ * Modo impresión — combinamos `print:hidden` en el layout (nav/sidebar/footer)
+ * con esta hoja para forzar fondo blanco y tipos legibles aunque la familia
+ * esté en dark mode al imprimir.
+ * ============================================================================ */
+@media print {
+  @page {
+    margin: 18mm 16mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Quitar sombras y ringas de cualquier card que sobreviva al print. */
+  [data-slot="card"] {
+    box-shadow: none !important;
+    border-color: #ddd !important;
+  }
+}
