@@ -1,11 +1,19 @@
 'use server';
 
+import { tagPhoto } from '@/lib/ai/agents/photo-tagger';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
 const BUCKET = 'photos';
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 const MAX_PHOTO_BYTES = 20 * 1024 * 1024; // 20 MB
+// Solo etiquetamos automáticamente formatos que el modelo entiende bien.
+// HEIC/HEIF a veces no son interpretables por el endpoint de visión, así que
+// las dejamos sin tags y la familia las puede tagear a mano.
+const VISION_FRIENDLY_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+// Cota dura para no mandar imágenes enormes al modelo (los buffers grandes
+// inflan el tiempo de upload y los costos). Si se pasa, omitimos tagging.
+const MAX_TAGGABLE_BYTES = 8 * 1024 * 1024; // 8 MB
 
 export interface AlbumEntry {
   id: string;
@@ -110,6 +118,31 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
       continue;
     }
 
+    // Tagging IA (best-effort). Si el modelo falla, timeoutea o el formato no
+    // se puede analizar, dejamos tags=[] y caption=null y la familia lo edita
+    // a mano desde el modal. Nunca bloquea el upload.
+    const takenAtIso = new Date(file.lastModified || Date.now()).toISOString();
+    let aiTags: string[] = [];
+    let aiCaption: string | null = null;
+    if (VISION_FRIENDLY_MIME.has(file.type) && file.size <= MAX_TAGGABLE_BYTES) {
+      try {
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        const dataUrl = `data:${file.type};base64,${base64}`;
+        const result = await tagPhoto(
+          { imageDataUrl: dataUrl, takenAtIso },
+          {
+            familyGroupId,
+            ...(childId ? { childId } : {}),
+            actorUserId: userData.user.id,
+          },
+        );
+        aiTags = result.tags;
+        aiCaption = result.caption.length > 0 ? result.caption : null;
+      } catch {
+        // best-effort, ya quedó logueado dentro del agente.
+      }
+    }
+
     // biome-ignore lint/suspicious/noExplicitAny: types stale.
     const sb = supabase as any;
     const { error: insertErr } = await sb.from('media_items').insert({
@@ -118,9 +151,9 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
       album_id: albumId,
       storage_path: path,
       mime_type: file.type,
-      caption: null,
-      tags: [],
-      taken_at: new Date(file.lastModified || Date.now()).toISOString(),
+      caption: aiCaption,
+      tags: aiTags,
+      taken_at: takenAtIso,
       created_by: userData.user.id,
     });
 

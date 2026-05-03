@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { ImageIcon, Loader2, Trash2, Upload, X } from 'lucide-react';
-import { type ChangeEvent, useEffect, useRef, useState, useTransition } from 'react';
+import { ImageIcon, Loader2, Sparkles, Trash2, Upload, X } from 'lucide-react';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import {
   type PhotoEntry,
@@ -38,10 +38,29 @@ interface AlbumGridProps {
 export function AlbumGrid({ initialPhotos }: AlbumGridProps) {
   const [photos, setPhotos] = useState(initialPhotos);
   const [active, setActive] = useState<PhotoEntry | null>(null);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const [uploading, startUpload] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const groups = groupByMonth(photos);
+  // Tags únicos del set actual de fotos, ordenados por frecuencia descendente
+  // y luego alfabéticamente. Mostramos hasta 12 chips para no abarrotar la UI.
+  const tagChips = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of photos) {
+      for (const t of p.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 12)
+      .map(([tag, count]) => ({ tag, count }));
+  }, [photos]);
+
+  const filteredPhotos = useMemo(() => {
+    if (!activeTag) return photos;
+    return photos.filter((p) => p.tags.includes(activeTag));
+  }, [photos, activeTag]);
+
+  const groups = groupByMonth(filteredPhotos);
 
   function handlePickFiles() {
     fileRef.current?.click();
@@ -104,7 +123,9 @@ export function AlbumGrid({ initialPhotos }: AlbumGridProps) {
         <p className="text-muted-foreground text-sm">
           {photos.length === 0
             ? 'Subí las primeras fotos de Salu.'
-            : `${photos.length} foto${photos.length === 1 ? '' : 's'} en ${groups.length} mes${groups.length === 1 ? '' : 'es'}.`}
+            : activeTag
+              ? `${filteredPhotos.length} foto${filteredPhotos.length === 1 ? '' : 's'} con #${activeTag}.`
+              : `${photos.length} foto${photos.length === 1 ? '' : 's'} en ${groups.length} mes${groups.length === 1 ? '' : 'es'}.`}
         </p>
         <Button type="button" size="sm" onClick={handlePickFiles} disabled={uploading}>
           {uploading ? (
@@ -115,6 +136,43 @@ export function AlbumGrid({ initialPhotos }: AlbumGridProps) {
           {uploading ? 'Subiendo…' : 'Subir fotos'}
         </Button>
       </div>
+
+      {tagChips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 pr-1 font-medium text-[11px] text-muted-foreground uppercase tracking-[0.18em]">
+            <Sparkles className="size-3" aria-hidden />
+            Filtrar
+          </span>
+          <button
+            type="button"
+            onClick={() => setActiveTag(null)}
+            className={cn(
+              'rounded-full border px-2.5 py-0.5 font-medium text-[11px] transition-colors',
+              activeTag === null
+                ? 'border-primary/30 bg-primary/10 text-primary'
+                : 'border-border/60 text-muted-foreground hover:border-border hover:text-foreground',
+            )}
+          >
+            Todas
+          </button>
+          {tagChips.map(({ tag, count }) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => setActiveTag((prev) => (prev === tag ? null : tag))}
+              className={cn(
+                'rounded-full border px-2.5 py-0.5 font-medium text-[11px] transition-colors',
+                activeTag === tag
+                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  : 'border-border/60 text-muted-foreground hover:border-border hover:text-foreground',
+              )}
+            >
+              {tag}
+              <span className="ml-1 text-muted-foreground/70">{count}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {photos.length === 0 ? (
         <Card className="flex flex-col items-center gap-4 p-12 text-center">
@@ -127,6 +185,13 @@ export function AlbumGrid({ initialPhotos }: AlbumGridProps) {
           <Button type="button" onClick={handlePickFiles} disabled={uploading}>
             <Upload className="size-4" aria-hidden />
             Subir fotos
+          </Button>
+        </Card>
+      ) : filteredPhotos.length === 0 ? (
+        <Card className="flex flex-col items-center gap-3 p-10 text-center">
+          <p className="text-muted-foreground text-sm">No hay fotos con #{activeTag} todavía.</p>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setActiveTag(null)}>
+            Quitar filtro
           </Button>
         </Card>
       ) : (
