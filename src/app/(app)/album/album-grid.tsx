@@ -15,6 +15,7 @@ import {
   Link2Off,
   Loader2,
   Plus,
+  Share2,
   Sparkles,
   Trash2,
   Upload,
@@ -417,6 +418,34 @@ function AlbumShareBar({
     }
   }
 
+  /**
+   * Web Share API: en mobile abre el sheet nativo de compartir (WhatsApp,
+   * Telegram, mail, etc.). En desktop sin soporte cae al copy del link.
+   * Usuario cancelando el share NO es un error — lo silenciamos.
+   */
+  async function handleNativeShare() {
+    const data = {
+      title: `Álbum: ${album.name}`,
+      text: `Mirá las fotos del álbum "${album.name}" de Salu:`,
+      url: fullUrl,
+    };
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share(data);
+      } catch (err) {
+        // El user canceló el sheet — no logueamos error.
+        if ((err as Error).name !== 'AbortError') {
+          toast.error('No pudimos abrir el compartir.');
+        }
+      }
+      return;
+    }
+    // Fallback: copy.
+    handleCopy();
+  }
+
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
   return (
     <Card className="flex flex-wrap items-center gap-3 border-primary/20 bg-primary/5 p-3">
       {isShared ? (
@@ -425,6 +454,12 @@ function AlbumShareBar({
             <span className="font-medium text-foreground text-sm">{album.name}</span>
             <span className="truncate text-muted-foreground text-xs">{fullUrl}</span>
           </div>
+          {canNativeShare && (
+            <Button type="button" size="sm" variant="default" onClick={handleNativeShare}>
+              <Share2 className="size-4" aria-hidden />
+              Compartir
+            </Button>
+          )}
           <Button type="button" size="sm" variant="ghost" onClick={handleCopy}>
             {copied ? (
               <Check className="size-4" aria-hidden />
