@@ -1,5 +1,7 @@
+import { CommentsThread } from '@/components/salu/comments-thread';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { listCommentsAction } from '@/lib/comments/actions';
 import { createClient } from '@/lib/supabase/server';
 import { NOTE_CATEGORY_LABELS, type NoteCategory } from '@/lib/validators/note';
 import { BookHeart, ChevronLeft, Pencil } from 'lucide-react';
@@ -43,7 +45,11 @@ export default async function NoteDetailPage({ params }: PageProps) {
   if (error || !note) notFound();
 
   const { data: userData } = await supabase.auth.getUser();
-  const photos = await listNotePhotosAction(note.id);
+  const [photos, comments] = await Promise.all([
+    listNotePhotosAction(note.id),
+    listCommentsAction('note', note.id),
+  ]);
+  const isLoggedIn = !!userData.user;
 
   // Edit/delete: el autor o un admin (RLS lo impone; la UI lo refleja).
   let canEdit = false;
@@ -103,6 +109,13 @@ export default async function NoteDetailPage({ params }: PageProps) {
       </Card>
 
       <NotePhotos noteId={note.id} initial={photos} canEdit={canEdit} />
+
+      <CommentsThread
+        targetType="note"
+        targetId={note.id}
+        initial={comments}
+        canComment={isLoggedIn}
+      />
 
       {canEdit && (
         <div className="flex flex-wrap gap-2 border-border border-t pt-4">

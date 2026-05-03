@@ -1,5 +1,7 @@
+import { CommentsThread } from '@/components/salu/comments-thread';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { listCommentsAction } from '@/lib/comments/actions';
 import { createClient } from '@/lib/supabase/server';
 import {
   MILESTONE_CATEGORY_LABELS,
@@ -77,6 +79,8 @@ export default async function MilestoneDetailPage({ params }: PageProps) {
 
   const status = deriveStatus(milestone.due_at, milestone.completed_at);
   const badge = STATUS_BADGE[status];
+  const comments = await listCommentsAction('milestone', milestone.id);
+  const isLoggedIn = !!userData.user;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
@@ -129,6 +133,13 @@ export default async function MilestoneDetailPage({ params }: PageProps) {
           </p>
         </Card>
       )}
+
+      <CommentsThread
+        targetType="milestone"
+        targetId={milestone.id}
+        initial={comments}
+        canComment={isLoggedIn}
+      />
 
       <div className="flex flex-col gap-4 border-border border-t pt-4">
         <MilestoneActions
