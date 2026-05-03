@@ -105,8 +105,11 @@ export default async function MeasurementsListPage() {
         </Button>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-2">
-            <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
-              Mediciones
+            <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
+              Cuidar · Mediciones
+            </span>
+            <h1 className="font-display text-[clamp(2rem,5vw,3rem)] text-foreground leading-[1.05] tracking-tight">
+              Cómo va creciendo
             </h1>
             <p className="max-w-prose text-muted-foreground">
               Lo que te entregan en cada control. Vas a ver cómo crece {child.name} con el tiempo.

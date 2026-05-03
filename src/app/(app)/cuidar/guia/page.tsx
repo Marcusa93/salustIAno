@@ -60,7 +60,10 @@ export default async function CareGuidesListPage({ searchParams }: PageProps) {
         </Button>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-2">
-            <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
+            <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
+              Cuidar · Guía
+            </span>
+            <h1 className="font-display text-[clamp(2rem,5vw,3rem)] text-foreground leading-[1.05] tracking-tight">
               Guía de cuidado
             </h1>
             <p className="max-w-prose text-muted-foreground">

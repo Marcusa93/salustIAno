@@ -18,24 +18,39 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-border border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-border/60 border-t bg-background/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
       aria-label="Navegación principal"
     >
       <div className="flex">
         {items.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href;
+          const isActive =
+            href === '/home'
+              ? pathname === href
+              : pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
               key={href}
               href={href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 py-2 font-medium text-xs transition-colors',
-                'transition-transform duration-150 active:scale-95',
+                'group/bnav relative flex min-h-[52px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 py-2 font-medium text-[10px] tracking-wide transition-all duration-200 active:scale-95',
                 isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              <Icon className="size-5" aria-hidden />
+              {isActive && (
+                <span
+                  aria-hidden
+                  className="absolute top-0 left-1/2 h-[3px] w-10 -translate-x-1/2 rounded-b-full bg-primary"
+                />
+              )}
+              <span
+                className={cn(
+                  'flex size-9 items-center justify-center rounded-full transition-all duration-200',
+                  isActive ? 'bg-primary/12 text-primary' : 'group-hover/bnav:bg-muted/50',
+                )}
+              >
+                <Icon className="size-5" aria-hidden />
+              </span>
               <span>{label}</span>
             </Link>
           );

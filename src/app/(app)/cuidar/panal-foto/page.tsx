@@ -9,12 +9,15 @@ export const metadata: Metadata = {
 
 export default function PanalFotoPage() {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-3">
-        <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+      <header className="animate-stagger-up flex flex-col gap-3">
+        <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
           <Camera className="size-6" aria-hidden />
         </div>
-        <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
+        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
+          Cuidar · Aquitapp
+        </span>
+        <h1 className="font-display text-[clamp(2rem,5vw,3rem)] text-foreground leading-[1.05] tracking-tight">
           Aquitapp
         </h1>
         <p className="text-muted-foreground">

@@ -33,10 +33,12 @@ describe('BottomNav', () => {
     expect(cuidarLink).not.toHaveAttribute('aria-current');
   });
 
-  it('tap targets incluyen min-h-[44px] y min-w-[44px]', () => {
+  it('tap targets respetan el mínimo de accesibilidad (>=44px)', () => {
     render(<BottomNav />);
     const homeLink = screen.getByText('Home').closest('a');
-    expect(homeLink?.className).toContain('min-h-[44px]');
+    // El tap target sube a 52px para tener más respiro visual + flecha
+    // de active. Lo importante es que sea >= 44px.
+    expect(homeLink?.className).toContain('min-h-[52px]');
     expect(homeLink?.className).toContain('min-w-[44px]');
   });
 });
