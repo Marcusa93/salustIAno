@@ -148,21 +148,48 @@ export default async function TimelinePage({ searchParams }: PageProps) {
         title={`El día a día de ${child.name}.`}
         action={
           <>
+            {/* En mobile mostramos los secundarios como icon-only para que
+                el primary "Anotar momento" mantenga la jerarquía visual.
+                En sm+ se ven con label completo. */}
+            <Button
+              render={<Link href={'/timeline/imprimir' as Route} />}
+              size="icon-sm"
+              variant="outline"
+              aria-label="Imprimir o exportar a PDF"
+              className="sm:hidden"
+            >
+              <Printer className="size-4" aria-hidden />
+            </Button>
             <Button
               render={<Link href={'/timeline/imprimir' as Route} />}
               size="sm"
               variant="outline"
+              className="hidden sm:inline-flex"
             >
               <Printer className="size-4" aria-hidden />
               Imprimir / PDF
             </Button>
-            <Button render={<Link href={'/timeline/mes' as Route} />} size="sm" variant="outline">
+            <Button
+              render={<Link href={'/timeline/mes' as Route} />}
+              size="icon-sm"
+              variant="outline"
+              aria-label="Vista mensual"
+              className="sm:hidden"
+            >
+              <CalendarDays className="size-4" aria-hidden />
+            </Button>
+            <Button
+              render={<Link href={'/timeline/mes' as Route} />}
+              size="sm"
+              variant="outline"
+              className="hidden sm:inline-flex"
+            >
               <CalendarDays className="size-4" aria-hidden />
               Vista mensual
             </Button>
             <Button render={<Link href="/notas/nuevo" />} size="sm">
               <BookHeart className="size-4" aria-hidden />
-              Anotar momento
+              Anotar
             </Button>
           </>
         }

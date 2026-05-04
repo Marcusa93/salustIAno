@@ -103,7 +103,7 @@ export default async function NoteDetailPage({ params }: PageProps) {
       </header>
 
       <Card className="p-6 sm:p-8">
-        <div className="whitespace-pre-wrap font-serif text-base text-foreground leading-[1.75] sm:text-lg">
+        <div className="whitespace-pre-wrap font-display text-base text-foreground leading-[1.75] sm:text-lg">
           {note.content}
         </div>
       </Card>

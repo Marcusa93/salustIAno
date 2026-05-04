@@ -35,7 +35,7 @@ export function BottomNav() {
               href={href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'group/bnav relative flex min-h-[52px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 py-2 font-medium text-[10px] tracking-wide transition-all duration-200 active:scale-95',
+                'group/bnav relative flex min-h-[52px] min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 font-medium text-[9px] tracking-wide transition-all duration-200 active:scale-95 sm:gap-1 sm:text-[10px]',
                 isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -53,7 +53,9 @@ export function BottomNav() {
               >
                 <Icon className="size-5" aria-hidden />
               </span>
-              <span>{label}</span>
+              {/* Label se oculta en pantallas muy chicas (<360px) para que
+                  el ícono respire. En ≥360px se muestra normal. */}
+              <span className="hidden truncate min-[360px]:inline">{label}</span>
             </Link>
           );
         })}

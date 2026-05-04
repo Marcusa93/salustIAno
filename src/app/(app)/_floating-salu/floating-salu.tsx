@@ -121,12 +121,15 @@ export function FloatingSalu() {
         onClick={() => setOpen(true)}
         aria-label="Abrir chat con SaluIA"
         className={cn(
-          'fixed right-4 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20 transition-all duration-200',
+          'fixed right-4 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20 transition-all duration-300',
           'bottom-[calc(env(safe-area-inset-bottom)+76px)] md:bottom-4',
           'hover:-translate-y-0.5 hover:shadow-xl active:scale-95',
           'focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2',
           'animate-breathe print:hidden',
-          open && 'opacity-0 pointer-events-none',
+          // Cuando el sheet está abierto, escondemos el botón con scale
+          // + opacity. Al cerrar, vuelve con un fade-in suave de 300ms en
+          // lugar de aparecer instantáneo.
+          open ? 'pointer-events-none scale-50 opacity-0' : 'scale-100 opacity-100',
         )}
       >
         <SaluBotAvatar size={36} className="text-primary-foreground" monochrome />

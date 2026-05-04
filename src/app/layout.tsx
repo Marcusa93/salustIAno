@@ -95,7 +95,10 @@ export default function RootLayout({
           themes={['system', 'light', 'dark', 'night']}
         >
           {children}
-          <Toaster position="bottom-center" richColors />
+          {/* Toasts en top-center — el bottom queda denso entre bottom-nav,
+              FloatingSalu y safe-area-inset; arriba se ven sin tapar nada
+              y son fáciles de descartar. */}
+          <Toaster position="top-center" richColors />
         </ThemeProvider>
       </body>
     </html>
