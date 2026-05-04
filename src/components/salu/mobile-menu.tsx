@@ -3,15 +3,17 @@
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { Baby, BookHeart, Home, Menu, Sparkles, Users } from 'lucide-react';
+import { Baby, BookHeart, Home, ImageIcon, Menu, Sparkles, Users } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
   { href: '/cuidar', label: 'Cuidar', icon: Baby },
-  { href: '/timeline', label: 'Recordar', icon: BookHeart },
+  { href: '/timeline', label: 'Timeline', icon: BookHeart },
+  { href: '/album', label: 'Álbum', icon: ImageIcon },
   { href: '/crear', label: 'Crear', icon: Sparkles },
   { href: '/familia', label: 'Familia', icon: Users },
 ] as const;
@@ -26,9 +28,21 @@ const themeOptions = [
 export function MobileMenu() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
+  // Convertimos el Sheet en controlado para poder cerrarlo a mano cuando
+  // la familia toca un item de nav. Sin esto el Sheet se quedaba abierto
+  // después de navegar, obligando a cerrarlo manualmente.
+  const [open, setOpen] = useState(false);
+
+  // Defensa extra: si por algún motivo Next ya navegó (cambio de pathname)
+  // pero el Sheet sigue abierto, lo cerramos. Cubre el caso del
+  // pre-fetch y de transitions con flag aria-current.
+  useEffect(() => {
+    if (open) setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
         render={
           <Button variant="ghost" size="icon" aria-label="Abrir menú" className="md:hidden">
@@ -49,6 +63,7 @@ export function MobileMenu() {
                 key={href}
                 href={href}
                 aria-current={isActive ? 'page' : undefined}
+                onClick={() => setOpen(false)}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 font-medium text-sm transition-colors',
                   isActive
