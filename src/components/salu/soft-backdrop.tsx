@@ -24,20 +24,25 @@ export function SoftBackdrop({ className }: { className?: string }) {
       aria-hidden
       className={cn('pointer-events-none fixed inset-0 z-0 overflow-hidden', className)}
     >
-      {/* Capa 1: patrón vichy / gingham (azul + blanco) */}
+      {/* Capa 1: patrón vichy / gingham (azul + blanco). Fade-out vertical
+          para que en pantallas largas el cuadrille no compita con el
+          contenido cerca del bottom. */}
       <div
         className="absolute inset-0"
         style={{
-          // Dos linear-gradients perpendiculares a 50% que se mezclan en
-          // las intersecciones gracias a la transparencia. El resultado
-          // es: cuadritos blancos, cuadritos azul claro a 50% opacidad,
-          // y donde se superponen quedan en azul más oscuro.
           backgroundImage: [
             'linear-gradient(to right, oklch(0.6 0.085 235 / 0.07) 50%, transparent 50%)',
             'linear-gradient(to bottom, oklch(0.6 0.085 235 / 0.07) 50%, transparent 50%)',
           ].join(', '),
           backgroundSize: '36px 36px, 36px 36px',
           backgroundPosition: '0 0, 0 0',
+          // El mask hace que el cuadrille empiece full opaco arriba y se
+          // vaya desvaneciendo hacia el bottom — útil cuando hay scroll
+          // largo y la repetición empieza a notarse como ruido.
+          maskImage:
+            'linear-gradient(to bottom, black 0%, black 50%, rgba(0,0,0,0.4) 80%, transparent 100%)',
+          WebkitMaskImage:
+            'linear-gradient(to bottom, black 0%, black 50%, rgba(0,0,0,0.4) 80%, transparent 100%)',
         }}
       />
 

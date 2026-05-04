@@ -1,6 +1,7 @@
 'use client';
 
 import { ProposalCard } from '@/app/(app)/chat/_components/proposal-card';
+import { SaluBotAvatar } from '@/components/salu/salu-bot-avatar';
 import { SpeechToTextButton } from '@/components/salu/speech-to-text-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -128,9 +129,7 @@ export function FloatingSalu() {
           open && 'opacity-0 pointer-events-none',
         )}
       >
-        <span className="text-2xl" aria-hidden>
-          👶
-        </span>
+        <SaluBotAvatar size={36} className="text-primary-foreground" monochrome />
         <span
           aria-hidden
           className="absolute size-14 animate-ping rounded-full bg-primary/20 opacity-30"
@@ -146,9 +145,9 @@ export function FloatingSalu() {
           <SheetHeader className="flex-row items-start gap-3 border-border/60 border-b p-4">
             <span
               aria-hidden
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-2xl ring-1 ring-primary/20"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20"
             >
-              👶
+              <SaluBotAvatar size={32} />
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <SheetTitle className="text-base">SaluIA</SheetTitle>
