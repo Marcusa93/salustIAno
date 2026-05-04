@@ -8,6 +8,7 @@ import { UserMenu } from '@/components/salu/user-menu';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import type * as React from 'react';
+import { FloatingSalu } from './_floating-salu/floating-salu';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -51,6 +52,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="print:hidden">
         <BottomNav />
         <InstallHint />
+        <FloatingSalu />
       </div>
     </div>
   );

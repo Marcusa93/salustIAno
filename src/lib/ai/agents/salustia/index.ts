@@ -24,12 +24,25 @@ const SYSTEM_PROMPT = readFileSync(
   'utf8',
 );
 
+const VOICE_BABY_PREFIX = readFileSync(
+  join(process.cwd(), 'src/lib/ai/agents/salustia/voice-baby.md'),
+  'utf8',
+);
+
+export type SalustiaVoice = 'assistant' | 'baby';
+
 export interface SalustiaInput {
   /**
    * Conversación previa más el último mensaje del usuario. El agente le
    * antepone el system prompt internamente, no hay que mandárselo.
    */
   messages: ChatMessage[];
+  /**
+   * Persona del asistente. 'assistant' (default) habla como SalustIA
+   * ayudante. 'baby' habla como Salu en primera persona, cariñoso. Las
+   * tools y reglas operativas son idénticas — solo cambia la forma.
+   */
+  voice?: SalustiaVoice;
 }
 
 export interface SalustiaOutput {
@@ -101,12 +114,15 @@ export async function chat(
   context: AgentContext = {},
 ): Promise<SalustiaOutput> {
   const startedAt = Date.now();
+  const voice: SalustiaVoice = input.voice ?? 'assistant';
+  const agentLabel = voice === 'baby' ? `${AGENT_NAME}-baby` : AGENT_NAME;
+
   let toolCtx: ToolContext;
   try {
     toolCtx = await resolveToolContext();
   } catch (err) {
     await logStore.record({
-      agent: AGENT_NAME,
+      agent: agentLabel,
       model: MODEL,
       promptVersion: PROMPT_VERSION,
       error: err instanceof Error ? err.message : 'unknown',
@@ -116,7 +132,9 @@ export async function chat(
     throw err;
   }
 
-  const messages: ChatMessage[] = [{ role: 'system', content: SYSTEM_PROMPT }, ...input.messages];
+  const systemContent =
+    voice === 'baby' ? `${VOICE_BABY_PREFIX}\n\n---\n\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
+  const messages: ChatMessage[] = [{ role: 'system', content: systemContent }, ...input.messages];
 
   const toolCallsMade: string[] = [];
   let totalPromptTokens = 0;
@@ -143,7 +161,7 @@ export async function chat(
         const latencyMs = Date.now() - startedAt;
 
         await logStore.record({
-          agent: AGENT_NAME,
+          agent: agentLabel,
           model: lastModel,
           promptVersion: PROMPT_VERSION,
           promptTokens: totalPromptTokens,
@@ -224,7 +242,7 @@ export async function chat(
     throw new AIError('provider', 'El asistente se enroscó y no pudo terminar la respuesta.');
   } catch (err) {
     await logStore.record({
-      agent: AGENT_NAME,
+      agent: agentLabel,
       model: lastModel,
       promptVersion: PROMPT_VERSION,
       error: err instanceof Error ? err.message : 'unknown',
