@@ -341,9 +341,7 @@ export default async function HomePage() {
         className="animate-stagger-up flex flex-col gap-3"
         style={{ animationDelay: '180ms' }}
       >
-        <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
-          Anotar
-        </h2>
+        <h2 className="font-semibold text-foreground text-sm">Anotar</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <FeedingQuickAdd
             trigger={
@@ -377,9 +375,7 @@ export default async function HomePage() {
         className="animate-stagger-up flex flex-col gap-3"
         style={{ animationDelay: '240ms' }}
       >
-        <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
-          Hoy
-        </h2>
+        <h2 className="font-semibold text-foreground text-sm">Hoy</h2>
         <div className="grid grid-cols-3 gap-3">
           <SummaryCard label="Tomas" count={todaySummary.feeding} Icon={Milk} />
           <SummaryCard label="Sueños" count={todaySummary.sleep} Icon={Moon} />
@@ -400,9 +396,7 @@ export default async function HomePage() {
         style={{ animationDelay: '300ms' }}
       >
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-[0.18em]">
-            Recientes
-          </h2>
+          <h2 className="font-semibold text-foreground text-sm">Recientes</h2>
           <Link
             href={'/timeline' as Route}
             className="font-medium text-primary text-sm hover:underline"

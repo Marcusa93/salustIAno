@@ -31,7 +31,7 @@ export default async function PerfilPage() {
     : null;
 
   return (
-    <div className="flex max-w-xl flex-col gap-10 py-10 sm:py-14">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
       <header className="animate-stagger-up flex flex-col gap-2">
         <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
           Mi cuenta

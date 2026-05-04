@@ -183,9 +183,7 @@ export default async function MeasurementsListPage() {
 
           {/* Lista completa */}
           <section className="flex flex-col gap-3">
-            <h2 className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
-              Histórico
-            </h2>
+            <h2 className="font-semibold text-foreground text-sm">Histórico</h2>
             <ul className="flex flex-col gap-3">
               {rows.map((m) => (
                 <li key={m.id}>

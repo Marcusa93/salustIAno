@@ -68,8 +68,8 @@ export default async function FamiliaPage() {
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-medium text-muted-foreground text-sm uppercase tracking-wider">Vos</h2>
-        <Card className="flex items-center gap-4 p-4">
+        <h2 className="font-semibold text-foreground text-sm">Vos</h2>
+        <Card className="flex items-center gap-4 p-5">
           <Avatar size="lg">
             <AvatarFallback>{initial}</AvatarFallback>
           </Avatar>
@@ -87,9 +87,7 @@ export default async function FamiliaPage() {
 
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
-            El bebé
-          </h2>
+          <h2 className="font-semibold text-foreground text-sm">El bebé</h2>
           {isAdmin && (children?.length ?? 0) === 0 && (
             <Button render={<Link href="/familia/bebe/nuevo" />} size="sm">
               <Plus className="size-4" aria-hidden />

@@ -212,9 +212,7 @@ export default async function TimelinePage({ searchParams }: PageProps) {
         <div className="flex flex-col gap-8">
           {Array.from(byDay.entries()).map(([day, items]) => (
             <section key={day} className="flex flex-col gap-3">
-              <h2 className="font-medium text-foreground text-sm uppercase tracking-wider text-muted-foreground">
-                {dayLabel(day)}
-              </h2>
+              <h2 className="font-semibold text-foreground text-sm">{dayLabel(day)}</h2>
               <ul className="flex flex-col gap-2">
                 {items.map((row) => (
                   <li key={`${row.event_type}-${row.id}`}>
