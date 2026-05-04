@@ -16,6 +16,19 @@ const supabaseHost = (() => {
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   typedRoutes: true,
+  // Server Actions: subimos el bodySizeLimit del default 1mb a 50mb porque
+  // /album acepta fotos hasta 20MB cada una y el upload es batch (varias
+  // fotos en un solo formData → puede totalizar ~50MB).
+  // En el server action seguimos validando file.size <= 20MB por foto y
+  // descartamos las que se pasan, así que esto no expone superficie de
+  // abuso — solo evita el rechazo prematuro de Next.
+  // Long term: migrar a uploads directos al Storage con signed URLs así no
+  // pasan por Next/Vercel — pero por ahora batch via action funciona ok.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
+  },
   images: {
     remotePatterns: supabaseHost
       ? [

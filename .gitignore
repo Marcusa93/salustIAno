@@ -50,3 +50,7 @@ supabase/.temp
 
 # Vercel
 .vercel
+
+# Claude Code worktrees, settings y typos
+.claude/
+.claire/
