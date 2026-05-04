@@ -1,6 +1,7 @@
 'use client';
 
 import { SpeakButton } from '@/components/salu/speak-button';
+import { SpeechToTextButton } from '@/components/salu/speech-to-text-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -272,12 +273,19 @@ export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) 
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Preguntale algo a SalustIA…"
+          placeholder="Preguntale algo a SalustIA o tocá el micrófono…"
           rows={2}
           maxLength={2000}
           disabled={pending}
           className="flex-1 resize-none"
           aria-label="Mensaje para SalustIA"
+        />
+        <SpeechToTextButton
+          disabled={pending}
+          onTranscript={(text) => {
+            setDraft((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+            requestAnimationFrame(() => inputRef.current?.focus());
+          }}
         />
         <Button type="submit" disabled={pending || draft.trim().length === 0} size="icon">
           {pending ? (

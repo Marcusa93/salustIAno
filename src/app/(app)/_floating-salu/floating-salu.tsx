@@ -1,6 +1,7 @@
 'use client';
 
 import { ProposalCard } from '@/app/(app)/chat/_components/proposal-card';
+import { SpeechToTextButton } from '@/components/salu/speech-to-text-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -249,12 +250,22 @@ export function FloatingSalu() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Hablame…"
+              placeholder="Hablame o tocá el micrófono…"
               rows={1}
               maxLength={1500}
               disabled={pending}
               className="max-h-32 flex-1 resize-none"
               aria-label="Mensaje para Salu"
+            />
+            <SpeechToTextButton
+              disabled={pending}
+              onTranscript={(text) => {
+                // Append al draft con un espacio. Si el usuario ya tenía
+                // texto, no lo pisa.
+                setDraft((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+                // Foco al textarea para que pueda corregir o tocar Enter.
+                requestAnimationFrame(() => inputRef.current?.focus());
+              }}
             />
             <Button
               type="submit"
