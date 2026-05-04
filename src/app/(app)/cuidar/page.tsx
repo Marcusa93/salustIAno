@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/salu/page-header';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { BookHeart, CalendarClock, Camera, ClipboardCheck, Ruler, Sparkles } from 'lucide-react';
@@ -65,14 +66,7 @@ const OPTIONS: CuidarOption[] = [
 export default function CuidarPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
-      <header className="animate-stagger-up flex flex-col gap-2" style={{ animationDelay: '0ms' }}>
-        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
-          Cuidar
-        </span>
-        <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
-          El día a día de Salu, ordenado.
-        </h1>
-      </header>
+      <PageHeader eyebrow="Cuidar" title="El día a día de Salu, ordenado." />
 
       <div className="grid gap-4 sm:grid-cols-2">
         {OPTIONS.map((opt, idx) => (

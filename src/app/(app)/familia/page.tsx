@@ -1,3 +1,5 @@
+import { EmptyState } from '@/components/salu/empty-state';
+import { PageHeader } from '@/components/salu/page-header';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -58,20 +60,13 @@ export default async function FamiliaPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
-      <header className="animate-stagger-up flex flex-col gap-2">
-        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
-          Familia
-        </span>
-        <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
-          Quiénes somos, quién está en camino.
-        </h1>
-      </header>
+      <PageHeader eyebrow="Familia" title="Quiénes somos, quién está en camino." />
 
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold text-foreground text-sm">Vos</h2>
         <Card className="flex items-center gap-4 p-5">
           <Avatar size="lg">
-            <AvatarFallback>{initial}</AvatarFallback>
+            <AvatarFallback tone="primary">{initial}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col gap-0.5">
             <span className="font-medium text-foreground">{displayName ?? 'Tu cuenta'}</span>
@@ -97,26 +92,16 @@ export default async function FamiliaPage() {
         </div>
 
         {!children || children.length === 0 ? (
-          <Card className="flex flex-col items-center gap-4 p-10 text-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Baby className="size-6" aria-hidden />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <h3 className="font-medium text-foreground text-lg">
-                Cuando llegue, su perfil va acá.
-              </h3>
-              <p className="max-w-md text-muted-foreground text-sm">
-                Podés crear el perfil hoy con lo que ya sabés (nombre, pediatra, fecha esperada) y
-                completar lo final cuando nazca.
-              </p>
-            </div>
-            {isAdmin && (
-              <Button render={<Link href="/familia/bebe/nuevo" />}>
-                <Plus className="size-4" aria-hidden />
-                Crear el perfil
-              </Button>
-            )}
-          </Card>
+          <EmptyState
+            icon={Baby}
+            title="Cuando llegue, su perfil va acá."
+            description="Podés crear el perfil hoy con lo que ya sabés (nombre, pediatra, fecha esperada) y completar lo final cuando nazca."
+            action={
+              isAdmin
+                ? { label: 'Crear el perfil', href: '/familia/bebe/nuevo' as Route }
+                : undefined
+            }
+          />
         ) : (
           <ul className="flex flex-col gap-3">
             {(children as ChildSummary[]).map((child) => (

@@ -26,7 +26,7 @@ export function FamilyActivityCard({ activity }: FamilyActivityCardProps) {
   if (activity.length === 0) return null;
 
   return (
-    <Card className="flex flex-col gap-3 p-4 sm:p-5">
+    <Card className="flex flex-col gap-3 border-border/50 bg-gradient-to-b from-card to-muted/15 p-4 sm:p-5">
       <div className="flex items-center gap-2">
         <span
           aria-hidden
@@ -51,7 +51,7 @@ export function FamilyActivityCard({ activity }: FamilyActivityCardProps) {
               )}
             >
               <Avatar size="sm">
-                <AvatarFallback>{initial}</AvatarFallback>
+                <AvatarFallback tone={m.isSelf ? 'primary' : 'muted'}>{initial}</AvatarFallback>
               </Avatar>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex items-center gap-1.5 truncate font-medium text-foreground text-sm">

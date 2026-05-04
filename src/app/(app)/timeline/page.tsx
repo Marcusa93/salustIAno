@@ -1,5 +1,7 @@
+import { EmptyState } from '@/components/salu/empty-state';
 import { CradleIllustration } from '@/components/salu/illustrations/cradle';
 import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timeline-empty';
+import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
@@ -141,17 +143,11 @@ export default async function TimelinePage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
-      <header className="animate-stagger-up flex flex-col gap-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex flex-col gap-2">
-            <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
-              Timeline
-            </span>
-            <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
-              El día a día de {child.name}.
-            </h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
+      <PageHeader
+        eyebrow="Timeline"
+        title={`El día a día de ${child.name}.`}
+        action={
+          <>
             <Button
               render={<Link href={'/timeline/imprimir' as Route} />}
               size="sm"
@@ -168,9 +164,9 @@ export default async function TimelinePage({ searchParams }: PageProps) {
               <BookHeart className="size-4" aria-hidden />
               Anotar momento
             </Button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <nav aria-label="Filtrar timeline" className="flex flex-wrap gap-2">
         {FILTER_OPTIONS.map((opt) => {
@@ -200,14 +196,16 @@ export default async function TimelinePage({ searchParams }: PageProps) {
           No pudimos cargar el timeline.
         </Card>
       ) : rows.length === 0 ? (
-        <Card className="flex flex-col items-center gap-4 p-10 text-center sm:p-12">
-          <div className="text-primary">
-            <TimelineEmptyIllustration size={140} />
-          </div>
-          <p className="max-w-sm text-muted-foreground leading-relaxed">
-            Todavía no hay registros. Anotá algo desde Casa.
-          </p>
-        </Card>
+        <EmptyState
+          illustration={
+            <div className="text-primary">
+              <TimelineEmptyIllustration size={140} />
+            </div>
+          }
+          title="Todavía no hay registros"
+          description="Anotá algo desde Casa y vuelve acá para verlo."
+          action={{ label: 'Ir a Casa', href: '/home' as Route }}
+        />
       ) : (
         <div className="flex flex-col gap-8">
           {Array.from(byDay.entries()).map(([day, items]) => (

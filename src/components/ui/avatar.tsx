@@ -35,12 +35,25 @@ function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
   );
 }
 
-function AvatarFallback({ className, ...props }: AvatarPrimitive.Fallback.Props) {
+function AvatarFallback({
+  className,
+  tone = 'muted',
+  ...props
+}: AvatarPrimitive.Fallback.Props & {
+  /**
+   * Color del fondo del avatar cuando no hay imagen:
+   *  - 'muted' (default): gris neutro, para miembros otros / desconocidos.
+   *  - 'primary': azul polvo, destacado para "vos" / autor / yo.
+   */
+  tone?: 'muted' | 'primary';
+}) {
   return (
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
+      data-tone={tone}
       className={cn(
-        'flex size-full items-center justify-center rounded-full bg-muted text-muted-foreground text-sm group-data-[size=sm]/avatar:text-xs',
+        'flex size-full items-center justify-center rounded-full font-medium text-sm group-data-[size=sm]/avatar:text-xs',
+        tone === 'primary' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
         className,
       )}
       {...props}

@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/salu/page-header';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
@@ -32,18 +33,15 @@ export default async function PerfilPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
-      <header className="animate-stagger-up flex flex-col gap-2">
-        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
-          Mi cuenta
-        </span>
-        <h1 className="font-display text-[clamp(2rem,5vw,3rem)] text-foreground leading-[1.05] tracking-tight">
-          Tu espacio.
-        </h1>
-      </header>
+      <PageHeader
+        eyebrow="Mi cuenta"
+        title="Tu espacio."
+        description="Tu nombre, tu foto, los devices que reciben notificaciones."
+      />
 
       <Card className="flex items-center gap-4 p-5">
         <Avatar size="lg" className="size-16 text-xl">
-          <AvatarFallback>{initial}</AvatarFallback>
+          <AvatarFallback tone="primary">{initial}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col gap-0.5">
           <p className="font-display font-medium text-foreground text-lg">

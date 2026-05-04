@@ -46,7 +46,7 @@ export function UpcomingControlsCard({ rows }: UpcomingControlsCardProps) {
   if (rows.length === 0) return null;
 
   return (
-    <Card className="flex flex-col gap-3 p-4 sm:p-5">
+    <Card className="flex flex-col gap-3 border-border/50 bg-gradient-to-b from-card to-muted/15 p-4 sm:p-5">
       <div className="flex items-center gap-2">
         <span
           aria-hidden

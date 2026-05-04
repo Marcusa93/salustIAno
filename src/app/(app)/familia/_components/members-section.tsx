@@ -224,7 +224,7 @@ function MemberCard({
     <li>
       <Card className="flex items-center gap-4 p-4">
         <Avatar size="lg">
-          <AvatarFallback>{initial}</AvatarFallback>
+          <AvatarFallback tone={member.isSelf ? 'primary' : 'muted'}>{initial}</AvatarFallback>
         </Avatar>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate font-medium text-foreground">
