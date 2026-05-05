@@ -39,7 +39,7 @@ import { EditSleepSheet } from '../cuidar/eventos/_components/edit-sleep-sheet';
 import { CloseSleepSheet } from '../home/_components/close-sleep-sheet';
 
 export const metadata: Metadata = {
-  title: 'Timeline',
+  title: 'Registro',
 };
 
 const FILTER_OPTIONS = [
@@ -107,7 +107,7 @@ export default async function TimelinePage({ searchParams }: PageProps) {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
         <header className="flex flex-col gap-2">
           <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
-            Timeline
+            Registro
           </h1>
           <p className="text-muted-foreground">Cuando registres eventos, van a aparecer acá.</p>
         </header>
@@ -144,7 +144,7 @@ export default async function TimelinePage({ searchParams }: PageProps) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
       <PageHeader
-        eyebrow="Timeline"
+        eyebrow="Registro"
         title={`El día a día de ${child.name}.`}
         action={
           <>
@@ -195,7 +195,7 @@ export default async function TimelinePage({ searchParams }: PageProps) {
         }
       />
 
-      <nav aria-label="Filtrar timeline" className="flex flex-wrap gap-2">
+      <nav aria-label="Filtrar registro" className="flex flex-wrap gap-2">
         {FILTER_OPTIONS.map((opt) => {
           const href = opt.value
             ? (`/timeline?tipo=${opt.value}` as Route)

@@ -79,7 +79,9 @@ export async function analyzeDiaperPhoto(
     },
     {
       type: 'image_url',
-      image_url: { url: input.imageDataUrl, detail: 'high' },
+      // No necesitamos detalle máximo para estimar color/consistencia y
+      // así bajamos latencia + tokens en cada análisis.
+      image_url: { url: input.imageDataUrl, detail: 'low' },
     },
   ];
 

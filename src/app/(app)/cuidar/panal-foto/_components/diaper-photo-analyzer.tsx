@@ -14,6 +14,9 @@ import { analyzeDiaperPhotoAction } from '../actions';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
+const CLIENT_IMAGE_MAX_DIMENSION = 1600;
+const CLIENT_IMAGE_QUALITY = 0.8;
+const CLIENT_SKIP_OPTIMIZATION_UNDER_BYTES = 1.25 * 1024 * 1024;
 
 /**
  * Convierte un análisis estructurado en texto plano listo para pegar en
@@ -51,6 +54,7 @@ export function DiaperPhotoAnalyzer({ onUseAnalysis, compact = false }: DiaperPh
   const [preview, setPreview] = useState<string | null>(null);
   const [contextNotes, setContextNotes] = useState('');
   const [analysis, setAnalysis] = useState<DiaperAnalysis | null>(null);
+  const [preparingPhoto, setPreparingPhoto] = useState(false);
   const [pending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,21 +63,33 @@ export function DiaperPhotoAnalyzer({ onUseAnalysis, compact = false }: DiaperPh
     return () => URL.revokeObjectURL(preview);
   }, [preview]);
 
-  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
-    const selected = e.target.files?.[0] ?? null;
+  async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const selected = input.files?.[0] ?? null;
     if (!selected) {
       setFile(null);
       setPreview(null);
       return;
     }
-    if (selected.size > MAX_BYTES) {
-      toast.error('La foto no puede pesar más de 5 MB.');
-      e.target.value = '';
-      return;
+
+    setPreparingPhoto(true);
+    try {
+      const optimized = await optimizeAnalysisFile(selected);
+      if (optimized.size > MAX_BYTES) {
+        toast.error('La foto no puede pesar más de 5 MB.');
+        input.value = '';
+        setFile(null);
+        setPreview(null);
+        setAnalysis(null);
+        return;
+      }
+
+      setFile(optimized);
+      setPreview(URL.createObjectURL(optimized));
+      setAnalysis(null);
+    } finally {
+      setPreparingPhoto(false);
     }
-    setFile(selected);
-    setPreview(URL.createObjectURL(selected));
-    setAnalysis(null);
   }
 
   function clearFile() {
@@ -88,6 +104,7 @@ export function DiaperPhotoAnalyzer({ onUseAnalysis, compact = false }: DiaperPh
       toast.error('Adjuntá una foto antes de analizar.');
       return;
     }
+    if (preparingPhoto) return;
     const fd = new FormData();
     fd.append('photo', file);
     if (contextNotes.trim().length > 0) fd.append('notes', contextNotes.trim());
@@ -112,9 +129,11 @@ export function DiaperPhotoAnalyzer({ onUseAnalysis, compact = false }: DiaperPh
           type="file"
           accept={ACCEPT}
           onChange={handleFileChange}
-          disabled={pending}
+          disabled={pending || preparingPhoto}
         />
-        <p className="text-muted-foreground text-xs">JPG, PNG o WEBP. Hasta 5 MB.</p>
+        <p className="text-muted-foreground text-xs">
+          JPG, PNG o WEBP. Hasta 5 MB. La optimizamos antes de analizarla.
+        </p>
       </div>
 
       {preview && (
@@ -144,14 +163,19 @@ export function DiaperPhotoAnalyzer({ onUseAnalysis, compact = false }: DiaperPh
             placeholder="Lo que quieras agregar: edad, si cambió la dieta, si vino con olor distinto…"
             value={contextNotes}
             onChange={(e) => setContextNotes(e.target.value)}
-            disabled={pending}
+            disabled={pending || preparingPhoto}
             maxLength={500}
           />
         </div>
       )}
 
-      <Button type="button" onClick={runAnalysis} disabled={!file || pending}>
-        {pending ? (
+      <Button type="button" onClick={runAnalysis} disabled={!file || pending || preparingPhoto}>
+        {preparingPhoto ? (
+          <>
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Preparando foto…
+          </>
+        ) : pending ? (
           <>
             <Loader2 className="size-4 animate-spin" aria-hidden />
             Analizando…
@@ -172,6 +196,79 @@ export function DiaperPhotoAnalyzer({ onUseAnalysis, compact = false }: DiaperPh
       )}
     </div>
   );
+}
+
+async function optimizeAnalysisFile(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) return file;
+  if (file.size <= CLIENT_SKIP_OPTIMIZATION_UNDER_BYTES) return file;
+
+  try {
+    const image = await loadImageFromFile(file);
+    const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+    const scale =
+      longestSide > CLIENT_IMAGE_MAX_DIMENSION ? CLIENT_IMAGE_MAX_DIMENSION / longestSide : 1;
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) return file;
+
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await canvasToJpegBlob(canvas);
+    if (!blob) return file;
+
+    const optimized = new File([blob], replaceFileExtension(file.name, 'jpg'), {
+      type: 'image/jpeg',
+      lastModified: file.lastModified,
+    });
+
+    if (file.size <= MAX_BYTES && optimized.size >= file.size * 0.98) {
+      return file;
+    }
+    if (optimized.size >= file.size && optimized.size > MAX_BYTES) {
+      return file;
+    }
+    return optimized;
+  } catch {
+    return file;
+  }
+}
+
+async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  return await new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('No pudimos abrir la imagen.'));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function canvasToJpegBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return await new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', CLIENT_IMAGE_QUALITY);
+  });
+}
+
+function replaceFileExtension(fileName: string, nextExtension: string): string {
+  const baseName = fileName.replace(/\.[^.]+$/, '');
+  return `${baseName || 'foto'}.${nextExtension}`;
 }
 
 function AnalysisCard({

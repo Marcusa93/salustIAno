@@ -88,7 +88,14 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
   const childId = (child?.id as string | undefined) ?? null;
 
   // Resolver/crear álbum mensual para hoy.
-  const albumId = await getOrCreateMonthlyAlbum(supabase, familyGroupId, childId, new Date());
+  const albumId = await getOrCreateMonthlyAlbum(
+    supabase,
+    familyGroupId,
+    childId,
+    userData.user.id,
+    new Date(),
+  );
+  const shouldAutoTag = files.length === 1;
 
   let uploaded = 0;
   let failed = 0;
@@ -126,7 +133,7 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
     const takenAtIso = new Date(file.lastModified || Date.now()).toISOString();
     let aiTags: string[] = [];
     let aiCaption: string | null = null;
-    if (VISION_FRIENDLY_MIME.has(file.type) && file.size <= MAX_TAGGABLE_BYTES) {
+    if (shouldAutoTag && VISION_FRIENDLY_MIME.has(file.type) && file.size <= MAX_TAGGABLE_BYTES) {
       try {
         const base64 = Buffer.from(arrayBuffer).toString('base64');
         const dataUrl = `data:${file.type};base64,${base64}`;
@@ -153,6 +160,7 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
       album_id: albumId,
       storage_path: path,
       mime_type: file.type,
+      size_bytes: file.size,
       caption: aiCaption,
       tags: aiTags,
       taken_at: takenAtIso,
@@ -181,6 +189,7 @@ async function getOrCreateMonthlyAlbum(
   supabase: any,
   familyGroupId: string,
   childId: string | null,
+  createdBy: string,
   date: Date,
 ): Promise<string | null> {
   const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
@@ -205,12 +214,24 @@ async function getOrCreateMonthlyAlbum(
       name: capitalized,
       kind: 'monthly',
       month_key: monthKey,
+      created_by: createdBy,
     })
     .select('id')
     .single();
 
-  if (error || !created) return null;
-  return created.id as string;
+  if (!error && created?.id) return created.id as string;
+
+  // Si otra request ganó la carrera y creó el álbum entre el SELECT y el
+  // INSERT, re-leemos el registro en vez de dejar las fotos sin álbum.
+  const { data: raced } = await supabase
+    .from('albums')
+    .select('id')
+    .eq('family_group_id', familyGroupId)
+    .eq('month_key', monthKey)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  return (raced?.id as string | undefined) ?? null;
 }
 
 export async function listAlbumsAction(): Promise<AlbumEntry[]> {
@@ -226,26 +247,13 @@ export async function listAlbumsAction(): Promise<AlbumEntry[]> {
 
   if (!albums) return [];
 
-  // Contar fotos por álbum (una sola query con group by sería ideal pero
-  // PostgREST no expone agregados directos sin RPC. Hacemos N queries
-  // simples — en la práctica los álbumes son pocos por familia).
-  const counts: Record<string, number> = {};
-  for (const a of albums as Array<{ id: string }>) {
-    const { count } = await sb
-      .from('media_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('album_id', a.id)
-      .is('deleted_at', null);
-    counts[a.id] = count ?? 0;
-  }
-
   return (albums as Array<Record<string, unknown>>).map((a) => ({
     id: a.id as string,
     name: a.name as string,
     kind: a.kind as AlbumEntry['kind'],
     monthKey: (a.month_key as string | null) ?? null,
     coverPath: (a.cover_path as string | null) ?? null,
-    count: counts[a.id as string] ?? 0,
+    count: 0,
     shareToken: (a.share_token as string | null) ?? null,
     sharedAt: (a.shared_at as string | null) ?? null,
   }));

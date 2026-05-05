@@ -10,9 +10,9 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 const navItems = [
-  { href: '/home', label: 'Home', icon: Home },
+  { href: '/home', label: 'Inicio', icon: Home },
   { href: '/cuidar', label: 'Cuidar', icon: Baby },
-  { href: '/timeline', label: 'Timeline', icon: BookHeart },
+  { href: '/timeline', label: 'Registro', icon: BookHeart },
   { href: '/album', label: 'Álbum', icon: ImageIcon },
   { href: '/crear', label: 'Crear', icon: Sparkles },
   { href: '/familia', label: 'Familia', icon: Users },
@@ -37,8 +37,8 @@ export function MobileMenu() {
   // pero el Sheet sigue abierto, lo cerramos. Cubre el caso del
   // pre-fetch y de transitions con flag aria-current.
   useEffect(() => {
-    if (open) setOpen(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!pathname) return;
+    setOpen(false);
   }, [pathname]);
 
   return (

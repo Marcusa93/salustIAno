@@ -56,10 +56,10 @@ export const feedingProposalSchema = z
       }
     } else if (data.type === 'bottle') {
       if (data.side) {
-        ctx.addIssue({ code: 'custom', path: ['side'], message: 'sin lado en biberón' });
+        ctx.addIssue({ code: 'custom', path: ['side'], message: 'sin lado en mamadera' });
       }
       if (data.foods?.length) {
-        ctx.addIssue({ code: 'custom', path: ['foods'], message: 'sin sólidos en biberón' });
+        ctx.addIssue({ code: 'custom', path: ['foods'], message: 'sin sólidos en mamadera' });
       }
     } else if (data.type === 'solid') {
       if (data.side || data.duration_minutes !== undefined || data.amount_ml !== undefined) {
@@ -137,7 +137,7 @@ export function summarizeProposal(p: Proposal): string {
           parts.push(p.side === 'left' ? 'izquierdo' : p.side === 'right' ? 'derecho' : 'ambos');
         if (p.duration_minutes) parts.push(`${p.duration_minutes} min`);
       } else if (p.type === 'bottle') {
-        parts.push('Biberón');
+        parts.push('Mamadera');
         if (p.amount_ml) parts.push(`${p.amount_ml} ml`);
         if (p.duration_minutes) parts.push(`${p.duration_minutes} min`);
       } else if (p.type === 'solid') {

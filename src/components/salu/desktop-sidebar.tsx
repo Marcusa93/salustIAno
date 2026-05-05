@@ -6,9 +6,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const items = [
-  { href: '/home', label: 'Home', icon: Home },
+  { href: '/home', label: 'Inicio', icon: Home },
   { href: '/cuidar', label: 'Cuidar', icon: Baby },
-  { href: '/timeline', label: 'Recordar', icon: BookHeart },
+  { href: '/timeline', label: 'Registro', icon: BookHeart },
   { href: '/album', label: 'Álbum', icon: ImageIcon },
   { href: '/crear', label: 'Crear', icon: Sparkles },
   { href: '/familia', label: 'Familia', icon: Users },
@@ -40,7 +40,7 @@ export function DesktopSidebar() {
               {isActive && (
                 <span
                   aria-hidden
-                  className="absolute top-1/2 left-0 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-primary"
+                  className="-translate-y-1/2 absolute top-1/2 left-0 h-6 w-[3px] rounded-r-full bg-primary"
                 />
               )}
               <span

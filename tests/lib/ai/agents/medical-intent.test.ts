@@ -7,7 +7,7 @@ describe('detectMedicalIntent', () => {
     expect(detectMedicalIntent('¿Cómo va el día?').matched).toBe(false);
     expect(detectMedicalIntent('Anotá una toma de pecho hace una hora').matched).toBe(false);
     expect(detectMedicalIntent('Mostrame las últimas tomas').matched).toBe(false);
-    expect(detectMedicalIntent('Le di 60ml de biberón').matched).toBe(false);
+    expect(detectMedicalIntent('Le di 60ml de mamadera').matched).toBe(false);
   });
 
   it('rebota síntomas con o sin tildes', () => {

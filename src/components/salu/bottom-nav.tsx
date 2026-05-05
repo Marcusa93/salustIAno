@@ -8,9 +8,9 @@ import { usePathname } from 'next/navigation';
 // Bottom nav mobile: 5 ítems (Familia se accede desde el user menu para
 // no abarrotar). Album entra acá porque es uso frecuente.
 const items = [
-  { href: '/home', label: 'Home', icon: Home },
+  { href: '/home', label: 'Inicio', icon: Home },
   { href: '/cuidar', label: 'Cuidar', icon: Baby },
-  { href: '/timeline', label: 'Timeline', icon: BookHeart },
+  { href: '/timeline', label: 'Registro', icon: BookHeart },
   { href: '/album', label: 'Álbum', icon: ImageIcon },
   { href: '/crear', label: 'Crear', icon: Sparkles },
 ] as const;
@@ -42,7 +42,7 @@ export function BottomNav() {
               {isActive && (
                 <span
                   aria-hidden
-                  className="absolute top-0 left-1/2 h-[3px] w-10 -translate-x-1/2 rounded-b-full bg-primary"
+                  className="-translate-x-1/2 absolute top-0 left-1/2 h-[3px] w-10 rounded-b-full bg-primary"
                 />
               )}
               <span

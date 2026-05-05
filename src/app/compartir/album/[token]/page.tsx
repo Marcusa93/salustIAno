@@ -1,9 +1,13 @@
 import { Card } from '@/components/ui/card';
+import { env } from '@/lib/env';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { ImageIcon } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { SharedAlbumPhoto } from './shared-album-photo';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Un álbum de Salu',
@@ -25,7 +29,8 @@ export default async function CompartirAlbumPage({ params }: PageProps) {
   const { token } = await params;
   if (!token || token.length < 16) notFound();
 
-  const supabase = await createClient();
+  const requestClient = await createClient();
+  const supabase = env.SUPABASE_SECRET_KEY ? createAdminClient() : requestClient;
   // biome-ignore lint/suspicious/noExplicitAny: types stale.
   const sb = supabase as any;
   const { data: album, error } = await sb
@@ -49,7 +54,9 @@ export default async function CompartirAlbumPage({ params }: PageProps) {
   const photos: SharedPhoto[] = await Promise.all(
     ((photoRows as Array<Record<string, unknown>> | null) ?? []).map(async (p) => {
       const path = p.storage_path as string;
-      const { data: signed } = await supabase.storage.from('photos').createSignedUrl(path, 3600);
+      const { data: signed } = await supabase.storage
+        .from('photos')
+        .createSignedUrl(path, 60 * 60 * 24);
       return {
         id: p.id as string,
         signedUrl: signed?.signedUrl ?? null,
