@@ -59,6 +59,18 @@ function normalizeToolCalls(raw: OpenRouterToolCall[] | undefined): ToolCall[] {
 }
 
 /**
+ * Algunos providers fallan cuando mezclamos visión + `response_format`.
+ * Para requests multimodales dejamos que el modelo responda en texto y
+ * parseamos el JSON nosotros con `extractJsonObject`.
+ */
+function requestHasImageContent(request: ChatRequest): boolean {
+  return request.messages.some(
+    (message) =>
+      Array.isArray(message.content) && message.content.some((part) => part.type === 'image_url'),
+  );
+}
+
+/**
  * Llama al endpoint de chat completions de OpenRouter y devuelve un
  * `ChatResponse` normalizado.
  *
@@ -79,6 +91,10 @@ export async function callLLM(request: ChatRequest): Promise<ChatResponse> {
     );
   }
 
+  const responseFormat =
+    request.responseFormat && !requestHasImageContent(request)
+      ? { type: request.responseFormat }
+      : undefined;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const startedAt = Date.now();
@@ -98,7 +114,7 @@ export async function callLLM(request: ChatRequest): Promise<ChatResponse> {
         messages: request.messages,
         temperature: request.temperature,
         max_tokens: request.maxTokens,
-        response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
+        response_format: responseFormat,
         tools: request.tools && request.tools.length > 0 ? request.tools : undefined,
       }),
       signal: controller.signal,

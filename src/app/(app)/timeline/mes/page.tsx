@@ -172,7 +172,7 @@ export default async function TimelineMesPage({ searchParams }: PageProps) {
             href={'/timeline' as Route}
             className="inline-flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground"
           >
-            <ChevronLeft className="size-4" aria-hidden /> Timeline
+            <ChevronLeft className="size-4" aria-hidden /> Registro
           </Link>
           <div className="flex items-center gap-1.5">
             <Button variant="outline" size="icon-sm" render={<Link href={`?mes=${prevMonth}`} />}>

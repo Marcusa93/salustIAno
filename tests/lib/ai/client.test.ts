@@ -47,6 +47,47 @@ describe('callLLM', () => {
     expect(res.model).toBe('anthropic/claude-haiku-4-5');
   });
 
+  it('envía response_format para requests de solo texto', async () => {
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValueOnce(okResponse);
+
+    await callLLM({
+      model: 'anthropic/claude-haiku-4-5',
+      messages: [{ role: 'user', content: 'hola' }],
+      responseFormat: 'json_object',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+    const body = JSON.parse(init.body);
+    expect(body.response_format).toEqual({ type: 'json_object' });
+  });
+
+  it('omite response_format cuando el request incluye imagen', async () => {
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValueOnce(okResponse);
+
+    await callLLM({
+      model: 'anthropic/claude-haiku-4-5',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'analizá la foto' },
+            {
+              type: 'image_url',
+              image_url: { url: 'data:image/jpeg;base64,/9j/4AAQ', detail: 'low' },
+            },
+          ],
+        },
+      ],
+      responseFormat: 'json_object',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+    const body = JSON.parse(init.body);
+    expect(body.response_format).toBeUndefined();
+  });
+
   it('mapea fetch.ok=false a AIProviderError con status', async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: false,

@@ -15,7 +15,7 @@ beforeAll(() => {
 describe('BottomNav', () => {
   it('renderiza 5 ítems de navegación', () => {
     render(<BottomNav />);
-    const labels = ['Home', 'Cuidar', 'Timeline', 'Álbum', 'Crear'];
+    const labels = ['Inicio', 'Cuidar', 'Registro', 'Álbum', 'Crear'];
     for (const label of labels) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
@@ -23,7 +23,7 @@ describe('BottomNav', () => {
 
   it("el ítem activo tiene aria-current='page'", () => {
     render(<BottomNav />);
-    const homeLink = screen.getByText('Home').closest('a');
+    const homeLink = screen.getByText('Inicio').closest('a');
     expect(homeLink).toHaveAttribute('aria-current', 'page');
   });
 
@@ -35,7 +35,7 @@ describe('BottomNav', () => {
 
   it('tap targets respetan el mínimo de accesibilidad (>=44px)', () => {
     render(<BottomNav />);
-    const homeLink = screen.getByText('Home').closest('a');
+    const homeLink = screen.getByText('Inicio').closest('a');
     // El tap target sube a 52px para tener más respiro visual + flecha
     // de active. Lo importante es que sea >= 44px.
     expect(homeLink?.className).toContain('min-h-[52px]');

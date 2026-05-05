@@ -116,7 +116,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: {
             type: 'string',
             enum: ['breastfeeding', 'bottle', 'solid'],
-            description: 'pecho, biberón o sólido.',
+            description:
+              'pecho, mamadera o sólido. Si la familia dice "mamadera", corresponde a "bottle".',
           },
           side: {
             type: 'string',
@@ -129,7 +130,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           },
           amount_ml: {
             type: 'integer',
-            description: 'Solo para bottle. Opcional.',
+            description: 'Solo para mamadera. Opcional.',
           },
           foods: {
             type: 'array',

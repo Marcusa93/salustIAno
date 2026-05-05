@@ -136,7 +136,7 @@ export function FeedingQuickAdd({ trigger }: FeedingQuickAddProps) {
             <Milk className="size-5" aria-hidden />
             Anotar toma
           </SheetTitle>
-          <SheetDescription>Pecho, biberón o sólido.</SheetDescription>
+          <SheetDescription>Pecho, mamadera o sólido.</SheetDescription>
         </SheetHeader>
 
         <div className="flex justify-end px-4 pt-1">
@@ -156,7 +156,7 @@ export function FeedingQuickAdd({ trigger }: FeedingQuickAddProps) {
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 px-4 pb-6 pt-2">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 px-4 pt-2 pb-6">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="f-when">Cuándo</Label>
             <Input

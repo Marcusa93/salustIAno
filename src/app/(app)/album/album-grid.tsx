@@ -21,6 +21,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { type ChangeEvent, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import {
@@ -48,6 +49,12 @@ interface AlbumGridProps {
   initialAlbums: AlbumEntry[];
 }
 
+const CLIENT_IMAGE_MAX_DIMENSION = 1800;
+const CLIENT_IMAGE_QUALITY = 0.78;
+const CLIENT_SKIP_COMPRESSION_UNDER_BYTES = 1.5 * 1024 * 1024;
+const MAX_BATCH_UPLOAD_BYTES = 18 * 1024 * 1024;
+const MAX_BATCH_UPLOAD_FILES = 4;
+
 /**
  * Grid principal del álbum. Agrupa fotos por mes (taken_at o created_at),
  * acepta multi-upload, y al click sobre una foto abre un modal con
@@ -57,16 +64,53 @@ interface AlbumGridProps {
  * viewport (IntersectionObserver) y al abrir el modal.
  */
 export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
+  const router = useRouter();
   const [photos, setPhotos] = useState(initialPhotos);
   const [albums, setAlbums] = useState(initialAlbums);
   const [active, setActive] = useState<PhotoEntry | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
+  const [showCreateAlbum, setShowCreateAlbum] = useState(false);
+  const [newAlbumName, setNewAlbumName] = useState('');
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [uploading, startUpload] = useTransition();
   const [creatingAlbum, startCreateAlbum] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const newAlbumRef = useRef<HTMLInputElement>(null);
 
-  const activeAlbum = albums.find((a) => a.id === activeAlbumId) ?? null;
+  useEffect(() => {
+    setPhotos(initialPhotos);
+  }, [initialPhotos]);
+
+  useEffect(() => {
+    setAlbums(initialAlbums);
+  }, [initialAlbums]);
+
+  useEffect(() => {
+    if (showCreateAlbum) {
+      newAlbumRef.current?.focus();
+    }
+  }, [showCreateAlbum]);
+
+  const albumCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const photo of photos) {
+      if (!photo.albumId) continue;
+      counts.set(photo.albumId, (counts.get(photo.albumId) ?? 0) + 1);
+    }
+    return counts;
+  }, [photos]);
+
+  const albumsWithCounts = useMemo(
+    () =>
+      albums.map((album) => ({
+        ...album,
+        count: albumCounts.get(album.id) ?? 0,
+      })),
+    [albums, albumCounts],
+  );
+
+  const activeAlbum = albumsWithCounts.find((a) => a.id === activeAlbumId) ?? null;
 
   // Tags únicos del set actual de fotos, ordenados por frecuencia descendente
   // y luego alfabéticamente. Mostramos hasta 12 chips para no abarrotar la UI.
@@ -97,26 +141,54 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
   function handleFiles(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const fd = new FormData();
-    for (const f of Array.from(files)) fd.append('photos', f);
+    const selectedFiles = Array.from(files);
 
     startUpload(async () => {
-      const result = await uploadPhotosAction(fd);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      if (result.uploaded === 0) {
-        toast.error('No pudimos subir ninguna foto.');
-      } else {
+      setUploadStatus(
+        `Optimizando ${selectedFiles.length} foto${selectedFiles.length === 1 ? '' : 's'}...`,
+      );
+
+      try {
+        const optimizedFiles = await optimizeUploadFiles(selectedFiles);
+        const batches = chunkUploadFiles(optimizedFiles);
+
+        let uploaded = 0;
+        let failed = 0;
+
+        for (const [index, batch] of batches.entries()) {
+          setUploadStatus(
+            `Subiendo lote ${index + 1} de ${batches.length} (${batch.length} foto${batch.length === 1 ? '' : 's'})...`,
+          );
+
+          const fd = new FormData();
+          for (const file of batch) {
+            fd.append('photos', file);
+          }
+
+          const result = await uploadPhotosAction(fd);
+          if (!result.ok) {
+            toast.error(result.error);
+            return;
+          }
+
+          uploaded += result.uploaded;
+          failed += result.failed;
+        }
+
+        if (uploaded === 0) {
+          toast.error('No pudimos subir ninguna foto.');
+          return;
+        }
+
         const msg =
-          result.failed > 0
-            ? `Subimos ${result.uploaded}. ${result.failed} fallaron.`
-            : `Subimos ${result.uploaded} foto${result.uploaded === 1 ? '' : 's'}.`;
+          failed > 0
+            ? `Subimos ${uploaded}. ${failed} fallaron.`
+            : `Subimos ${uploaded} foto${uploaded === 1 ? '' : 's'}.`;
         toast.success(msg);
+        router.refresh();
+      } finally {
+        setUploadStatus(null);
       }
-      // Recargamos del server (revalidatePath ya fue llamado).
-      window.location.reload();
     });
     if (fileRef.current) fileRef.current.value = '';
   }
@@ -137,16 +209,19 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
   }
 
   function handleCreateAlbum() {
-    const name = window.prompt('Nombre del álbum nuevo:');
-    if (!name || name.trim().length === 0) return;
+    const trimmed = newAlbumName.trim();
+    if (trimmed.length === 0) return;
+
     startCreateAlbum(async () => {
-      const result = await createManualAlbumAction(name);
+      const result = await createManualAlbumAction(trimmed);
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
       setAlbums((prev) => [result.album, ...prev]);
       setActiveAlbumId(result.album.id);
+      setNewAlbumName('');
+      setShowCreateAlbum(false);
       toast.success(`Álbum "${result.album.name}" creado.`);
     });
   }
@@ -185,7 +260,10 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
             type="button"
             size="sm"
             variant="ghost"
-            onClick={handleCreateAlbum}
+            onClick={() => {
+              setShowCreateAlbum((prev) => !prev);
+              setNewAlbumName('');
+            }}
             disabled={creatingAlbum}
           >
             {creatingAlbum ? (
@@ -193,7 +271,7 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
             ) : (
               <Plus className="size-4" aria-hidden />
             )}
-            Nuevo álbum
+            {showCreateAlbum ? 'Cancelar' : 'Nuevo álbum'}
           </Button>
           <Button type="button" size="sm" onClick={handlePickFiles} disabled={uploading}>
             {uploading ? (
@@ -201,10 +279,53 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
             ) : (
               <Upload className="size-4" aria-hidden />
             )}
-            {uploading ? 'Subiendo…' : 'Subir fotos'}
+            {uploading ? (uploadStatus ?? 'Subiendo...') : 'Subir fotos'}
           </Button>
         </div>
       </div>
+
+      {showCreateAlbum && (
+        <Card className="border-border/60 p-3">
+          <form
+            className="flex flex-col gap-2 sm:flex-row"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleCreateAlbum();
+            }}
+          >
+            <Input
+              ref={newAlbumRef}
+              value={newAlbumName}
+              onChange={(event) => setNewAlbumName(event.target.value)}
+              placeholder="Nombre del álbum"
+              maxLength={80}
+              disabled={creatingAlbum}
+            />
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                size="sm"
+                disabled={creatingAlbum || newAlbumName.trim() === ''}
+              >
+                {creatingAlbum ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                Crear
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowCreateAlbum(false);
+                  setNewAlbumName('');
+                }}
+                disabled={creatingAlbum}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       {albums.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -224,7 +345,7 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
           >
             Todos
           </button>
-          {albums.map((al) => (
+          {albumsWithCounts.map((al) => (
             <button
               key={al.id}
               type="button"
@@ -734,7 +855,7 @@ function PhotoModal({
               id="ph-album"
               value={photo.albumId ?? ''}
               onChange={(e) => onAssignAlbum(e.target.value === '' ? null : e.target.value)}
-              className="h-9 rounded-lg border border-input bg-transparent px-2.5 font-medium text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="h-9 rounded-lg border border-input bg-transparent px-2.5 font-medium text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <option value="">Sin álbum</option>
               {albums.map((al) => (
@@ -791,6 +912,108 @@ function groupByMonth(photos: PhotoEntry[]): MonthGroup[] {
     monthLabel: formatMonth(k),
     photos: map.get(k) ?? [],
   }));
+}
+
+async function optimizeUploadFiles(files: File[]): Promise<File[]> {
+  const optimized: File[] = [];
+  for (const file of files) {
+    optimized.push(await compressUploadFile(file));
+  }
+  return optimized;
+}
+
+async function compressUploadFile(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) return file;
+  if (file.size <= CLIENT_SKIP_COMPRESSION_UNDER_BYTES) return file;
+
+  try {
+    const image = await loadImageFromFile(file);
+    const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+    const scale =
+      longestSide > CLIENT_IMAGE_MAX_DIMENSION ? CLIENT_IMAGE_MAX_DIMENSION / longestSide : 1;
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) return file;
+
+    // El álbum es 100% fotográfico: si el browser re-encodea a JPEG,
+    // priorizamos peso y velocidad sobre transparencia.
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await canvasToJpegBlob(canvas);
+    if (!blob || blob.size >= file.size * 0.95) return file;
+
+    return new File([blob], replaceFileExtension(file.name, 'jpg'), {
+      type: 'image/jpeg',
+      lastModified: file.lastModified,
+    });
+  } catch {
+    return file;
+  }
+}
+
+async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  return await new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('No pudimos abrir la imagen.'));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function canvasToJpegBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return await new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', CLIENT_IMAGE_QUALITY);
+  });
+}
+
+function replaceFileExtension(fileName: string, nextExtension: string): string {
+  const baseName = fileName.replace(/\.[^.]+$/, '');
+  return `${baseName || 'foto'}.${nextExtension}`;
+}
+
+function chunkUploadFiles(files: File[]): File[][] {
+  const batches: File[][] = [];
+  let currentBatch: File[] = [];
+  let currentBatchBytes = 0;
+
+  for (const file of files) {
+    const wouldOverflowCount = currentBatch.length >= MAX_BATCH_UPLOAD_FILES;
+    const wouldOverflowBytes =
+      currentBatch.length > 0 && currentBatchBytes + file.size > MAX_BATCH_UPLOAD_BYTES;
+
+    if (wouldOverflowCount || wouldOverflowBytes) {
+      batches.push(currentBatch);
+      currentBatch = [];
+      currentBatchBytes = 0;
+    }
+
+    currentBatch.push(file);
+    currentBatchBytes += file.size;
+  }
+
+  if (currentBatch.length > 0) {
+    batches.push(currentBatch);
+  }
+
+  return batches;
 }
 
 function formatMonth(key: string): string {

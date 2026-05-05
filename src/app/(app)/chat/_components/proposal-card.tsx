@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import type { Proposal } from '@/lib/ai/agents/salustia/proposals';
 import { summarizeProposal } from '@/lib/ai/agents/salustia/proposals';
 import { Baby, BookHeart, Check, Loader2, Milk, Moon, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { executeProposalAction, logProposalDeclineAction } from '../actions';
@@ -29,6 +30,7 @@ type CardState =
  * - "No" → solo cierra la card visualmente, sin tocar la base.
  */
 export function ProposalCard({ proposal }: { proposal: Proposal }) {
+  const router = useRouter();
   const [state, setState] = useState<CardState>({ kind: 'pending' });
   const [pending, startTransition] = useTransition();
   const meta = KIND_META[proposal.kind];
@@ -41,6 +43,7 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
         return;
       }
       setState({ kind: 'confirmed', summary: result.summary });
+      router.refresh();
       toast.success('Anotado.');
     });
   }

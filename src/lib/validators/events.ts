@@ -88,7 +88,7 @@ export type FeedingType = z.infer<typeof feedingTypeEnum>;
 
 export const FEEDING_TYPE_LABELS: Record<FeedingType, string> = {
   breastfeeding: 'Pecho',
-  bottle: 'Biberón',
+  bottle: 'Mamadera',
   solid: 'Sólido',
 };
 
@@ -157,13 +157,13 @@ export const feedingEventSchema = z
       }
     } else if (data.type === 'bottle') {
       if (data.side) {
-        ctx.addIssue({ code: 'custom', path: ['side'], message: 'Sin lado en biberón' });
+        ctx.addIssue({ code: 'custom', path: ['side'], message: 'Sin lado en mamadera' });
       }
       if (data.foods && data.foods.length > 0) {
         ctx.addIssue({
           code: 'custom',
           path: ['foods'],
-          message: 'Sin alimentos sólidos en biberón',
+          message: 'Sin alimentos sólidos en mamadera',
         });
       }
     } else if (data.type === 'solid') {
