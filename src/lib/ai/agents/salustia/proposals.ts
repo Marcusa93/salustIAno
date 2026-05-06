@@ -27,6 +27,7 @@ import {
   feedingTypeEnum,
   sleepQualityEnum,
 } from '@/lib/validators/events';
+import { milestoneCategoryEnum } from '@/lib/validators/milestone';
 
 const isoOrLocalDateTime = z
   .string()
@@ -110,17 +111,34 @@ export const noteProposalSchema = z.object({
   content: z.string().min(1).max(5000),
 });
 
+/**
+ * Propuesta de hito médico — turno con pediatra, vacuna, ecografía,
+ * estudio, control. due_at es la fecha del turno (ISO local AR). El
+ * agent puede pasar solo fecha "2026-05-08" o fecha+hora
+ * "2026-05-08T15:00" — la app trata el hito por día.
+ */
+export const milestoneProposalSchema = z.object({
+  kind: z.literal('milestone'),
+  title: z.string().min(1).max(200),
+  category: milestoneCategoryEnum.default('otro'),
+  due_at: isoOrLocalDateTime,
+  description: z.string().max(2000).optional(),
+  notes: z.string().max(5000).optional(),
+});
+
 export const proposalSchema = z.discriminatedUnion('kind', [
   feedingProposalSchema,
   sleepProposalSchema,
   diaperProposalSchema,
   noteProposalSchema,
+  milestoneProposalSchema,
 ]);
 
 export type FeedingProposal = z.infer<typeof feedingProposalSchema>;
 export type SleepProposal = z.infer<typeof sleepProposalSchema>;
 export type DiaperProposal = z.infer<typeof diaperProposalSchema>;
 export type NoteProposal = z.infer<typeof noteProposalSchema>;
+export type MilestoneProposal = z.infer<typeof milestoneProposalSchema>;
 export type Proposal = z.infer<typeof proposalSchema>;
 
 /**
@@ -173,5 +191,26 @@ export function summarizeProposal(p: Proposal): string {
     }
     case 'note':
       return `Nota: ${p.content.slice(0, 60)}${p.content.length > 60 ? '…' : ''}`;
+    case 'milestone': {
+      const labels: Record<z.infer<typeof milestoneCategoryEnum>, string> = {
+        control_pediatrico: 'Control',
+        pesquisa: 'Pesquisa',
+        estudio: 'Estudio',
+        vacuna: 'Vacuna',
+        otro: 'Turno',
+      };
+      const date = new Date(p.due_at);
+      const dateLabel = date.toLocaleDateString('es-AR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      });
+      // Si la hora no es 00:00, la mostramos también.
+      const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0;
+      const timeLabel = hasTime
+        ? ` ${date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
+        : '';
+      return `${labels[p.category]} — ${p.title} · ${dateLabel}${timeLabel}`;
+    }
   }
 }

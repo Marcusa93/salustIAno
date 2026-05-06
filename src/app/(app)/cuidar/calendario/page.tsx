@@ -8,7 +8,7 @@ import {
   type MilestoneStatus,
   deriveStatus,
 } from '@/lib/validators/milestone';
-import { CalendarClock, ChevronLeft, Plus } from 'lucide-react';
+import { CalendarClock, CalendarDays, ChevronLeft, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 
@@ -94,10 +94,20 @@ export default async function MilestonesListPage() {
               hicieron.
             </p>
           </div>
-          <Button render={<Link href="/cuidar/calendario/nuevo" />} size="sm">
-            <Plus className="size-4" aria-hidden />
-            Agregar hito
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              render={<Link href={'/cuidar/calendario/mes' as Route} />}
+              size="sm"
+              variant="outline"
+            >
+              <CalendarDays className="size-4" aria-hidden />
+              Vista mensual
+            </Button>
+            <Button render={<Link href="/cuidar/calendario/nuevo" />} size="sm">
+              <Plus className="size-4" aria-hidden />
+              Agregar hito
+            </Button>
+          </div>
         </div>
       </header>
 

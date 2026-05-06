@@ -5,8 +5,8 @@ import { TOOL_DEFINITIONS, TOOL_HANDLERS } from '@/lib/ai/agents/salustia/tools'
 describe('SalustIA tool definitions', () => {
   it('exporta read tools + propose tools', () => {
     const names = TOOL_DEFINITIONS.map((t) => t.function.name);
-    // 5 read + 4 propose = 9
-    expect(TOOL_DEFINITIONS).toHaveLength(9);
+    // 5 read + 5 propose = 10
+    expect(TOOL_DEFINITIONS).toHaveLength(10);
     expect(names).toEqual(
       expect.arrayContaining([
         'get_today_summary',
@@ -18,6 +18,7 @@ describe('SalustIA tool definitions', () => {
         'propose_sleep',
         'propose_diaper',
         'propose_note',
+        'propose_milestone',
       ]),
     );
   });

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { Proposal } from '@/lib/ai/agents/salustia/proposals';
 import { summarizeProposal } from '@/lib/ai/agents/salustia/proposals';
-import { Baby, BookHeart, Check, Loader2, Milk, Moon, X } from 'lucide-react';
+import { Baby, BookHeart, CalendarClock, Check, Loader2, Milk, Moon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ const KIND_META: Record<Proposal['kind'], { Icon: typeof Milk; label: string }> 
   sleep: { Icon: Moon, label: 'Sueño' },
   diaper: { Icon: Baby, label: 'Pañal' },
   note: { Icon: BookHeart, label: 'Momento' },
+  milestone: { Icon: CalendarClock, label: 'Turno' },
 };
 
 type CardState =

@@ -206,7 +206,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: 'propose_note',
       description:
-        'Cuando la familia quiere ANOTAR un momento, una preocupación o un hito. NO escribe — solo propone para confirmar.',
+        'Cuando la familia quiere ANOTAR un momento, una preocupación o un hito vivido (primera sonrisa, primer rollo). NO confundir con turnos futuros o controles agendados — para eso usá propose_milestone. NO escribe — solo propone para confirmar.',
       parameters: {
         type: 'object',
         properties: {
@@ -215,11 +215,47 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             type: 'string',
             enum: ['memory', 'observation', 'milestone', 'other'],
             description:
-              'memory: recuerdo. observation: cosa observada (algo que la familia notó pero no necesariamente preocupante). milestone: hito (primera sonrisa, primer rollo). other: otra cosa. Default memory.',
+              'memory: recuerdo. observation: cosa observada (algo que la familia notó pero no necesariamente preocupante). milestone: hito vivido (primera sonrisa, primer rollo). other: otra cosa. Default memory.',
           },
           content: { type: 'string', description: 'El texto del momento. Obligatorio.' },
         },
         required: ['content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_milestone',
+      description:
+        'Cuando la familia te pide AGENDAR un turno médico, control, vacuna, estudio o ecografía. Ejemplos: "el viernes turno con Belen pediatra", "en dos semanas con Pato la obstetra", "vacunas de los 2 meses el 15", "ecografía morfológica el 20 a las 10 hs". NO escribe — solo propone una card de confirmación que la familia confirma con un botón. Usá due_at en ISO local AR.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: {
+            type: 'string',
+            description:
+              'Resumen corto del turno. Ejemplos: "Pediatra Belen", "Obstetra Pato", "Vacuna 2 meses", "Ecografía morfológica". Evitá frases largas.',
+          },
+          category: {
+            type: 'string',
+            enum: ['control_pediatrico', 'pesquisa', 'estudio', 'vacuna', 'otro'],
+            description:
+              'control_pediatrico: turno con pediatra. pesquisa: pesquisa neonatal o auditiva. estudio: ecografía, análisis, RMN. vacuna: aplicación de vacuna. otro: obstetra, kinesio, fonoaudiologo, cualquier otra cosa.',
+          },
+          due_at: {
+            type: 'string',
+            description:
+              'Fecha y hora del turno en ISO local AR. "2026-05-08T15:00" si saben hora; "2026-05-08T00:00" si solo fecha. Para "el viernes" calculá el próximo viernes a partir del ISO actual del contexto temporal. Para "en dos semanas" sumá 14 días.',
+          },
+          description: {
+            type: 'string',
+            description:
+              'Detalle opcional: dónde es, qué llevar. Ej. "consultorio Av. Mitre 250, llevar libreta sanitaria".',
+          },
+          notes: { type: 'string', description: 'Notas adicionales libres opcionales.' },
+        },
+        required: ['title', 'due_at'],
       },
     },
   },
@@ -377,9 +413,14 @@ const listPendingMilestones: ToolHandler = async (_args, ctx) => {
 // confirma desde la UI.
 // ============================================================================
 
-function proposeHandlerFor(kind: 'feeding' | 'sleep' | 'diaper' | 'note'): ToolHandler {
+function proposeHandlerFor(
+  kind: 'feeding' | 'sleep' | 'diaper' | 'note' | 'milestone',
+): ToolHandler {
   return async (rawArgs, ctx) => {
-    if (!ctx.childId) {
+    // Para 'milestone' el child puede no existir todavía (ej. agendar
+    // turnos antes del nacimiento) — el milestone va a la familia, no al
+    // child específico. Para los otros kinds sí necesitamos child_id.
+    if (kind !== 'milestone' && !ctx.childId) {
       return jsonError(
         'Todavía no hay perfil de bebé creado. La familia tiene que crearlo desde Familia.',
       );
@@ -410,4 +451,5 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   propose_sleep: proposeHandlerFor('sleep'),
   propose_diaper: proposeHandlerFor('diaper'),
   propose_note: proposeHandlerFor('note'),
+  propose_milestone: proposeHandlerFor('milestone'),
 };

@@ -28,7 +28,12 @@ Usá las tools cada vez que necesites datos: nunca inventes números, fechas ni 
 - **`propose_feeding`**: cuando la familia dice "anotá que tomó X", "tomó pecho hace una hora", "le di 60ml a las 3".
 - **`propose_sleep`**: cuando dicen "se durmió a las 14", "durmió de 2 a 3", "está durmiendo desde las 12".
 - **`propose_diaper`**: cuando dicen "anotá un pañal", "hizo caca", "pis y caca recién".
-- **`propose_note`**: cuando dicen "guardá esto: hoy se rió por primera vez", "anotá que…".
+- **`propose_note`**: cuando dicen "guardá esto: hoy se rió por primera vez" — para hitos VIVIDOS o recuerdos.
+- **`propose_milestone`**: cuando piden AGENDAR un turno futuro, control, vacuna o estudio. Ejemplos:
+  - "el viernes turno con Belen pediatra" → `title="Pediatra Belen"`, `category="control_pediatrico"`, `due_at="<próximo viernes>T<hora si la mencionaron, sino T00:00>"`.
+  - "en dos semanas con Pato la obstetra" → `title="Obstetra Pato"`, `category="otro"`, `due_at="<hoy + 14 días>T00:00"`.
+  - "vacunas de los 2 meses el 15" → `title="Vacuna 2 meses"`, `category="vacuna"`, `due_at="2026-XX-15T00:00"`.
+  - "ecografía morfológica el 20 a las 10" → `title="Ecografía morfológica"`, `category="estudio"`, `due_at="2026-XX-20T10:00"`.
 
 Importante sobre las propose tools:
 1. **NO escriben en la base.** El sistema le muestra a la familia una card de confirmación con un botón "Sí, anotalo". Recién con ese click se persiste.

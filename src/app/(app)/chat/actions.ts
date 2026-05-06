@@ -332,51 +332,112 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
     return { ok: true, eventId: result.id, summary: summarizeProposal(proposal) };
   }
 
-  // proposal.kind === 'note' — insertamos inline para evitar el redirect
-  // del createNoteAction (ese está pensado para el flow de la página /notas).
+  if (proposal.kind === 'note') {
+    // Insertamos inline para evitar el redirect del createNoteAction
+    // (ese está pensado para el flow de la página /notas).
+    const supabase = await createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      return { ok: false, error: { type: 'validation', message: 'Sesión expirada.' } };
+    }
+    const { data: child } = await supabase
+      .from('child_profiles')
+      .select('id')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (!child) {
+      return {
+        ok: false,
+        error: { type: 'validation', message: 'Todavía no hay un perfil de bebé.' },
+      };
+    }
+
+    const { data: noteData, error: noteErr } = await supabase
+      .from('notes')
+      .insert({
+        child_id: child.id,
+        occurred_at: proposal.occurred_at
+          ? agentTimestampToUTC(proposal.occurred_at)
+          : new Date().toISOString(),
+        category: proposal.category,
+        content: proposal.content,
+        created_by: userData.user.id,
+      })
+      .select('id')
+      .single();
+
+    if (noteErr || !noteData) {
+      return {
+        ok: false,
+        error: { type: 'provider', message: 'No pudimos guardar la nota.' },
+      };
+    }
+    revalidatePath('/home');
+    revalidatePath('/timeline');
+    await logProposalConfirm(proposal.kind, noteData.id);
+    return { ok: true, eventId: noteData.id, summary: summarizeProposal(proposal) };
+  }
+
+  // proposal.kind === 'milestone' — turno médico, vacuna, control, etc.
+  // Insert directo en medical_milestones. La RLS exige is_family_admin,
+  // así que solo admins pueden agendar via chat (igual que el form de
+  // /cuidar/calendario/nuevo).
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
     return { ok: false, error: { type: 'validation', message: 'Sesión expirada.' } };
   }
-  const { data: child } = await supabase
-    .from('child_profiles')
-    .select('id')
+
+  const { data: membership } = await supabase
+    .from('family_memberships')
+    .select('family_group_id')
+    .eq('user_id', userData.user.id)
     .is('deleted_at', null)
-    .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
-  if (!child) {
+
+  if (!membership?.family_group_id) {
     return {
       ok: false,
-      error: { type: 'validation', message: 'Todavía no hay un perfil de bebé.' },
+      error: { type: 'validation', message: 'No encontramos tu grupo familiar.' },
     };
   }
 
-  const { data: noteData, error: noteErr } = await supabase
-    .from('notes')
+  const dueUTC = agentTimestampToUTC(proposal.due_at);
+  // Para milestones la "sanity" es distinta — pueden ser hasta 2 años en
+  // el futuro (controles del año), o pasados (cargas retroactivas). No
+  // logueamos warning.
+
+  const { data: msData, error: msErr } = await supabase
+    .from('medical_milestones')
     .insert({
-      child_id: child.id,
-      occurred_at: proposal.occurred_at
-        ? agentTimestampToUTC(proposal.occurred_at)
-        : new Date().toISOString(),
+      family_group_id: membership.family_group_id,
+      title: proposal.title,
       category: proposal.category,
-      content: proposal.content,
+      due_at: dueUTC,
+      description: proposal.description ?? null,
+      notes: proposal.notes ?? null,
       created_by: userData.user.id,
     })
     .select('id')
     .single();
 
-  if (noteErr || !noteData) {
+  if (msErr || !msData) {
     return {
       ok: false,
-      error: { type: 'provider', message: 'No pudimos guardar la nota.' },
+      error: {
+        type: 'provider',
+        message: 'No pudimos guardar el turno. Si no sos admin, pedile a un admin que lo cargue.',
+      },
     };
   }
+
   revalidatePath('/home');
-  revalidatePath('/timeline');
-  await logProposalConfirm(proposal.kind, noteData.id);
-  return { ok: true, eventId: noteData.id, summary: summarizeProposal(proposal) };
+  revalidatePath('/cuidar/calendario');
+  await logProposalConfirm(proposal.kind, msData.id);
+  return { ok: true, eventId: msData.id, summary: summarizeProposal(proposal) };
 }
 
 /**
