@@ -1,7 +1,5 @@
 import { ImageResponse } from 'next/og';
 
-export const runtime = 'edge';
-
 /**
  * PNG 192x192 generado en runtime. Lo referencia el manifest. Mismo look
  * que `app/icon.svg` pero con dimensiones explícitas para que Chrome lo

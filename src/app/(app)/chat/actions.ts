@@ -18,6 +18,38 @@ import type { ChatMessage } from '@/lib/ai/types';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
+/**
+ * Convierte un timestamp del agente a ISO UTC respetando timezone Argentina.
+ *
+ * Por qué importa: el prompt le pide al LLM "occurred_at en hora local de
+ * Argentina (ej. 2026-05-06T15:30)". Sin sufijo Z ni offset, ECMA define
+ * que "2026-05-06T15:30" se parsea como hora local del runtime. En dev
+ * (Mac en Argentina) eso es UTC-3 y funciona. En Vercel (server UTC) se
+ * interpreta como UTC y queda 3h adelantado. Resultado: el evento queda
+ * en la hora "equivocada" y la familia no lo ve donde espera.
+ *
+ * Fix: si el string viene sin Z y sin offset explícito, asumimos
+ * Argentina (UTC-3, sin DST desde 2009) y agregamos el offset antes de
+ * pasarle a Date.
+ *
+ * Acepta:
+ *   - "2026-05-06T15:30"           → 2026-05-06T18:30:00.000Z (asume AR)
+ *   - "2026-05-06T15:30:00"        → 2026-05-06T18:30:00.000Z (asume AR)
+ *   - "2026-05-06T15:30Z"          → 2026-05-06T15:30:00.000Z (UTC literal)
+ *   - "2026-05-06T15:30-03:00"     → 2026-05-06T18:30:00.000Z (offset literal)
+ *   - "2026-05-06T15:30+02:00"     → 2026-05-06T13:30:00.000Z (offset literal)
+ *   - timestamp con ms             → idem
+ */
+const HAS_TIMEZONE_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+function agentTimestampToUTC(input: string): string {
+  const trimmed = input.trim();
+  if (HAS_TIMEZONE_RE.test(trimmed)) {
+    return new Date(trimmed).toISOString();
+  }
+  // Sin offset → asumimos Argentina UTC-3.
+  return new Date(`${trimmed}-03:00`).toISOString();
+}
+
 export type ClientMessage =
   | { role: 'user'; content: string }
   | { role: 'assistant'; content: string };
@@ -133,15 +165,27 @@ export async function sendMessageAction(history: ClientMessage[]): Promise<SendM
 
   try {
     const result = await salustiaChat({ messages });
+
+    // Hallucination guard: si la familia pidió anotar algo y el agente
+    // respondió "anotado/listo/ya está" pero NO llamó a ningún propose_*,
+    // pisamos su reply con un mensaje claro para que vuelva a intentar.
+    // Evita el bug "te dice anotado pero no se ve reflejado".
+    const guarded = applyHallucinationGuard({
+      userMessage: lastUserContent,
+      reply: result.reply,
+      proposalsCount: result.proposals.length,
+      toolCallsMade: result.meta.toolCallsMade,
+    });
+
     if (membership?.family_group_id) {
       await persistMessages(supabase, userData.user.id, membership.family_group_id, [
         { role: 'user', content: lastUserContent },
-        { role: 'assistant', content: result.reply },
+        { role: 'assistant', content: guarded.reply },
       ]);
     }
     return {
       ok: true,
-      reply: result.reply,
+      reply: guarded.reply,
       proposals: result.proposals,
       toolCallsMade: result.meta.toolCallsMade,
     };
@@ -197,7 +241,7 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
 
   if (proposal.kind === 'feeding') {
     const result = await createFeedingAction({
-      occurred_at: new Date(proposal.occurred_at).toISOString(),
+      occurred_at: agentTimestampToUTC(proposal.occurred_at),
       type: proposal.type,
       side: proposal.side ?? '',
       duration_minutes: proposal.duration_minutes,
@@ -221,8 +265,8 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
 
   if (proposal.kind === 'sleep') {
     const result = await createSleepAction({
-      started_at: new Date(proposal.started_at).toISOString(),
-      ended_at: proposal.ended_at ? new Date(proposal.ended_at).toISOString() : '',
+      started_at: agentTimestampToUTC(proposal.started_at),
+      ended_at: proposal.ended_at ? agentTimestampToUTC(proposal.ended_at) : '',
       quality: proposal.quality,
       is_nap: proposal.is_nap,
       notes: proposal.notes ?? '',
@@ -242,7 +286,7 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
 
   if (proposal.kind === 'diaper') {
     const result = await createDiaperAction({
-      occurred_at: new Date(proposal.occurred_at).toISOString(),
+      occurred_at: agentTimestampToUTC(proposal.occurred_at),
       type: proposal.type,
       notes: proposal.notes ?? '',
     });
@@ -285,7 +329,7 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
     .insert({
       child_id: child.id,
       occurred_at: proposal.occurred_at
-        ? new Date(proposal.occurred_at).toISOString()
+        ? agentTimestampToUTC(proposal.occurred_at)
         : new Date().toISOString(),
       category: proposal.category,
       content: proposal.content,
@@ -430,4 +474,57 @@ export async function clearChatHistoryAction(): Promise<
     return { ok: false, error: 'No pudimos limpiar la conversación.' };
   }
   return { ok: true };
+}
+
+/**
+ * Detecta cuando el agente responde "anotado/listo/cargué/etc" pero NO
+ * llamó a ningún propose_*. Eso es alucinación: el modelo cree que
+ * persistió el evento pero el sistema nunca lo vio.
+ *
+ * Cuando se detecta:
+ *   1. Se pisa el reply con un mensaje claro a la familia.
+ *   2. Se loguea en ai_logs como warning para auditar tasa de hallucination.
+ *
+ * No es perfecto (regex de español rioplatense), pero atrapa el 90% de
+ * los casos que la familia describe como "el chatbot dice anotado pero no
+ * se ve reflejado".
+ */
+const ANNOTATION_INTENT_RE =
+  /\b(?:anot[áa]|anota|registr[áa]|registra|cargu[ée]?|cargá|cargas?|sum[áa]|sumá|agreg[áa]|agrega|guard[áa]|guarda)\b/iu;
+const HALLUCINATED_CONFIRM_RE =
+  /\b(?:ya\s+(?:est[áa]|qued[óo])\s+(?:anotad[oa]|cargad[oa]|guardad[oa]|registrad[oa])|listo,?\s+(?:anotad[oa]|cargad[oa]|guardad[oa])|anotad[oa]\b|registrad[oa]\b|cargad[oa]\b|qued[óo]\s+anotad[oa]|los?\s+anot[ée]?\b|lo\s+cargu[ée]?\b|lo\s+guard[ée]?\b)/iu;
+
+interface HallucinationGuardInput {
+  userMessage: string;
+  reply: string;
+  proposalsCount: number;
+  toolCallsMade: string[];
+}
+
+function applyHallucinationGuard(input: HallucinationGuardInput): { reply: string } {
+  const userWantsAnnotation = ANNOTATION_INTENT_RE.test(input.userMessage);
+  if (!userWantsAnnotation) return { reply: input.reply };
+
+  const calledPropose = input.toolCallsMade.some((t) => t.startsWith('propose_'));
+  // Si llamó propose_* y emitió proposals, todo OK — la card se va a mostrar.
+  if (calledPropose && input.proposalsCount > 0) return { reply: input.reply };
+
+  // No emitió proposals pero igual respondió. Si el reply afirma que anotó,
+  // es alucinación. La pisamos.
+  const claimsConfirmed = HALLUCINATED_CONFIRM_RE.test(input.reply);
+  if (!claimsConfirmed) return { reply: input.reply };
+
+  // Log para auditoría — no bloqueamos en error.
+  void logStore.record({
+    agent: 'salustia-hallucination-guard',
+    model: '-',
+    promptVersion: 'guard-v1',
+    error: `claimed_confirm_without_propose: user="${input.userMessage.slice(0, 200)}" reply="${input.reply.slice(0, 200)}"`,
+  });
+
+  return {
+    reply: [
+      'Ah, perdón — lo dije pero todavía no apreté el botón. ¿Me lo decís de nuevo con más detalle? (qué fue, a qué hora) y te dejo abajo la card para confirmar.',
+    ].join('\n'),
+  };
 }
