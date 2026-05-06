@@ -82,7 +82,10 @@ export function CreateMemberSheet({ open, onOpenChange, onSubmit }: CreateMember
         onOpenChange(next);
       }}
     >
-      <SheetContent side="right" className="flex w-full max-w-md flex-col gap-0 overflow-y-auto">
+      <SheetContent
+        side="right"
+        className="flex h-[100dvh] w-full max-h-none flex-col gap-0 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))] sm:h-full sm:max-w-md"
+      >
         <SheetHeader className="border-border/60 border-b p-5">
           <SheetTitle className="flex items-center gap-2 text-lg">
             <UserPlus className="size-5 text-primary" aria-hidden />

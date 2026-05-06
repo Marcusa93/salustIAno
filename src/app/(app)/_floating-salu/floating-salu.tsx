@@ -143,9 +143,22 @@ export function FloatingSalu() {
         <SheetContent
           side="right"
           showCloseButton={false}
-          className="flex w-full max-w-md flex-col gap-0 overflow-hidden p-0"
+          className={cn(
+            // Mobile: full-screen para que SaluIA tenga el espacio que merece
+            // y la conversación sea cómoda con el teclado abierto.
+            'flex w-full flex-col gap-0 overflow-hidden p-0',
+            'h-[100dvh] max-h-none',
+            // Desktop: panel lateral derecho de tamaño cómodo.
+            'sm:h-full sm:max-w-md',
+          )}
         >
-          <SheetHeader className="flex-row items-start gap-3 border-border/60 border-b p-4">
+          <SheetHeader
+            className={cn(
+              'flex-row items-center gap-3 border-border/60 border-b p-3 sm:items-start sm:p-4',
+              // Mobile: respetar safe-area-inset-top para iPhone notch.
+              'pt-[max(0.75rem,env(safe-area-inset-top))]',
+            )}
+          >
             <span
               aria-hidden
               className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20"
@@ -154,7 +167,9 @@ export function FloatingSalu() {
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <SheetTitle className="text-base">SaluIA</SheetTitle>
-              <SheetDescription className="text-xs">
+              {/* Descripción solo en sm+ — en mobile el header se mantiene
+                  compacto y la conversación tiene más altura visible. */}
+              <SheetDescription className="hidden text-xs sm:block">
                 Soy Salu, hablame en primera persona. Puedo contarte cómo viene mi día o anotar
                 algo.
               </SheetDescription>
@@ -174,12 +189,12 @@ export function FloatingSalu() {
             <Button
               type="button"
               variant="ghost"
-              size="icon-sm"
+              size="icon"
               onClick={() => setOpen(false)}
               aria-label="Cerrar"
-              className="shrink-0"
+              className="shrink-0 sm:size-8"
             >
-              <X className="size-4" aria-hidden />
+              <X className="size-5 sm:size-4" aria-hidden />
             </Button>
           </SheetHeader>
 
@@ -245,7 +260,12 @@ export function FloatingSalu() {
               e.preventDefault();
               if (!pending) send(draft);
             }}
-            className="flex items-end gap-2 border-border/60 border-t p-3"
+            className={cn(
+              'flex items-end gap-2 border-border/60 border-t p-3',
+              // Safe-area en mobile para iPhone con home indicator.
+              'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+              'sm:pb-3',
+            )}
           >
             <Textarea
               ref={inputRef}

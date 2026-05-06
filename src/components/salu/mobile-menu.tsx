@@ -50,7 +50,10 @@ export function MobileMenu() {
           </Button>
         }
       />
-      <SheetContent side="left" className="flex w-72 flex-col p-0">
+      <SheetContent
+        side="left"
+        className="flex w-[85vw] max-w-72 flex-col p-0 pb-[max(0,env(safe-area-inset-bottom))] pt-[max(0,env(safe-area-inset-top))]"
+      >
         <SheetHeader className="p-4 pb-2">
           <SheetTitle className="sr-only">Menú</SheetTitle>
         </SheetHeader>

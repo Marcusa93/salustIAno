@@ -94,7 +94,10 @@ export function CloseSleepSheet({ sessionId, startedAt, trigger }: CloseSleepShe
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger render={trigger} />
-      <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
+      <SheetContent
+        side="bottom"
+        className="max-h-[90dvh] overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]"
+      >
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 font-display text-2xl">
             <Sun className="size-5" aria-hidden />

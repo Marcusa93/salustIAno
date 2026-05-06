@@ -54,3 +54,8 @@ supabase/.temp
 # Claude Code worktrees, settings y typos
 .claude/
 .claire/
+
+# Archivos de audio sueltos en root (deben ir a public/audio/)
+/*.mp3
+/*.wav
+/*.m4a

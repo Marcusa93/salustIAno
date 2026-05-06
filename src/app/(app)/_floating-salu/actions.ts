@@ -158,7 +158,7 @@ export async function sendBabyMessageAction(
  * para que suene como Salu (primera persona, cariñoso) sin cambiar el
  * núcleo del mensaje (que sigue siendo "no soy médico, andá al pediatra").
  */
-function babyifyMedicalDeflect(original: string): string {
+function babyifyMedicalDeflect(_original: string): string {
   return [
     'Mami, eso es para preguntarle a la pediatra — yo soy un bebé y no puedo opinar de salud.',
     'Si querés te muestro lo que ya tenés anotado de mí.',

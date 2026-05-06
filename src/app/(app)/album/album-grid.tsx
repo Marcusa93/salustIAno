@@ -568,31 +568,52 @@ function AlbumShareBar({
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   return (
-    <Card className="flex flex-wrap items-center gap-3 border-primary/20 bg-primary/5 p-3">
+    <Card className="flex flex-col gap-3 border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center">
       {isShared ? (
         <>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="font-medium text-foreground text-sm">{album.name}</span>
             <span className="truncate text-muted-foreground text-xs">{fullUrl}</span>
           </div>
-          {canNativeShare && (
-            <Button type="button" size="sm" variant="default" onClick={handleNativeShare}>
-              <Share2 className="size-4" aria-hidden />
-              Compartir
-            </Button>
-          )}
-          <Button type="button" size="sm" variant="ghost" onClick={handleCopy}>
-            {copied ? (
-              <Check className="size-4" aria-hidden />
-            ) : (
-              <Copy className="size-4" aria-hidden />
+          <div className="flex flex-wrap gap-1.5 sm:flex-nowrap">
+            {canNativeShare && (
+              <Button
+                type="button"
+                size="sm"
+                variant="default"
+                onClick={handleNativeShare}
+                className="flex-1 sm:flex-initial"
+              >
+                <Share2 className="size-4" aria-hidden />
+                Compartir
+              </Button>
             )}
-            {copied ? 'Copiado' : 'Copiar'}
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={handleRevoke} disabled={pending}>
-            <Link2Off className="size-4" aria-hidden />
-            Revocar
-          </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={handleCopy}
+              className="flex-1 sm:flex-initial"
+            >
+              {copied ? (
+                <Check className="size-4" aria-hidden />
+              ) : (
+                <Copy className="size-4" aria-hidden />
+              )}
+              {copied ? 'Copiado' : 'Copiar'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={handleRevoke}
+              disabled={pending}
+              className="flex-1 sm:flex-initial"
+            >
+              <Link2Off className="size-4" aria-hidden />
+              Revocar
+            </Button>
+          </div>
         </>
       ) : (
         <>
@@ -768,41 +789,68 @@ function PhotoModal({
       type="button"
       onClick={onClose}
       aria-label="Cerrar"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-stretch justify-center bg-foreground/60 backdrop-blur-sm sm:items-center sm:p-4"
     >
       <span
         role="presentation"
         onClickCapture={(e) => e.stopPropagation()}
-        className="relative flex max-h-[92vh] w-full max-w-3xl flex-col gap-3 overflow-y-auto rounded-2xl bg-card p-3 text-left shadow-2xl sm:flex-row sm:p-4"
+        className={cn(
+          // Mobile: full-screen sin gaps ni rounded — la foto ocupa toda la
+          // pantalla y abajo tiene el panel scrollable.
+          'relative flex w-full flex-col overflow-hidden bg-card text-left shadow-2xl',
+          // Mobile: full viewport con safe-area insets para iPhone notch.
+          'h-[100dvh] max-h-none rounded-none',
+          // Desktop: caja flotante centrada con altura cómoda.
+          'sm:h-auto sm:max-h-[92dvh] sm:max-w-3xl sm:flex-row sm:gap-3 sm:rounded-2xl sm:p-4',
+        )}
       >
         <Button
           type="button"
-          size="icon-sm"
+          size="icon"
           variant="ghost"
           onClick={onClose}
           aria-label="Cerrar"
-          className="absolute top-2 right-2 z-10 bg-background/80"
+          className={cn(
+            // Mobile: tap target grande (44px+) sobre la foto, alto contraste.
+            'absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-20 size-11 bg-background/85 shadow-md ring-1 ring-foreground/10 backdrop-blur-md',
+            // Desktop: chiquito en la esquina del card.
+            'sm:top-2 sm:right-2 sm:size-8 sm:bg-background/80 sm:shadow-none sm:ring-0 sm:backdrop-blur-none',
+          )}
         >
-          <X className="size-4" aria-hidden />
+          <X className="size-5 sm:size-4" aria-hidden />
         </Button>
 
         {/* Foto */}
-        <div className="flex flex-1 items-center justify-center sm:max-w-[60%]">
+        <div
+          className={cn(
+            // Mobile: la foto ocupa ~55% del alto disponible arriba.
+            'flex shrink-0 items-center justify-center bg-foreground/[0.04]',
+            'h-[55dvh] w-full',
+            // Desktop: lado izquierdo del card, máx 60% del ancho, alto cómodo.
+            'sm:h-auto sm:max-h-[80dvh] sm:max-w-[60%] sm:flex-1 sm:bg-transparent',
+          )}
+        >
           {url ? (
             <img
               src={url}
               alt={photo.caption ?? 'Foto'}
-              className="max-h-[60vh] w-full rounded-xl object-contain sm:max-h-[80vh]"
+              className="size-full object-contain sm:rounded-xl"
             />
           ) : (
-            <div className="flex aspect-square w-full items-center justify-center rounded-xl bg-muted/40 text-muted-foreground">
+            <div className="flex size-full items-center justify-center text-muted-foreground sm:aspect-square sm:rounded-xl sm:bg-muted/40">
               <Loader2 className="size-6 animate-spin" aria-hidden />
             </div>
           )}
         </div>
 
-        {/* Detalles */}
-        <div className="flex flex-1 flex-col gap-4 px-2 pb-3 sm:px-3 sm:pb-0">
+        {/* Detalles — scrollable en mobile, side-panel en desktop */}
+        <div
+          className={cn(
+            'flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4',
+            'pb-[max(1rem,env(safe-area-inset-bottom))]',
+            'sm:px-3 sm:pb-0',
+          )}
+        >
           <div className="flex flex-col gap-1">
             <span className="font-medium text-[11px] text-muted-foreground uppercase tracking-[0.18em]">
               {photo.takenAt ? formatDate(photo.takenAt) : 'Sin fecha'}

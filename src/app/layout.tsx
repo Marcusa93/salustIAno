@@ -1,3 +1,4 @@
+import { BackgroundMusic } from '@/components/salu/background-music';
 import { Toaster } from '@/components/ui/sonner';
 import type { Metadata, Viewport } from 'next';
 import { ThemeProvider } from 'next-themes';
@@ -95,6 +96,7 @@ export default function RootLayout({
           themes={['system', 'light', 'dark', 'night']}
         >
           {children}
+          <BackgroundMusic />
           {/* Toasts en top-center — el bottom queda denso entre bottom-nav,
               FloatingSalu y safe-area-inset; arriba se ven sin tapar nada
               y son fáciles de descartar. */}
