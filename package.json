@@ -4,7 +4,7 @@
   "private": true,
   "description": "Sistema operativo familiar para acompañar la crianza de Salustiano",
   "engines": {
-    "node": ">=22.0.0",
+    "node": "22.x",
     "pnpm": ">=9.0.0"
   },
   "packageManager": "pnpm@9.15.0",

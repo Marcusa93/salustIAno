@@ -1,7 +1,5 @@
 import { ImageResponse } from 'next/og';
 
-export const runtime = 'edge';
-
 /**
  * Variante "maskable": el OS recorta el ícono con su forma propia (círculo,
  * cuadrado redondeado, etc.). Para que la S no quede recortada, dejamos
