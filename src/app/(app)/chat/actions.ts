@@ -50,6 +50,27 @@ function agentTimestampToUTC(input: string): string {
   return new Date(`${trimmed}-03:00`).toISOString();
 }
 
+/**
+ * Sanity check: si el timestamp del agente está absurdamente lejos del
+ * presente (>24h atrás o >1h en el futuro), lo loggeamos como warning
+ * para debug. No bloqueamos — la familia puede haber querido cargar algo
+ * de ayer o mañana — pero si pasa seguido es síntoma de mala interpretación
+ * de hora por parte del LLM.
+ */
+function logTimestampSanity(kind: string, agentISO: string, utcISO: string): void {
+  const eventMs = new Date(utcISO).getTime();
+  const now = Date.now();
+  const diffHours = (now - eventMs) / (60 * 60 * 1000);
+  if (diffHours > 24 || diffHours < -1) {
+    void logStore.record({
+      agent: 'salustia-timestamp-sanity',
+      model: '-',
+      promptVersion: 'sanity-v1',
+      error: `kind=${kind} agentISO="${agentISO}" utcISO="${utcISO}" diffHours=${diffHours.toFixed(1)}`,
+    });
+  }
+}
+
 export type ClientMessage =
   | { role: 'user'; content: string }
   | { role: 'assistant'; content: string };
@@ -240,8 +261,10 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
   const proposal = parsed.data;
 
   if (proposal.kind === 'feeding') {
+    const occurredUTC = agentTimestampToUTC(proposal.occurred_at);
+    logTimestampSanity('feeding', proposal.occurred_at, occurredUTC);
     const result = await createFeedingAction({
-      occurred_at: agentTimestampToUTC(proposal.occurred_at),
+      occurred_at: occurredUTC,
       type: proposal.type,
       side: proposal.side ?? '',
       duration_minutes: proposal.duration_minutes,
@@ -264,9 +287,13 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
   }
 
   if (proposal.kind === 'sleep') {
+    const startedUTC = agentTimestampToUTC(proposal.started_at);
+    logTimestampSanity('sleep.start', proposal.started_at, startedUTC);
+    const endedUTC = proposal.ended_at ? agentTimestampToUTC(proposal.ended_at) : '';
+    if (endedUTC) logTimestampSanity('sleep.end', proposal.ended_at ?? '', endedUTC);
     const result = await createSleepAction({
-      started_at: agentTimestampToUTC(proposal.started_at),
-      ended_at: proposal.ended_at ? agentTimestampToUTC(proposal.ended_at) : '',
+      started_at: startedUTC,
+      ended_at: endedUTC,
       quality: proposal.quality,
       is_nap: proposal.is_nap,
       notes: proposal.notes ?? '',
@@ -285,8 +312,10 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
   }
 
   if (proposal.kind === 'diaper') {
+    const occurredUTC = agentTimestampToUTC(proposal.occurred_at);
+    logTimestampSanity('diaper', proposal.occurred_at, occurredUTC);
     const result = await createDiaperAction({
-      occurred_at: agentTimestampToUTC(proposal.occurred_at),
+      occurred_at: occurredUTC,
       type: proposal.type,
       notes: proposal.notes ?? '',
     });

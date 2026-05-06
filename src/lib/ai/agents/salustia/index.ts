@@ -132,8 +132,55 @@ export async function chat(
     throw err;
   }
 
+  // Anchor temporal — le pasamos al modelo la fecha y hora ACTUAL de
+  // Argentina explícita. Sin esto, el LLM tiene que adivinar:
+  //   - El día (puede agarrar uno cacheado del entrenamiento).
+  //   - AM/PM cuando el usuario dice "12:50" sin contexto.
+  //   - "Hace una hora" o "ahora mismo" sin fecha referente.
+  // Con el anchor inyectado al system, el modelo puede calcular bien y
+  // los timestamps que genera se acercan mucho más a lo que la familia
+  // espera. NO es timezone math — es solo dar contexto al LLM.
+  const nowAr = new Date();
+  const arDateTime = new Intl.DateTimeFormat('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(nowAr);
+  const arIsoLocal = (() => {
+    // Construimos "YYYY-MM-DDTHH:mm" en hora AR para que el modelo lo
+    // copie tal cual al generar occurred_at sin tener que calcular.
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(nowAr);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+    return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
+  })();
+  const timeAnchor = [
+    '## Contexto temporal (no se lo digas al usuario salvo que pregunte)',
+    '',
+    `- Hora actual de Argentina: ${arDateTime}`,
+    `- ISO local AR para usar en occurred_at: ${arIsoLocal}`,
+    '- Si el usuario dice "ahora", "recién", "ya": usá exactamente este ISO.',
+    '- Si dice "hace X minutos/horas": restá X al ISO actual.',
+    '- Si dice solo una hora (ej. "12:50"): asumí que es de HOY si esa hora ya pasó. Si todavía no llegó esa hora hoy (ej. son las 10 y dice "15:30"), preguntá si fue ayer o si es para más tarde. NO interpretes 12-horas: en AR siempre se usa formato 24-horas.',
+    '- El sistema convierte tu ISO a UTC automáticamente. Vos siempre escribís en hora AR sin sufijo.',
+  ].join('\n');
+
   const systemContent =
-    voice === 'baby' ? `${VOICE_BABY_PREFIX}\n\n---\n\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
+    voice === 'baby'
+      ? `${VOICE_BABY_PREFIX}\n\n---\n\n${SYSTEM_PROMPT}\n\n---\n\n${timeAnchor}`
+      : `${SYSTEM_PROMPT}\n\n---\n\n${timeAnchor}`;
   const messages: ChatMessage[] = [{ role: 'system', content: systemContent }, ...input.messages];
 
   const toolCallsMade: string[] = [];
