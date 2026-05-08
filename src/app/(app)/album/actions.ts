@@ -574,3 +574,117 @@ export async function deletePhotoAction(
   revalidatePath('/album');
   return { ok: true };
 }
+
+/**
+ * Renombra un álbum manual. Los mensuales no se renombran — su nombre
+ * se deriva del `month_key` y la familia espera ver "Mayo 2026" siempre.
+ * Si querés llamarlo distinto, conviene crear uno manual y mover las
+ * fotos.
+ */
+export async function renameAlbumAction(
+  id: string,
+  name: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (typeof id !== 'string' || id.length === 0) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+  const trimmed = (name ?? '').trim();
+  if (trimmed.length === 0 || trimmed.length > 80) {
+    return { ok: false, error: 'El nombre tiene que tener entre 1 y 80 caracteres.' };
+  }
+
+  const supabase = await createClient();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+
+  const { data: album } = await sb
+    .from('albums')
+    .select('id, kind')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (!album) return { ok: false, error: 'Álbum no encontrado.' };
+  if (album.kind !== 'manual') {
+    return {
+      ok: false,
+      error: 'Los álbumes mensuales no se renombran — su nombre lo arma el sistema por mes.',
+    };
+  }
+
+  const { error } = await sb.from('albums').update({ name: trimmed }).eq('id', id);
+  if (error) return { ok: false, error: 'No pudimos renombrar el álbum.' };
+
+  revalidatePath('/album');
+  return { ok: true };
+}
+
+/**
+ * Soft-delete de un álbum manual. Las fotos no se borran — quedan con
+ * `album_id = null` (vuelven al pool general "sin álbum") para que la
+ * familia no pierda nada por accidente.
+ *
+ * Los mensuales no se borran desde acá: si la familia subió una foto en
+ * mayo, el álbum "Mayo 2026" siempre debería existir mientras esa foto
+ * exista. Borrarlo lo recrearía en el próximo upload.
+ *
+ * Operación en dos pasos (no atómica):
+ *   1. UPDATE media_items SET album_id = NULL WHERE album_id = id
+ *   2. UPDATE albums SET deleted_at = now() WHERE id = id
+ *
+ * Si el paso 2 falla después del 1, las fotos quedan correctamente
+ * desasignadas pero el álbum sigue existiendo (sin fotos) — el usuario
+ * puede reintentar.
+ */
+export async function deleteAlbumAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (typeof id !== 'string' || id.length === 0) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+
+  const supabase = await createClient();
+  // biome-ignore lint/suspicious/noExplicitAny: types stale.
+  const sb = supabase as any;
+
+  const { data: album } = await sb
+    .from('albums')
+    .select('id, kind')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (!album) return { ok: false, error: 'Álbum no encontrado.' };
+  if (album.kind !== 'manual') {
+    return {
+      ok: false,
+      error:
+        'Los álbumes mensuales no se borran — se regeneran al subir una foto del mes. Para esconderlo, mové las fotos a otro álbum.',
+    };
+  }
+
+  // 1. Sacar el album_id de las fotos (vuelven al pool general).
+  const { error: detachErr } = await sb
+    .from('media_items')
+    .update({ album_id: null })
+    .eq('album_id', id);
+  if (detachErr) {
+    return { ok: false, error: 'No pudimos desasignar las fotos del álbum.' };
+  }
+
+  // 2. Soft-delete del álbum.
+  const { error: deleteErr } = await sb
+    .from('albums')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
+  if (deleteErr) {
+    return {
+      ok: false,
+      error:
+        'Quitamos las fotos del álbum pero no pudimos eliminarlo. Probá de nuevo en unos segundos.',
+    };
+  }
+
+  revalidatePath('/album');
+  return { ok: true };
+}

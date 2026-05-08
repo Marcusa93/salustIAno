@@ -15,6 +15,7 @@ import {
   Link2,
   Link2Off,
   Loader2,
+  Pencil,
   Plus,
   Share2,
   Sparkles,
@@ -30,8 +31,10 @@ import {
   type PhotoEntry,
   assignPhotoToAlbumAction,
   createManualAlbumAction,
+  deleteAlbumAction,
   deletePhotoAction,
   getPhotoUrlAction,
+  renameAlbumAction,
   retagPhotoAction,
   revokeAlbumShareAction,
   shareAlbumAction,
@@ -367,21 +370,42 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
       )}
 
       {activeAlbum && (
-        <AlbumShareBar
-          album={activeAlbum}
-          onShared={(shareToken, sharedAt) =>
-            setAlbums((prev) =>
-              prev.map((a) => (a.id === activeAlbum.id ? { ...a, shareToken, sharedAt } : a)),
-            )
-          }
-          onRevoked={() =>
-            setAlbums((prev) =>
-              prev.map((a) =>
-                a.id === activeAlbum.id ? { ...a, shareToken: null, sharedAt: null } : a,
-              ),
-            )
-          }
-        />
+        <div className="flex flex-col gap-2.5">
+          <AlbumShareBar
+            album={activeAlbum}
+            onShared={(shareToken, sharedAt) =>
+              setAlbums((prev) =>
+                prev.map((a) => (a.id === activeAlbum.id ? { ...a, shareToken, sharedAt } : a)),
+              )
+            }
+            onRevoked={() =>
+              setAlbums((prev) =>
+                prev.map((a) =>
+                  a.id === activeAlbum.id ? { ...a, shareToken: null, sharedAt: null } : a,
+                ),
+              )
+            }
+          />
+          {activeAlbum.kind === 'manual' && (
+            <ManualAlbumActions
+              album={activeAlbum}
+              onRenamed={(newName) =>
+                setAlbums((prev) =>
+                  prev.map((a) => (a.id === activeAlbum.id ? { ...a, name: newName } : a)),
+                )
+              }
+              onDeleted={() => {
+                // Quitar el álbum del listado y desasignar las fotos en
+                // memoria (server ya las puso en album_id=null).
+                setAlbums((prev) => prev.filter((a) => a.id !== activeAlbum.id));
+                setPhotos((prev) =>
+                  prev.map((p) => (p.albumId === activeAlbum.id ? { ...p, albumId: null } : p)),
+                );
+                setActiveAlbumId(null);
+              }}
+            />
+          )}
+        </div>
       )}
 
       {tagChips.length > 0 && (
@@ -672,6 +696,146 @@ function AlbumShareBar({
 }
 
 // ----------------------------------------------------------------------------
+// ManualAlbumActions: renombrar y eliminar (solo álbumes manuales).
+// ----------------------------------------------------------------------------
+
+function ManualAlbumActions({
+  album,
+  onRenamed,
+  onDeleted,
+}: {
+  album: AlbumEntry;
+  onRenamed: (newName: string) => void;
+  onDeleted: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(album.name);
+  const [pending, startPending] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      // Foco + selección del nombre actual al abrir el editor.
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  function handleRename() {
+    const trimmed = draftName.trim();
+    if (trimmed.length === 0) {
+      toast.error('El nombre no puede estar vacío.');
+      return;
+    }
+    if (trimmed === album.name) {
+      setEditing(false);
+      return;
+    }
+    startPending(async () => {
+      const result = await renameAlbumAction(album.id, trimmed);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      onRenamed(trimmed);
+      setEditing(false);
+      toast.success('Álbum renombrado.');
+    });
+  }
+
+  function handleDelete() {
+    const ok = window.confirm(
+      `¿Eliminar el álbum "${album.name}"? Las fotos no se borran — vuelven al pool general (sin álbum).`,
+    );
+    if (!ok) return;
+    startPending(async () => {
+      const result = await deleteAlbumAction(album.id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      onDeleted();
+      toast.success('Álbum eliminado.');
+    });
+  }
+
+  if (editing) {
+    return (
+      <Card className="flex flex-col gap-2 border-border/60 p-3 sm:flex-row sm:items-center">
+        <Input
+          ref={inputRef}
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleRename();
+            }
+            if (e.key === 'Escape') {
+              setDraftName(album.name);
+              setEditing(false);
+            }
+          }}
+          maxLength={80}
+          disabled={pending}
+          className="flex-1"
+          aria-label="Nuevo nombre del álbum"
+        />
+        <div className="flex gap-2">
+          <Button type="button" size="sm" onClick={handleRename} disabled={pending}>
+            {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+            Guardar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setDraftName(album.name);
+              setEditing(false);
+            }}
+            disabled={pending}
+          >
+            Cancelar
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="flex items-center gap-2 border-border/60 p-2 pl-3">
+      <span className="font-medium text-[10.5px] text-muted-foreground uppercase tracking-[0.18em]">
+        Álbum manual
+      </span>
+      <div className="ml-auto flex gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => setEditing(true)}
+          disabled={pending}
+        >
+          <Pencil className="size-4" aria-hidden />
+          Renombrar
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={handleDelete}
+          disabled={pending}
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="size-4" aria-hidden />
+          Eliminar
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+// ----------------------------------------------------------------------------
 // Thumbnail: lazy-load del signed URL cuando entra al viewport.
 // ----------------------------------------------------------------------------
 
@@ -931,21 +1095,28 @@ function PhotoModal({
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ph-album">Álbum</Label>
+          <div className="flex flex-col gap-1.5 rounded-lg border border-primary/15 bg-primary/[0.04] p-3">
+            <Label htmlFor="ph-album" className="flex items-center gap-1.5 text-foreground">
+              <FolderOpen className="size-4 text-primary" aria-hidden />
+              Mover a otro álbum
+            </Label>
             <select
               id="ph-album"
               value={photo.albumId ?? ''}
               onChange={(e) => onAssignAlbum(e.target.value === '' ? null : e.target.value)}
-              className="h-9 rounded-lg border border-input bg-transparent px-2.5 font-medium text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="h-9 rounded-lg border border-input bg-background px-2.5 font-medium text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              <option value="">Sin álbum</option>
+              <option value="">Sin álbum (pool general)</option>
               {albums.map((al) => (
                 <option key={al.id} value={al.id}>
-                  {al.name}
+                  {al.kind === 'monthly' ? `📅 ${al.name}` : al.name}
                 </option>
               ))}
             </select>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Se guarda al instante. Si querés un álbum nuevo, creá uno desde la grilla con "Nuevo
+              álbum" y volvé acá a moverla.
+            </p>
           </div>
 
           <div className="mt-auto flex flex-wrap gap-2 pt-2">
