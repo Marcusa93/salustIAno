@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyEvent, groupEventsByTime } from './event-grouping';
+import { arDayKeyFor, classifyEvent, groupEventsByDay, groupEventsByTime } from './event-grouping';
 
 describe('classifyEvent', () => {
   // Ahora referencia: 2026-05-08 18:00 UTC (15:00 AR del viernes 8).
@@ -71,5 +71,63 @@ describe('groupEventsByTime', () => {
     const groups = groupEventsByTime(events, now);
     expect(groups).toHaveLength(1);
     expect(groups[0]?.key).toBe('recent');
+  });
+});
+
+describe('arDayKeyFor', () => {
+  it('22 AR del 7 (= 01 UTC del 8) cae en el día 7 AR', () => {
+    expect(arDayKeyFor('2026-05-08T01:00:00Z')).toBe('2026-05-07');
+  });
+
+  it('mediodía UTC normal del 8 cae en el día 8 AR', () => {
+    expect(arDayKeyFor('2026-05-08T15:00:00Z')).toBe('2026-05-08');
+  });
+
+  it('00:00 UTC del 9 (= 21 AR del 8) cae en el día 8 AR', () => {
+    expect(arDayKeyFor('2026-05-09T00:00:00Z')).toBe('2026-05-08');
+  });
+});
+
+describe('groupEventsByDay', () => {
+  // Ahora referencia: viernes 2026-05-08 18:00 UTC = 15:00 AR.
+  const now = new Date('2026-05-08T18:00:00Z');
+
+  it('agrupa por día calendario AR y ordena descendente', () => {
+    const events = [
+      { occurred_at: '2026-05-08T14:00:00Z', id: 'a' }, // hoy AR
+      { occurred_at: '2026-05-08T01:00:00Z', id: 'b' }, // ayer AR (22 AR del 7)
+      { occurred_at: '2026-05-06T15:00:00Z', id: 'c' }, // anteayer AR
+    ];
+    const groups = groupEventsByDay(events, now);
+    expect(groups).toHaveLength(3);
+    expect(groups[0]?.key).toBe('2026-05-08');
+    expect(groups[0]?.label).toBe('Hoy');
+    expect(groups[1]?.key).toBe('2026-05-07');
+    expect(groups[1]?.label).toBe('Ayer');
+    expect(groups[2]?.key).toBe('2026-05-06');
+    // "Miércoles 6 de mayo" — \w no matchea acentos sin flag u, por eso uso patrón explícito.
+    expect(groups[2]?.label).toMatch(/^\p{L}+ \d+ de \p{L}+/u);
+  });
+
+  it('agrupa varios eventos del mismo día en una sección', () => {
+    const events = [
+      { occurred_at: '2026-05-08T14:00:00Z', id: 'a' },
+      { occurred_at: '2026-05-08T10:00:00Z', id: 'b' },
+      { occurred_at: '2026-05-08T07:00:00Z', id: 'c' },
+    ];
+    const groups = groupEventsByDay(events, now);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.items.map((i) => i.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('lista vacía devuelve []', () => {
+    expect(groupEventsByDay([], now)).toEqual([]);
+  });
+
+  it('label en español capitalizado', () => {
+    const events = [{ occurred_at: '2026-05-04T15:00:00Z', id: 'a' }];
+    const groups = groupEventsByDay(events, now);
+    // 04 mayo 2026 fue lunes.
+    expect(groups[0]?.label).toBe('Lunes 4 de mayo');
   });
 });

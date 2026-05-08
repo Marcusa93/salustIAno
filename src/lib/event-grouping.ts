@@ -76,3 +76,67 @@ export function groupEventsByTime<T extends { occurred_at: string }>(
     .filter((k) => buckets[k].length > 0)
     .map((k) => ({ key: k, label: LABELS[k], items: buckets[k] }));
 }
+
+/**
+ * Clave de día en hora AR ("YYYY-MM-DD"). Útil para agrupar eventos en
+ * /timeline donde necesitamos un día calendario por sección, no buckets
+ * relativos.
+ */
+export function arDayKeyFor(iso: string): string {
+  return arDateKey(new Date(iso));
+}
+
+export interface DayGroup<T> {
+  /** Clave de día en hora AR (`YYYY-MM-DD`). */
+  key: string;
+  /** Etiqueta humana: "Hoy", "Ayer", o "Lunes 6 de mayo". */
+  label: string;
+  items: T[];
+}
+
+/**
+ * Agrupa eventos por día calendario AR (sin importar a qué hora UTC
+ * pasen). Devuelve los días en orden descendente — el más reciente
+ * primero — preservando el orden interno de cada día.
+ */
+export function groupEventsByDay<T extends { occurred_at: string }>(
+  items: ReadonlyArray<T>,
+  now: Date = new Date(),
+): Array<DayGroup<T>> {
+  const byDay = new Map<string, T[]>();
+  for (const it of items) {
+    const k = arDayKeyFor(it.occurred_at);
+    const arr = byDay.get(k);
+    if (arr) arr.push(it);
+    else byDay.set(k, [it]);
+  }
+  const todayKey = arDateKey(now);
+  const yesterdayKey = arDateKey(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+
+  return Array.from(byDay.entries())
+    .sort(([a], [b]) => (a < b ? 1 : -1))
+    .map(([key, dayItems]) => ({
+      key,
+      label: dayHeaderLabel(key, todayKey, yesterdayKey),
+      items: dayItems,
+    }));
+}
+
+function dayHeaderLabel(dayKey: string, todayKey: string, yesterdayKey: string): string {
+  if (dayKey === todayKey) return 'Hoy';
+  if (dayKey === yesterdayKey) return 'Ayer';
+  // dayKey es YYYY-MM-DD en hora AR. Lo formateamos como "Lunes 6 de mayo".
+  // Construimos un Date a las 12:00 UTC del día para evitar saltar de día
+  // por timezone.
+  const d = new Date(`${dayKey}T12:00:00Z`);
+  const raw = d.toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  });
+  // es-AR mete una coma entre weekday y día ("Lunes, 4 de mayo"). La
+  // sacamos para que el header sea más limpio: "Lunes 4 de mayo".
+  const noComma = raw.replace(/,\s*/, ' ');
+  return noComma.charAt(0).toUpperCase() + noComma.slice(1);
+}

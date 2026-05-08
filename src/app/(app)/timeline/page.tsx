@@ -4,6 +4,7 @@ import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timel
 import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { groupEventsByDay } from '@/lib/event-grouping';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
 import {
@@ -30,6 +31,7 @@ import {
   Printer,
   Sun,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { DiaperPhotoLink } from '../cuidar/eventos/_components/diaper-photo-link';
@@ -37,6 +39,9 @@ import { EditDiaperSheet } from '../cuidar/eventos/_components/edit-diaper-sheet
 import { EditFeedingSheet } from '../cuidar/eventos/_components/edit-feeding-sheet';
 import { EditSleepSheet } from '../cuidar/eventos/_components/edit-sleep-sheet';
 import { CloseSleepSheet } from '../home/_components/close-sleep-sheet';
+import { DiaperQuickAdd } from '../home/_components/diaper-quick-add';
+import { FeedingQuickAdd } from '../home/_components/feeding-quick-add';
+import { SleepQuickAdd } from '../home/_components/sleep-quick-add';
 
 export const metadata: Metadata = {
   title: 'Registro',
@@ -62,30 +67,36 @@ interface PageProps {
   searchParams: Promise<{ tipo?: string }>;
 }
 
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString('es-AR', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
+function formatTimeOnly(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-AR', {
     hour: '2-digit',
     minute: '2-digit',
   });
 }
 
-function dayKey(iso: string): string {
-  return new Date(iso).toISOString().slice(0, 10);
+function dayCounts(items: ReadonlyArray<TimelineRow>): Array<{ Icon: LucideIcon; n: number }> {
+  const feeding = items.filter((e) => e.event_type === 'feeding').length;
+  const sleep = items.filter((e) => e.event_type === 'sleep').length;
+  const diaper = items.filter((e) => e.event_type === 'diaper').length;
+  const out: Array<{ Icon: LucideIcon; n: number }> = [];
+  if (feeding > 0) out.push({ Icon: Milk, n: feeding });
+  if (sleep > 0) out.push({ Icon: Moon, n: sleep });
+  if (diaper > 0) out.push({ Icon: Baby, n: diaper });
+  return out;
 }
 
-function dayLabel(iso: string): string {
-  const today = new Date();
-  const that = new Date(iso);
-  const sameDay = today.toISOString().slice(0, 10) === that.toISOString().slice(0, 10);
-  if (sameDay) return 'Hoy';
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (yesterday.toISOString().slice(0, 10) === that.toISOString().slice(0, 10)) return 'Ayer';
-  return that.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+const QUICK_TILE_CLS =
+  'group/qa relative flex h-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-card to-card/40 p-3 text-foreground shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 active:translate-y-0 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+
+function quickTile(Icon: LucideIcon, label: string) {
+  return (
+    <span className={QUICK_TILE_CLS}>
+      <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10 transition-transform duration-200 group-hover/qa:scale-110 group-hover/qa:bg-primary/15 group-active/qa:scale-95">
+        <Icon className="size-4" aria-hidden />
+      </span>
+      <span className="font-medium text-foreground text-xs leading-tight">{label}</span>
+    </span>
+  );
 }
 
 export default async function TimelinePage({ searchParams }: PageProps) {
@@ -131,26 +142,15 @@ export default async function TimelinePage({ searchParams }: PageProps) {
   });
 
   const rows = (data ?? []) as TimelineRow[];
-
-  // Agrupamos por día para el rendering.
-  const byDay = new Map<string, TimelineRow[]>();
-  for (const row of rows) {
-    const k = dayKey(row.occurred_at);
-    const arr = byDay.get(k);
-    if (arr) arr.push(row);
-    else byDay.set(k, [row]);
-  }
+  const dayGroups = groupEventsByDay(rows);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
       <PageHeader
         eyebrow="Registro"
         title={`El día a día de ${child.name}.`}
         action={
           <>
-            {/* En mobile mostramos los secundarios como icon-only para que
-                el primary "Anotar momento" mantenga la jerarquía visual.
-                En sm+ se ven con label completo. */}
             <Button
               render={<Link href={'/timeline/imprimir' as Route} />}
               size="icon-sm"
@@ -187,13 +187,47 @@ export default async function TimelinePage({ searchParams }: PageProps) {
               <CalendarDays className="size-4" aria-hidden />
               Vista mensual
             </Button>
-            <Button render={<Link href="/notas/nuevo" />} size="sm">
-              <BookHeart className="size-4" aria-hidden />
-              Anotar
-            </Button>
           </>
         }
       />
+
+      {/* Quick-add row — la acción primaria del registro vive acá, no en el
+          header. Reusa los mismos Sheets que /home para que se sienta una
+          sola app. */}
+      <section
+        className="animate-stagger-up flex flex-col gap-3"
+        style={{ animationDelay: '60ms' }}
+      >
+        <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+          Anotar en dos toques
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <FeedingQuickAdd
+            trigger={
+              <button type="button" className="contents">
+                {quickTile(Milk, 'Tomó')}
+              </button>
+            }
+          />
+          <SleepQuickAdd
+            trigger={
+              <button type="button" className="contents">
+                {quickTile(Moon, 'Durmió')}
+              </button>
+            }
+          />
+          <DiaperQuickAdd
+            trigger={
+              <button type="button" className="contents">
+                {quickTile(Baby, 'Pañal')}
+              </button>
+            }
+          />
+          <Link href="/notas/nuevo" className="contents">
+            {quickTile(BookHeart, 'Momento')}
+          </Link>
+        </div>
+      </section>
 
       <nav aria-label="Filtrar registro" className="flex flex-wrap gap-2">
         {FILTER_OPTIONS.map((opt) => {
@@ -206,10 +240,11 @@ export default async function TimelinePage({ searchParams }: PageProps) {
               key={opt.value || 'all'}
               href={href}
               className={cn(
-                'inline-flex items-center rounded-full px-3 py-1.5 font-medium text-sm transition-colors',
+                'inline-flex items-center rounded-full border px-3.5 py-1.5 font-medium text-xs transition-all duration-200',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                 active
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  ? 'border-primary/30 bg-primary text-primary-foreground shadow-sm'
+                  : 'border-border/60 bg-card text-muted-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:bg-card hover:text-foreground',
               )}
             >
               {opt.label}
@@ -230,23 +265,44 @@ export default async function TimelinePage({ searchParams }: PageProps) {
             </div>
           }
           title="Todavía no hay registros"
-          description="Anotá algo desde Casa y vuelve acá para verlo."
+          description="Anotá algo desde Casa y volvé acá para verlo."
           action={{ label: 'Ir a Casa', href: '/home' as Route }}
         />
       ) : (
-        <div className="flex flex-col gap-8">
-          {Array.from(byDay.entries()).map(([day, items]) => (
-            <section key={day} className="flex flex-col gap-3">
-              <h2 className="font-semibold text-foreground text-sm">{dayLabel(day)}</h2>
-              <ul className="flex flex-col gap-2">
-                {items.map((row) => (
-                  <li key={`${row.event_type}-${row.id}`}>
-                    <TimelineEntry row={row} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+        <div className="flex flex-col gap-7">
+          {dayGroups.map((group) => {
+            const counts = dayCounts(group.items);
+            return (
+              <section key={group.key} className="flex flex-col gap-2.5">
+                <header className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+                    {group.label}
+                  </h2>
+                  {counts.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      {counts.map(({ Icon, n }, idx) => (
+                        <span
+                          // biome-ignore lint/suspicious/noArrayIndexKey: índice estable, no hay reorder.
+                          key={idx}
+                          className="inline-flex items-center gap-1 text-muted-foreground/80 text-xs"
+                        >
+                          <Icon className="size-3.5" aria-hidden />
+                          {n}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </header>
+                <ul className="flex flex-col gap-2">
+                  {group.items.map((row) => (
+                    <li key={`${row.event_type}-${row.id}`}>
+                      <TimelineEntry row={row} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
         </div>
       )}
     </div>
@@ -270,8 +326,8 @@ function TimelineEntry({ row }: { row: TimelineRow }) {
   return (
     <Card
       className={cn(
-        'flex items-start gap-3 p-3',
-        photoAnalysis?.alarm && 'border-destructive/40 bg-destructive/5',
+        'flex items-start gap-3 border-border/60 p-3 transition-colors hover:bg-muted/30',
+        photoAnalysis?.alarm && 'border-destructive/40 bg-destructive/5 hover:bg-destructive/10',
       )}
     >
       <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -301,8 +357,8 @@ function TimelineEntry({ row }: { row: TimelineRow }) {
         )}
       </div>
       <div className="ml-auto flex flex-col items-end gap-1.5">
-        <span className="whitespace-nowrap text-muted-foreground text-xs">
-          {formatDateTime(row.occurred_at)}
+        <span className="whitespace-nowrap font-medium text-muted-foreground text-xs tabular-nums">
+          {formatTimeOnly(row.occurred_at)}
         </span>
         {isOpenSleep && (
           <CloseSleepSheet
@@ -390,7 +446,7 @@ function EditButton({ row }: { row: TimelineRow }) {
 }
 
 function describeEvent(row: TimelineRow): {
-  Icon: typeof Milk;
+  Icon: LucideIcon;
   title: string;
   detail: string | null;
 } {
