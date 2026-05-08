@@ -65,7 +65,9 @@ export function MembersSection({ initialMembers, isAdmin }: MembersSectionProps)
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-semibold text-foreground text-sm">Miembros</h2>
+        <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+          Miembros
+        </h2>
         {isAdmin && (
           <Button type="button" size="sm" onClick={() => setOpen(true)}>
             <Plus className="size-4" aria-hidden />
