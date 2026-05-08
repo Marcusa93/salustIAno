@@ -1,5 +1,6 @@
 'use server';
 
+import { persistMessages } from '@/app/(app)/chat/actions';
 import { salustiaChat } from '@/lib/ai/agents';
 import { detectMedicalIntent } from '@/lib/ai/agents/salustia/medical-intent';
 import type { Proposal } from '@/lib/ai/agents/salustia/proposals';
@@ -22,7 +23,9 @@ export type SendBabyMessageResult =
       };
     };
 
-const MAX_HISTORY = 20;
+// Alineado con /chat: la timeline es compartida, el LLM debería recibir
+// la misma profundidad de contexto desde cualquier surface.
+const MAX_HISTORY = 30;
 const MAX_INPUT_LEN = 1500;
 
 /**
@@ -30,9 +33,10 @@ const MAX_INPUT_LEN = 1500;
  * `sendMessageAction` del /chat principal:
  *
  *   1. **Voz `baby`**: el agente habla como Salu en primera persona.
- *   2. **Sin persistencia de historial**: el floating widget es ephemeral —
- *      la conversación vive solo mientras el sheet está abierto. Si la
- *      familia quiere historial persistente, /chat sigue funcionando.
+ *   2. **Misma timeline que /chat**: persiste en `chat_messages` igual
+ *      que el chat principal. Abrir el flotante es seguir la misma
+ *      conversación que se ve en /chat — un thread por usuario, sin
+ *      importar dónde se escribió.
  *   3. **Misma capacidad de proposals + executeProposalAction**: las
  *      acciones se persisten igual que en /chat. La voz solo cambia la
  *      forma del texto, no la mecánica de tools.
@@ -76,17 +80,25 @@ export async function sendBabyMessageAction(
   const trimmed = history.slice(-MAX_HISTORY);
   const messages: ChatMessage[] = trimmed.map((m) => ({ role: m.role, content: m.content }));
 
-  // Sesión: no insistimos con persistencia, pero sí necesitamos estar
-  // logueados para que las tools puedan resolver familyGroupId.
+  // Resolvemos user + family_group_id para persistir igual que /chat.
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
     return { ok: false, error: { type: 'validation', message: 'Sesión expirada.' } };
   }
+  const { data: membership } = await supabase
+    .from('family_memberships')
+    .select('family_group_id')
+    .eq('user_id', userData.user.id)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
+  const lastUserContent = last.content;
 
   // Pre-LLM medical intent guardrail. Si matchea, devolvemos canned reply
   // adaptada a la voz baby (mantiene el deflect, lo dice cariñoso).
-  const detection = detectMedicalIntent(last.content);
+  const detection = detectMedicalIntent(lastUserContent);
   if (detection.matched) {
     await logStore.record({
       agent: 'salustia-baby-medical-deflect',
@@ -94,9 +106,16 @@ export async function sendBabyMessageAction(
       promptVersion: 'medical-intent-v1',
       error: `pattern matched: ${detection.pattern}`,
     });
+    const reply = babyifyMedicalDeflect(detection.reply);
+    if (membership?.family_group_id) {
+      await persistMessages(supabase, userData.user.id, membership.family_group_id, [
+        { role: 'user', content: lastUserContent },
+        { role: 'assistant', content: reply },
+      ]);
+    }
     return {
       ok: true,
-      reply: babyifyMedicalDeflect(detection.reply),
+      reply,
       proposals: [],
       toolCallsMade: [],
     };
@@ -112,11 +131,18 @@ export async function sendBabyMessageAction(
     // crear una dep transversal entre _floating-salu y /chat por una
     // función chiquita.
     const guarded = applyBabyHallucinationGuard({
-      userMessage: last.content,
+      userMessage: lastUserContent,
       reply: result.reply,
       proposalsCount: result.proposals.length,
       toolCallsMade: result.meta.toolCallsMade,
     });
+
+    if (membership?.family_group_id) {
+      await persistMessages(supabase, userData.user.id, membership.family_group_id, [
+        { role: 'user', content: lastUserContent },
+        { role: 'assistant', content: guarded },
+      ]);
+    }
 
     return {
       ok: true,

@@ -1,6 +1,11 @@
 'use client';
 
 import { ProposalCard } from '@/app/(app)/chat/_components/proposal-card';
+import {
+  type ChatHistoryEntry,
+  clearChatHistoryAction,
+  loadChatHistoryAction,
+} from '@/app/(app)/chat/actions';
 import { SaluBotAvatar } from '@/components/salu/salu-bot-avatar';
 import { SpeechToTextButton } from '@/components/salu/speech-to-text-button';
 import { Button } from '@/components/ui/button';
@@ -33,11 +38,22 @@ const SUGGESTIONS = [
   '¿Cuándo es mi próximo control?',
 ];
 
+function historyToEntries(history: ChatHistoryEntry[]): ChatEntry[] {
+  // Las proposals son transitorias y no se persisten — al rehidratar
+  // queda la card de mensaje sin botones, igual que en /chat.
+  return history.map((m) =>
+    m.role === 'assistant'
+      ? { role: 'assistant', content: m.content, proposals: [] }
+      : { role: 'user', content: m.content },
+  );
+}
+
 /**
  * Botón flotante esquina inferior derecha que abre un Sheet con un chat
- * en primera persona ("hablo yo, Salu"). Mismo motor que /chat pero con
- * `voice: 'baby'` y sin persistencia de historial — la conversación es
- * ephemeral, ideal para preguntas rápidas o anotar algo en 2 toques.
+ * en primera persona ("hablo yo, Salu"). Comparte la timeline con `/chat`:
+ * los mensajes que mandás desde acá quedan en la misma conversación que
+ * ves en la página completa, y al abrir el sheet se rehidrata el
+ * historial reciente.
  *
  * Esconde automáticamente:
  *  - En /chat (no duplicar el chat principal).
@@ -50,17 +66,42 @@ export function FloatingSalu() {
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [draft, setDraft] = useState('');
   const [pending, startTransition] = useTransition();
+  const [hydrating, setHydrating] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [clearing, startClearTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll al fondo cuando llega un mensaje nuevo.
+  // Hidratación: la primera vez que el user abre el sheet, traemos los
+  // últimos N mensajes de chat_messages (mismos que ve /chat). Si vuelve
+  // a abrir más tarde sin recargar la página, no rehidratamos para no
+  // pisar mensajes nuevos que mandó desde acá.
+  useEffect(() => {
+    if (!open || hydrated || hydrating) return;
+    setHydrating(true);
+    void loadChatHistoryAction()
+      .then((history) => {
+        setEntries(historyToEntries(history));
+      })
+      .catch(() => {
+        // Best effort: si falla la hidratación, arrancamos vacío. No es
+        // un error bloqueante — el chat sigue andando.
+      })
+      .finally(() => {
+        setHydrating(false);
+        setHydrated(true);
+      });
+  }, [open, hydrated, hydrating]);
+
+  // Auto-scroll al fondo cuando llega un mensaje nuevo o cuando termina
+  // la hidratación (queremos arrancar viendo lo más reciente).
   useEffect(() => {
     if (!open) return;
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
       behavior: 'smooth',
     });
-  }, [open, entries.length]);
+  }, [open, entries.length, hydrating]);
 
   // Foco en el textarea cuando abrimos.
   useEffect(() => {
@@ -109,8 +150,16 @@ export function FloatingSalu() {
   }
 
   function clearChat() {
-    setEntries([]);
-    setDraft('');
+    if (!window.confirm('¿Borrar la conversación con SaluIA? Se borra también de /chat.')) return;
+    startClearTransition(async () => {
+      const result = await clearChatHistoryAction();
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setEntries([]);
+      setDraft('');
+    });
   }
 
   return (
@@ -181,10 +230,10 @@ export function FloatingSalu() {
                 variant="ghost"
                 size="xs"
                 onClick={clearChat}
-                disabled={pending}
+                disabled={pending || clearing}
                 className="shrink-0 text-muted-foreground"
               >
-                Limpiar
+                {clearing ? 'Limpiando…' : 'Limpiar'}
               </Button>
             )}
             <Button
@@ -200,7 +249,14 @@ export function FloatingSalu() {
           </SheetHeader>
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4" aria-live="polite">
-            {entries.length === 0 ? (
+            {hydrating && entries.length === 0 ? (
+              <div className="flex h-full items-center justify-center">
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
+                  <span className="text-xs">Levantando la conversación…</span>
+                </div>
+              </div>
+            ) : entries.length === 0 ? (
               <div className="flex flex-col gap-3">
                 <Card className="flex flex-col items-start gap-2 bg-primary/5 p-3">
                   <p className="font-medium text-foreground text-sm leading-snug">

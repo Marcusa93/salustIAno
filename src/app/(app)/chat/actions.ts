@@ -538,8 +538,12 @@ const CHAT_HISTORY_LIMIT = 50;
  * Persiste un par user→assistant en chat_messages. Best-effort: si falla
  * la insert, no bloqueamos la respuesta del chat — el user ya vio el
  * reply. Lo loggeamos para que se note si pasa seguido.
+ *
+ * Exportada para que el FloatingSalu (que comparte tabla con /chat) la
+ * pueda reusar. La timeline es UNA por usuario, sin importar dónde se
+ * escribió el mensaje.
  */
-async function persistMessages(
+export async function persistMessages(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   familyGroupId: string,
