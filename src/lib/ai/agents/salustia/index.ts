@@ -17,8 +17,10 @@ export { proposalSchema, summarizeProposal } from './proposals';
 
 const AGENT_NAME = 'salustia';
 const MODEL = 'anthropic/claude-haiku-4-5';
-// v3: inyectamos perfil del bebé + memorias persistentes al system prompt.
-const PROMPT_VERSION = 'salustia-v3';
+// v4: agregamos search_chat_history para que el agente busque en su
+// propia conversación pasada cuando la familia pregunta "¿qué te dije
+// sobre…?". v3 ya inyectaba perfil del bebé + memorias persistentes.
+const PROMPT_VERSION = 'salustia-v4';
 const MAX_ITERATIONS = 5;
 // Cota de inyección: si la familia acumula 200 memorias, no las metemos
 // todas en cada turno. Cortamos por cantidad y por chars.

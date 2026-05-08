@@ -107,6 +107,29 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'search_chat_history',
+      description:
+        'Busca en el historial de chat del usuario actual (los mensajes propios y tus respuestas) por una palabra clave. Útil cuando la familia te pregunta "¿qué te dije la otra vez sobre X?", "¿cuándo hablamos de Y?" o quiere recordar algo que ya conversaron. Devuelve los matches más recientes con role + content + fecha. La búsqueda es por substring (ILIKE) — no por significado: si el usuario buscó "fiebre" no va a encontrar "temperatura". Si no encuentra nada, sugerí buscar con sinónimos.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description:
+              'Texto a buscar dentro del contenido del mensaje. Mínimo 2 caracteres. Ejemplos: "obra social", "vómito", "dosis", "Belén".',
+          },
+          limit: {
+            type: 'integer',
+            description: 'Máximo número de resultados. Default 8, máximo 20.',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  },
   // ===== Tools de PROPUESTA — no escriben, solo proponen para confirmación =====
   {
     type: 'function',
@@ -480,6 +503,43 @@ function proposeHandlerFor(
   };
 }
 
+interface SearchChatHistoryArgs {
+  query?: string;
+  limit?: number;
+}
+
+const searchChatHistory: ToolHandler = async (rawArgs, ctx) => {
+  const args = (rawArgs ?? {}) as SearchChatHistoryArgs;
+  const query = (args.query ?? '').trim();
+  if (query.length < 2) {
+    return jsonError('query debe tener al menos 2 caracteres.');
+  }
+  const limit = Math.min(Math.max(args.limit ?? 8, 1), 20);
+
+  // Escape de wildcards LIKE para que el user no rompa la búsqueda con
+  // caracteres especiales. Los reemplazamos por espacio (búsqueda más
+  // laxa pero predecible).
+  const safeQuery = query.replace(/[%_]/g, ' ');
+
+  // RLS de chat_messages limita a auth.uid() — no necesitamos filtrar
+  // por user en el WHERE, pero lo hacemos defensa en profundidad.
+  // biome-ignore lint/suspicious/noExplicitAny: types stale para chat_messages (mismo patrón que persistMessages).
+  const sb = ctx.supabase as any;
+  const { data, error } = await sb
+    .from('chat_messages')
+    .select('role, content, created_at')
+    .eq('user_id', ctx.userId)
+    .is('deleted_at', null)
+    .ilike('content', `%${safeQuery}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) return jsonError(error.message);
+
+  const matches = (data ?? []) as Array<{ role: string; content: string; created_at: string }>;
+  return jsonOk({ query, count: matches.length, matches });
+};
+
 const recallMemories: ToolHandler = async (_args, ctx) => {
   const { data: userData } = await ctx.supabase.auth.getUser();
   if (!userData.user) return jsonError('Sesión inválida.');
@@ -528,4 +588,5 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   propose_milestone: proposeHandlerFor('milestone'),
   propose_memory: proposeHandlerFor('memory'),
   recall_memories: recallMemories,
+  search_chat_history: searchChatHistory,
 };

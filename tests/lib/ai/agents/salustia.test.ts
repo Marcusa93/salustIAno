@@ -5,8 +5,8 @@ import { TOOL_DEFINITIONS, TOOL_HANDLERS } from '@/lib/ai/agents/salustia/tools'
 describe('SalustIA tool definitions', () => {
   it('exporta read tools + propose tools', () => {
     const names = TOOL_DEFINITIONS.map((t) => t.function.name);
-    // 6 read (incluye recall_memories) + 6 propose (incluye propose_memory) = 12
-    expect(TOOL_DEFINITIONS).toHaveLength(12);
+    // 7 read (recall_memories + search_chat_history) + 6 propose = 13
+    expect(TOOL_DEFINITIONS).toHaveLength(13);
     expect(names).toEqual(
       expect.arrayContaining([
         'get_today_summary',
@@ -15,6 +15,7 @@ describe('SalustIA tool definitions', () => {
         'search_care_guides',
         'list_pending_milestones',
         'recall_memories',
+        'search_chat_history',
         'propose_feeding',
         'propose_sleep',
         'propose_diaper',
@@ -86,6 +87,122 @@ describe('SalustIA tool handlers — error paths', () => {
     const result = await TOOL_HANDLERS.list_recent_events?.({}, noChildCtx);
     const parsed = JSON.parse(result as string);
     expect(parsed.ok).toBe(false);
+  });
+
+  it('search_chat_history rechaza query corta (< 2 chars)', async () => {
+    const result = await TOOL_HANDLERS.search_chat_history?.({ query: 'a' }, noChildCtx);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toMatch(/2 caracteres/);
+  });
+
+  it('search_chat_history rechaza query vacía', async () => {
+    const result = await TOOL_HANDLERS.search_chat_history?.({ query: '   ' }, noChildCtx);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('search_chat_history rechaza si no se pasa query', async () => {
+    const result = await TOOL_HANDLERS.search_chat_history?.({}, noChildCtx);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('search_chat_history acepta query válida y delega a supabase', async () => {
+    // Stub mínimo de la cadena .from().select().eq().is().ilike().order().limit()
+    const calls: { method: string; args: unknown[] }[] = [];
+    const chain = {
+      select: (...args: unknown[]) => {
+        calls.push({ method: 'select', args });
+        return chain;
+      },
+      eq: (...args: unknown[]) => {
+        calls.push({ method: 'eq', args });
+        return chain;
+      },
+      is: (...args: unknown[]) => {
+        calls.push({ method: 'is', args });
+        return chain;
+      },
+      ilike: (...args: unknown[]) => {
+        calls.push({ method: 'ilike', args });
+        return chain;
+      },
+      order: (...args: unknown[]) => {
+        calls.push({ method: 'order', args });
+        return chain;
+      },
+      limit: async (...args: unknown[]) => {
+        calls.push({ method: 'limit', args });
+        return {
+          data: [{ role: 'user', content: 'qué obra social tengo', created_at: '2026-05-01' }],
+          error: null,
+        };
+      },
+    };
+    const supabase = {
+      from: (table: string) => {
+        calls.push({ method: 'from', args: [table] });
+        return chain;
+      },
+    } as never;
+    const ctx = { supabase, userId: 'user-1', childId: 'child-1', proposals: [] };
+
+    const result = await TOOL_HANDLERS.search_chat_history?.(
+      { query: 'obra social', limit: 5 },
+      ctx,
+    );
+    const parsed = JSON.parse(result as string);
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.data.count).toBe(1);
+    expect(parsed.data.matches[0].content).toMatch(/obra social/);
+    // Verificamos que la query usó la tabla y filtró por user.
+    expect(calls.some((c) => c.method === 'from' && c.args[0] === 'chat_messages')).toBe(true);
+    expect(
+      calls.some((c) => c.method === 'eq' && c.args[0] === 'user_id' && c.args[1] === 'user-1'),
+    ).toBe(true);
+    expect(calls.some((c) => c.method === 'ilike')).toBe(true);
+  });
+
+  it('search_chat_history escapa wildcards LIKE en la query', async () => {
+    let ilikeArg: string | null = null;
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      is: () => chain,
+      ilike: (_col: string, pattern: string) => {
+        ilikeArg = pattern;
+        return chain;
+      },
+      order: () => chain,
+      limit: async () => ({ data: [], error: null }),
+    };
+    const supabase = { from: () => chain } as never;
+    const ctx = { supabase, userId: 'user-1', childId: null, proposals: [] };
+
+    await TOOL_HANDLERS.search_chat_history?.({ query: '50%_off' }, ctx);
+    expect(ilikeArg).toBe('%50  off%');
+  });
+
+  it('search_chat_history clampa limit a 20', async () => {
+    let limitArg: number | null = null;
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      is: () => chain,
+      ilike: () => chain,
+      order: () => chain,
+      limit: async (n: number) => {
+        limitArg = n;
+        return { data: [], error: null };
+      },
+    };
+    const supabase = { from: () => chain } as never;
+    const ctx = { supabase, userId: 'user-1', childId: null, proposals: [] };
+
+    await TOOL_HANDLERS.search_chat_history?.({ query: 'algo', limit: 100 }, ctx);
+    expect(limitArg).toBe(20);
   });
 });
 
