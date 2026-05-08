@@ -1,7 +1,15 @@
 import { PageHeader } from '@/components/salu/page-header';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { BookHeart, CalendarClock, Camera, ClipboardCheck, Ruler, Sparkles } from 'lucide-react';
+import {
+  BookHeart,
+  CalendarClock,
+  Camera,
+  ClipboardCheck,
+  Moon,
+  Ruler,
+  Sparkles,
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -31,6 +39,13 @@ const OPTIONS: CuidarOption[] = [
     title: 'Calendario de controles',
     description: 'Pesquisa neonatal, ecografías, vacunas. Lo que viene y lo que ya hicieron.',
     Icon: CalendarClock,
+  },
+  {
+    href: '/cuidar/sueno',
+    title: 'Sueño',
+    description:
+      'Cómo viene el descanso de las últimas 24 h, ventana de vigilia sugerida y guía de sueño seguro.',
+    Icon: Moon,
   },
   {
     href: '/cuidar/mediciones',

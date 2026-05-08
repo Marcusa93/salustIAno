@@ -19,10 +19,12 @@ import {
 import { ProposalCard } from './proposal-card';
 
 const SUGGESTIONS = [
+  'Anotá una toma de pecho izquierdo, 15 minutos, hace una hora',
+  'Anotá un pañal mojado hace 10 minutos',
+  'Anotá una siesta que empezó hace 30 minutos',
   '¿Cómo va el día?',
-  '¿Cuándo es el próximo control?',
-  'Anotá una toma de pecho hace 1 hora',
   'Mostrame las últimas tomas',
+  '¿Cuándo es el próximo control?',
 ];
 
 /**

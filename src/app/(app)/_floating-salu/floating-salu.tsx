@@ -26,9 +26,10 @@ type ChatEntry =
   | { role: 'assistant'; content: string; proposals: Proposal[] };
 
 const SUGGESTIONS = [
-  'Anotá que tomé teta hace una hora',
+  'Acabo de tomar teta del lado izquierdo, 15 minutos',
+  'Hice pis hace 5 minutos',
+  'Me dormí hace media hora — siesta',
   '¿Cómo viene mi día?',
-  'Anotá un pañal',
   '¿Cuándo es mi próximo control?',
 ];
 
