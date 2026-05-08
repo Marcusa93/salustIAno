@@ -1,3 +1,5 @@
+import { EmptyState } from '@/components/salu/empty-state';
+import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
@@ -64,22 +66,14 @@ export default async function MeasurementsListPage() {
 
   if (!child) {
     return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-        <header className="flex flex-col gap-2">
-          <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
-            Mediciones
-          </h1>
-        </header>
-        <Card className="flex flex-col items-center gap-4 p-10 text-center">
-          <Ruler className="size-10 text-muted-foreground" aria-hidden />
-          <p className="text-muted-foreground text-sm">
-            Creá el perfil del bebé para empezar a cargar mediciones.
-          </p>
-          <Button render={<Link href="/familia/bebe/nuevo" />}>
-            <Plus className="size-4" aria-hidden />
-            Crear perfil
-          </Button>
-        </Card>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
+        <PageHeader eyebrow="Cuidar" title="Mediciones." />
+        <EmptyState
+          icon={Ruler}
+          title="Creá el perfil del bebé."
+          description="Para empezar a cargar mediciones necesitamos primero el perfil."
+          action={{ label: 'Crear perfil', href: '/familia/bebe/nuevo' as Route }}
+        />
       </div>
     );
   }
@@ -98,52 +92,40 @@ export default async function MeasurementsListPage() {
   const head = pickLatest(rows, 'head_circumference_cm');
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-3">
-        <Button render={<Link href="/cuidar" />} variant="ghost" size="sm" className="self-start">
-          <ChevronLeft className="size-4" aria-hidden />
-          Volver
-        </Button>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex flex-col gap-2">
-            <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
-              Cuidar · Mediciones
-            </span>
-            <h1 className="font-display text-[clamp(2rem,5vw,3rem)] text-foreground leading-[1.05] tracking-tight">
-              Cómo va creciendo
-            </h1>
-            <p className="max-w-prose text-muted-foreground">
-              Lo que te entregan en cada control. Vas a ver cómo crece {child.name} con el tiempo.
-            </p>
-          </div>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
+      <Button
+        render={<Link href={'/cuidar' as Route} />}
+        variant="ghost"
+        size="sm"
+        className="-mb-2 self-start text-muted-foreground"
+      >
+        <ChevronLeft className="size-4" aria-hidden />
+        Cuidar
+      </Button>
+
+      <PageHeader
+        eyebrow="Cuidar"
+        title="Cómo va creciendo."
+        description={`Lo que te entregan en cada control. Vas a ver cómo crece ${child.name} con el tiempo.`}
+        action={
           <Button render={<Link href="/cuidar/mediciones/nueva" />} size="sm">
             <Plus className="size-4" aria-hidden />
             Cargar medición
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       {error ? (
         <Card className="border-destructive/30 bg-destructive/5 p-4 text-destructive text-sm">
           No pudimos cargar las mediciones.
         </Card>
       ) : rows.length === 0 ? (
-        <Card className="flex flex-col items-center gap-4 p-10 text-center">
-          <div className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Ruler className="size-6" aria-hidden />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <h2 className="font-medium text-foreground text-lg">Todavía no cargaste mediciones.</h2>
-            <p className="max-w-md text-muted-foreground text-sm">
-              Después de cada control, cargá lo que te dijo la pediatra. Vas a poder ver la
-              evolución a lo largo del tiempo.
-            </p>
-          </div>
-          <Button render={<Link href="/cuidar/mediciones/nueva" />}>
-            <Plus className="size-4" aria-hidden />
-            Cargar la primera
-          </Button>
-        </Card>
+        <EmptyState
+          icon={Ruler}
+          title="Todavía no cargaste mediciones."
+          description="Después de cada control, cargá lo que te dijo la pediatra. Vas a poder ver la evolución a lo largo del tiempo."
+          action={{ label: 'Cargar la primera', href: '/cuidar/mediciones/nueva' as Route }}
+        />
       ) : (
         <>
           {/* Gráfico de evolución */}
@@ -183,28 +165,32 @@ export default async function MeasurementsListPage() {
 
           {/* Lista completa */}
           <section className="flex flex-col gap-3">
-            <h2 className="font-semibold text-foreground text-sm">Histórico</h2>
-            <ul className="flex flex-col gap-3">
+            <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+              Histórico
+            </h2>
+            <ul className="flex flex-col gap-2">
               {rows.map((m) => (
                 <li key={m.id}>
                   <Link
                     href={`/cuidar/mediciones/${m.id}` as Route}
-                    className="block rounded-lg outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+                    className="block rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   >
-                    <Card className="flex flex-col gap-2 p-4 transition-all hover:-translate-y-0.5 hover:shadow-md">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="font-medium text-foreground">
-                          {formatDate(m.measured_at)}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-sm">
+                    <Card className="flex flex-col gap-1.5 border-border/60 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md hover:shadow-primary/5">
+                      <span className="font-medium text-foreground text-sm">
+                        {formatDate(m.measured_at)}
+                      </span>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
                         {m.weight_grams !== null && <span>Peso: {fmtWeight(m.weight_grams)}</span>}
                         {m.height_cm !== null && <span>Talla: {fmtCm(m.height_cm)}</span>}
                         {m.head_circumference_cm !== null && (
                           <span>Cabeza: {fmtCm(m.head_circumference_cm)}</span>
                         )}
                       </div>
-                      {m.notes && <p className="text-muted-foreground text-xs italic">{m.notes}</p>}
+                      {m.notes && (
+                        <p className="line-clamp-2 text-muted-foreground/80 text-xs italic">
+                          {m.notes}
+                        </p>
+                      )}
                     </Card>
                   </Link>
                 </li>
@@ -232,11 +218,13 @@ function SummaryCard({
 }) {
   const delta = latest !== null && previous !== null ? latest - previous : null;
   return (
-    <Card className="flex flex-col gap-1 p-4">
-      <span className="text-muted-foreground text-xs uppercase tracking-wider">{label}</span>
-      <span className="font-display text-2xl text-foreground">{format(latest)}</span>
+    <Card className="flex flex-col gap-1 border-border/60 bg-gradient-to-b from-card to-muted/15 p-4">
+      <span className="font-medium text-[10.5px] text-muted-foreground uppercase tracking-[0.18em]">
+        {label}
+      </span>
+      <span className="font-display text-2xl text-foreground tracking-tight">{format(latest)}</span>
       {delta !== null && (
-        <span className={`text-xs ${delta >= 0 ? 'text-primary' : 'text-destructive'}`}>
+        <span className={`font-medium text-xs ${delta >= 0 ? 'text-primary' : 'text-destructive'}`}>
           {delta > 0 ? '+' : ''}
           {format(delta)} vs. anterior
         </span>
