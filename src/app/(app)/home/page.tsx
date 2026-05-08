@@ -1,46 +1,22 @@
-import { AnimatedCount } from '@/components/salu/animated-count';
 import { CradleIllustration } from '@/components/salu/illustrations/cradle';
 import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timeline-empty';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { greetingFor } from '@/lib/greeting';
 import { createClient } from '@/lib/supabase/server';
-import { cn } from '@/lib/utils';
-import { chronologicalAgeDays } from '@/lib/validators/child-profile';
-import {
-  BREAST_SIDE_LABELS,
-  type BreastSide,
-  DIAPER_TYPE_LABELS,
-  type DiaperPhotoAnalysis,
-  type DiaperType,
-  FEEDING_TYPE_LABELS,
-  type FeedingReaction,
-  type FeedingType,
-  SLEEP_QUALITY_LABELS,
-  type SleepQuality,
-} from '@/lib/validators/events';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
-import {
-  AlertTriangle,
-  Baby,
-  BookHeart,
-  Camera,
-  Milk,
-  Moon,
-  Pencil,
-  Plus,
-  Sparkles,
-  Sun,
-} from 'lucide-react';
+import { Baby, BookHeart, Milk, Moon, Plus, Sparkles } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
-import { EditDiaperSheet } from '../cuidar/eventos/_components/edit-diaper-sheet';
-import { EditFeedingSheet } from '../cuidar/eventos/_components/edit-feeding-sheet';
-import { EditSleepSheet } from '../cuidar/eventos/_components/edit-sleep-sheet';
 import { CloseSleepSheet } from './_components/close-sleep-sheet';
 import { DailySummaryCard } from './_components/daily-summary-card';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
 import { FamilyActivityCard } from './_components/family-activity-card';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
+import { HomeHero } from './_components/home-hero';
+import { LastEventsStrip } from './_components/last-events-strip';
+import { QuickActionTile } from './_components/quick-action-tile';
+import { RecentEventsGrouped, type RecentTimelineRow } from './_components/recent-events-grouped';
 import { SleepQuickAdd } from './_components/sleep-quick-add';
 import { UpcomingControlsCard } from './_components/upcoming-controls-card';
 import { getTodayActivityByMemberAction } from './family-activity-actions';
@@ -48,63 +24,6 @@ import { getTodayActivityByMemberAction } from './family-activity-actions';
 export const metadata: Metadata = {
   title: 'Casa',
 };
-
-interface TimelineRow {
-  event_type: 'feeding' | 'sleep' | 'diaper' | 'measurement' | 'note' | 'media';
-  id: string;
-  child_id: string;
-  occurred_at: string;
-  payload: Record<string, unknown>;
-  created_at: string;
-}
-
-function formatRelativeTime(iso: string, now: Date = new Date()): string {
-  const then = new Date(iso).getTime();
-  const diffMs = now.getTime() - then;
-  const minutes = Math.round(diffMs / 60000);
-  if (Math.abs(minutes) < 1) return 'Recién';
-  if (Math.abs(minutes) < 60)
-    return minutes >= 0 ? `Hace ${minutes} min` : `En ${Math.abs(minutes)} min`;
-  const hours = Math.round(minutes / 60);
-  if (Math.abs(hours) < 24) return hours >= 0 ? `Hace ${hours} h` : `En ${Math.abs(hours)} h`;
-  const days = Math.round(hours / 24);
-  return days >= 0 ? `Hace ${days} día${days === 1 ? '' : 's'}` : 'Mañana';
-}
-
-function capitalize(s: string): string {
-  return s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-}
-
-function formatAge(days: number | null): string {
-  if (days === null) return '—';
-  if (days < 0)
-    return `Falta${days < -1 ? 'n' : ''} ${Math.abs(days)} día${Math.abs(days) === 1 ? '' : 's'}`;
-  if (days < 7) return `${days} día${days === 1 ? '' : 's'}`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 8) return `${weeks} semana${weeks === 1 ? '' : 's'}`;
-  const months = Math.floor(days / 30);
-  if (months < 24) return `${months} mes${months === 1 ? '' : 'es'}`;
-  return `${Math.floor(days / 365)} años`;
-}
-
-const QUICK_BUTTON_CLS =
-  'group/qb relative flex h-auto flex-col items-center justify-center gap-2 rounded-2xl border border-border/60 bg-gradient-to-br from-card to-card/40 p-5 text-foreground shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 active:translate-y-0 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
-
-function quickButtonContent(Icon: typeof Milk, label: string, todayCount?: number) {
-  return (
-    <span className={QUICK_BUTTON_CLS}>
-      <span className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover/qb:scale-110 group-hover/qb:bg-primary/15">
-        <Icon className="size-5" aria-hidden />
-      </span>
-      <span className="font-medium text-sm">{label}</span>
-      {todayCount !== undefined && todayCount > 0 && (
-        <span className="text-[10px] font-medium text-muted-foreground tracking-wide">
-          {todayCount} hoy
-        </span>
-      )}
-    </span>
-  );
-}
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -129,13 +48,15 @@ export default async function HomePage() {
     displayName = membership?.display_name ?? null;
   }
 
-  // Si no hay perfil del bebé, mostramos un onboarding suave.
+  // Sin perfil del bebé: onboarding suave (sin hero ni stats).
   if (!child) {
+    const greeting = greetingFor();
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
         <header className="flex flex-col gap-2">
           <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
-            Hola{displayName ? `, ${displayName}` : ''}.
+            {greeting}
+            {displayName ? `, ${displayName}` : ''}.
           </h1>
           <p className="text-base text-muted-foreground sm:text-lg">
             Acá te esperamos cuando creemos el perfil.
@@ -163,11 +84,9 @@ export default async function HomePage() {
     );
   }
 
-  // Eventos de hoy + recientes.
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  // Próximos controles: vencidos o que caen en los próximos 14 días.
   const upcomingHorizon = new Date();
   upcomingHorizon.setDate(upcomingHorizon.getDate() + 14);
 
@@ -175,13 +94,16 @@ export default async function HomePage() {
     { data: recentEvents },
     { data: todayEvents },
     { data: activeSleeps },
+    { data: lastClosedSleep },
+    { data: lastFeeding },
+    { data: lastDiaper },
     todayActivity,
     { data: upcomingMilestones },
   ] = await Promise.all([
     supabase.rpc('get_timeline', {
       p_child_id: child.id,
       p_event_types: ['feeding', 'sleep', 'diaper'],
-      p_limit: 8,
+      p_limit: 12,
       p_offset: 0,
     }),
     supabase.rpc('get_timeline', {
@@ -199,6 +121,31 @@ export default async function HomePage() {
       .is('deleted_at', null)
       .order('started_at', { ascending: false })
       .limit(1),
+    supabase
+      .from('sleep_sessions')
+      .select('ended_at')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .not('ended_at', 'is', null)
+      .order('ended_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('feeding_events')
+      .select('occurred_at')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .order('occurred_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('diaper_events')
+      .select('occurred_at')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .order('occurred_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     getTodayActivityByMemberAction(),
     supabase
       .from('medical_milestones')
@@ -210,13 +157,16 @@ export default async function HomePage() {
       .limit(3),
   ]);
 
-  const recents = (recentEvents ?? []) as TimelineRow[];
-  const today = (todayEvents ?? []) as TimelineRow[];
+  const recents = (recentEvents ?? []) as RecentTimelineRow[];
+  const today = (todayEvents ?? []) as RecentTimelineRow[];
   const activeSleep = (activeSleeps?.[0] ?? null) as {
     id: string;
     started_at: string;
     is_nap: boolean;
   } | null;
+  const lastClosedSleepAt = (lastClosedSleep?.ended_at as string | null | undefined) ?? null;
+  const lastFeedingAt = (lastFeeding?.occurred_at as string | null | undefined) ?? null;
+  const lastDiaperAt = (lastDiaper?.occurred_at as string | null | undefined) ?? null;
 
   const todaySummary = {
     feeding: today.filter((e) => e.event_type === 'feeding').length,
@@ -224,76 +174,71 @@ export default async function HomePage() {
     diaper: today.filter((e) => e.event_type === 'diaper').length,
   };
 
-  const ageDays = chronologicalAgeDays(child.birth_date);
-  const todayLabel = capitalize(
-    new Date().toLocaleDateString('es-AR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-    }),
-  );
-
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
-      <header className="animate-stagger-up flex flex-col gap-2" style={{ animationDelay: '0ms' }}>
-        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
-          {todayLabel}
-        </span>
-        <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
-          Hola{displayName ? `, ${displayName}` : ''}.
-        </h1>
-        <p className="max-w-md text-base text-muted-foreground sm:text-lg">
-          {child.birth_date
-            ? `${child.name}, ${formatAge(ageDays)}.`
-            : `Esperando a ${child.name}.`}
-        </p>
-      </header>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
+      {/* ZONA 1 — HERO: estado vivo del bebé. */}
+      <HomeHero
+        displayName={displayName}
+        childName={child.name}
+        birthDate={child.birth_date}
+        active={activeSleep}
+        lastWokeUpAt={lastClosedSleepAt}
+        awakeCta={
+          <SleepQuickAdd
+            trigger={
+              <Button type="button" size="default" variant="outline" className="shrink-0">
+                <Moon className="size-4" aria-hidden />
+                Anotar siesta
+              </Button>
+            }
+          />
+        }
+      />
 
       {/* SalustIA */}
       <Link
         href="/chat"
-        className="animate-stagger-up rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-        style={{ animationDelay: '60ms' }}
+        className="animate-stagger-up rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        style={{ animationDelay: '90ms' }}
       >
         <Card className="relative flex items-center gap-4 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-accent/30 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/10">
           <div className="relative flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/10">
             <Sparkles className="size-5 animate-breathe" aria-hidden />
-            {/* Chispitas orbitando — guiño SalustIA está viva */}
             <span
               aria-hidden
               className="absolute inset-0 origin-center"
               style={{ animation: 'salu-orbit 9s linear infinite' }}
             >
-              <span className="absolute top-0 left-1/2 size-1 -translate-x-1/2 -translate-y-1 rounded-full bg-primary/60" />
+              <span className="-translate-x-1/2 -translate-y-1 absolute top-0 left-1/2 size-1 rounded-full bg-primary/60" />
             </span>
             <span
               aria-hidden
               className="absolute inset-0 origin-center"
               style={{ animation: 'salu-orbit 7s linear infinite reverse', animationDelay: '-2s' }}
             >
-              <span className="absolute top-1/2 left-0 size-1 -translate-x-1 -translate-y-1/2 rounded-full bg-accent-foreground/40" />
+              <span className="-translate-x-1 -translate-y-1/2 absolute top-1/2 left-0 size-1 rounded-full bg-accent-foreground/40" />
             </span>
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="font-medium text-foreground">Preguntale a SalustIA</span>
             <span className="text-muted-foreground text-sm">
-              Cómo va el día, qué controles vienen, qué dijo la pediatra.
+              Anotá una toma, un pañal o un sueño con tu voz, o preguntale cómo viene el día.
             </span>
           </div>
         </Card>
       </Link>
 
       {/* Resumen del día con IA */}
-      <div className="animate-stagger-up" style={{ animationDelay: '90ms' }}>
+      <div className="animate-stagger-up" style={{ animationDelay: '120ms' }}>
         <DailySummaryCard
           childId={child.id as string}
           todayEventCount={todaySummary.feeding + todaySummary.sleep + todaySummary.diaper}
         />
       </div>
 
-      {/* Próximos controles (vencidos + 14 días). Si no hay nada, no se renderiza. */}
+      {/* Próximos controles (vencidos + 14 días) */}
       {upcomingMilestones && upcomingMilestones.length > 0 && (
-        <div className="animate-stagger-up" style={{ animationDelay: '105ms' }}>
+        <div className="animate-stagger-up" style={{ animationDelay: '135ms' }}>
           <UpcomingControlsCard
             rows={(upcomingMilestones as Array<Record<string, unknown>>).map((m) => ({
               id: m.id as string,
@@ -306,97 +251,82 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* Está durmiendo */}
-      {activeSleep && (
-        <Card
-          className="animate-stagger-up flex items-center gap-4 border-primary/30 bg-primary/5 p-4"
-          style={{ animationDelay: '120ms' }}
-        >
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-            <Moon className="size-5" aria-hidden />
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="font-medium text-foreground">
-              {activeSleep.is_nap ? 'Está en la siesta' : 'Está durmiendo'}
-            </span>
-            <span className="text-muted-foreground text-xs">
-              Desde {formatRelativeTime(activeSleep.started_at).toLowerCase()}.
-            </span>
-          </div>
-          <CloseSleepSheet
-            sessionId={activeSleep.id}
-            startedAt={activeSleep.started_at}
-            trigger={
-              <Button type="button" size="sm" variant="outline">
-                <Sun className="size-4" aria-hidden />
-                Se despertó
-              </Button>
-            }
-          />
-        </Card>
-      )}
+      {/* ZONA 2 — ACCIÓN: tira de últimas + carga rápida. */}
+      <LastEventsStrip
+        lastFeedingAt={lastFeedingAt}
+        lastDiaperAt={lastDiaperAt}
+        lastSleepClosedAt={activeSleep ? activeSleep.started_at : lastClosedSleepAt}
+        todayCounts={todaySummary}
+      />
 
-      {/* Quick add */}
       <section
         className="animate-stagger-up flex flex-col gap-3"
-        style={{ animationDelay: '180ms' }}
+        style={{ animationDelay: '210ms' }}
       >
-        <h2 className="font-semibold text-foreground text-sm">Anotar</h2>
+        <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+          Anotar en dos toques
+        </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <FeedingQuickAdd
             trigger={
-              <button type="button">
-                {quickButtonContent(Milk, 'Tomó', todaySummary.feeding)}
+              <button type="button" className="contents">
+                <QuickActionTile
+                  Icon={Milk}
+                  label="Tomó"
+                  lastAt={lastFeedingAt}
+                  todayCount={todaySummary.feeding}
+                  emphasis="primary"
+                />
               </button>
             }
           />
           <SleepQuickAdd
             trigger={
-              <button type="button">
-                {quickButtonContent(Moon, 'Durmió', todaySummary.sleep)}
+              <button type="button" className="contents">
+                <QuickActionTile
+                  Icon={Moon}
+                  label={activeSleep ? 'Durmiendo' : 'Durmió'}
+                  lastAt={activeSleep ? null : lastClosedSleepAt}
+                  todayCount={todaySummary.sleep}
+                  microInfoOverride={activeSleep ? 'En curso' : undefined}
+                />
               </button>
             }
           />
           <DiaperQuickAdd
             trigger={
-              <button type="button">
-                {quickButtonContent(Baby, 'Pañal', todaySummary.diaper)}
+              <button type="button" className="contents">
+                <QuickActionTile
+                  Icon={Baby}
+                  label="Pañal"
+                  lastAt={lastDiaperAt}
+                  todayCount={todaySummary.diaper}
+                />
               </button>
             }
           />
           <Link href="/notas/nuevo" className="contents">
-            {quickButtonContent(BookHeart, 'Momento')}
+            <QuickActionTile Icon={BookHeart} label="Momento" />
           </Link>
         </div>
       </section>
 
-      {/* Hoy */}
-      <section
-        className="animate-stagger-up flex flex-col gap-3"
-        style={{ animationDelay: '240ms' }}
-      >
-        <h2 className="font-semibold text-foreground text-sm">Hoy</h2>
-        <div className="grid grid-cols-3 gap-3">
-          <SummaryCard label="Tomas" count={todaySummary.feeding} Icon={Milk} />
-          <SummaryCard label="Sueños" count={todaySummary.sleep} Icon={Moon} />
-          <SummaryCard label="Pañales" count={todaySummary.diaper} Icon={Baby} />
-        </div>
-      </section>
-
-      {/* Actividad por miembro de la familia hoy. Si nadie hizo nada, no se renderiza. */}
+      {/* Actividad por miembro */}
       {todayActivity.length > 0 && (
-        <div className="animate-stagger-up" style={{ animationDelay: '270ms' }}>
+        <div className="animate-stagger-up" style={{ animationDelay: '255ms' }}>
           <FamilyActivityCard activity={todayActivity} />
         </div>
       )}
 
-      {/* Recientes */}
+      {/* ZONA 3 — HISTORIA: recientes agrupados. */}
       <section
-        className="animate-stagger-up flex flex-col gap-3"
-        style={{ animationDelay: '300ms' }}
+        className="animate-stagger-up flex flex-col gap-4"
+        style={{ animationDelay: '285ms' }}
       >
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="font-semibold text-foreground text-sm">Recientes</h2>
+          <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+            Recientes
+          </h2>
           <Link
             href={'/timeline' as Route}
             className="font-medium text-primary text-sm hover:underline"
@@ -404,198 +334,40 @@ export default async function HomePage() {
             Ver todo
           </Link>
         </div>
-        {recents.length === 0 ? (
-          <Card className="flex flex-col items-center gap-3 p-8 text-center">
-            <div className="text-primary">
-              <TimelineEmptyIllustration size={120} />
-            </div>
-            <p className="max-w-xs text-muted-foreground text-sm leading-relaxed">
-              Todavía no hay registros. Anotá la primera toma cuando ocurra.
-            </p>
+        <RecentEventsGrouped
+          rows={recents}
+          emptyState={
+            <Card className="flex flex-col items-center gap-3 p-8 text-center">
+              <div className="text-primary">
+                <TimelineEmptyIllustration size={120} />
+              </div>
+              <p className="max-w-xs text-muted-foreground text-sm leading-relaxed">
+                Todavía no hay registros. Anotá la primera toma cuando ocurra — o decísela a
+                SalustIA y ella la guarda por vos.
+              </p>
+            </Card>
+          }
+        />
+        {/* Si hay sueño activo, lo dejamos visible aunque ya esté el hero arriba —
+            permite cerrar la sesión desde acá sin scrollear. */}
+        {activeSleep && (
+          <Card className="flex items-center gap-3 border-primary/30 bg-primary/5 p-3.5">
+            <Moon className="size-4 shrink-0 text-primary" aria-hidden />
+            <span className="text-muted-foreground text-xs">
+              Hay un sueño en curso. Cuando se despierte, cerralo desde el hero arriba o desde acá.
+            </span>
+            <CloseSleepSheet
+              sessionId={activeSleep.id}
+              startedAt={activeSleep.started_at}
+              trigger={
+                <Button type="button" size="xs" variant="outline" className="ml-auto">
+                  Cerrar
+                </Button>
+              }
+            />
           </Card>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {recents.map((e) => (
-              <li key={`${e.event_type}-${e.id}`}>
-                <EventRow row={e} />
-              </li>
-            ))}
-          </ul>
         )}
       </section>
     </div>
   );
-}
-
-function SummaryCard({
-  label,
-  count,
-  Icon,
-}: {
-  label: string;
-  count: number;
-  Icon: typeof Milk;
-}) {
-  return (
-    <Card className="flex flex-col items-center gap-1.5 border-border/60 bg-gradient-to-b from-card to-muted/20 p-4 shadow-sm">
-      <Icon className="size-5 text-primary/80" aria-hidden />
-      <AnimatedCount
-        value={count}
-        className={cn(
-          'font-display text-3xl tracking-tight transition-colors',
-          count > 0 ? 'text-foreground' : 'text-muted-foreground/40',
-        )}
-      />
-      <span className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
-        {label}
-      </span>
-    </Card>
-  );
-}
-
-function EventRow({ row }: { row: TimelineRow }) {
-  const summary = describeEvent(row);
-  const photoAnalysis =
-    row.event_type === 'diaper' && row.payload.photo_analysis
-      ? (row.payload.photo_analysis as { alarm?: boolean })
-      : null;
-  return (
-    <Card
-      className={cn(
-        'flex items-center gap-3 border-border/60 p-3.5 transition-colors hover:bg-muted/30',
-        photoAnalysis?.alarm && 'border-destructive/40 bg-destructive/5 hover:bg-destructive/10',
-      )}
-    >
-      <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-        {summary.Icon ? <summary.Icon className="size-4" aria-hidden /> : null}
-      </div>
-      <div className="flex flex-col gap-0.5">
-        <span className="flex items-center gap-1.5 font-medium text-foreground text-sm">
-          {summary.title}
-          {photoAnalysis?.alarm ? (
-            <AlertTriangle
-              className="size-3.5 text-destructive"
-              aria-label="Conviene mostrar al pediatra"
-            />
-          ) : photoAnalysis ? (
-            <Camera
-              className="size-3.5 text-muted-foreground"
-              aria-label="Tiene análisis de foto"
-            />
-          ) : null}
-        </span>
-        {summary.detail && <span className="text-muted-foreground text-xs">{summary.detail}</span>}
-      </div>
-      <div className="ml-auto flex flex-col items-end gap-1">
-        <span className="text-muted-foreground text-xs">{formatRelativeTime(row.occurred_at)}</span>
-        <EventRowEditButton row={row} />
-      </div>
-    </Card>
-  );
-}
-
-/**
- * Render del botón "editar" para una fila de Recientes — reusa los Sheets
- * de edición de /timeline. Para measurement/note/media (no editables
- * desde acá), devuelve null.
- */
-function EventRowEditButton({ row }: { row: TimelineRow }) {
-  const trigger = (
-    <Button type="button" size="icon-xs" variant="ghost" aria-label="Editar">
-      <Pencil className="size-3" aria-hidden />
-    </Button>
-  );
-
-  if (row.event_type === 'diaper') {
-    return (
-      <EditDiaperSheet
-        eventId={row.id}
-        initial={{
-          occurred_at: row.occurred_at,
-          type: (row.payload.type as DiaperType) ?? 'wet',
-          notes: (row.payload.notes as string | null | undefined) ?? null,
-          photo_analysis:
-            (row.payload.photo_analysis as DiaperPhotoAnalysis | null | undefined) ?? null,
-        }}
-        trigger={trigger}
-      />
-    );
-  }
-
-  if (row.event_type === 'feeding') {
-    return (
-      <EditFeedingSheet
-        eventId={row.id}
-        initial={{
-          occurred_at: row.occurred_at,
-          type: (row.payload.type as FeedingType) ?? 'breastfeeding',
-          side: (row.payload.side as BreastSide | null | undefined) ?? null,
-          duration_minutes: (row.payload.duration_minutes as number | null | undefined) ?? null,
-          amount_ml: (row.payload.amount_ml as number | null | undefined) ?? null,
-          foods: (row.payload.foods as string[] | null | undefined) ?? null,
-          reaction: (row.payload.reaction as FeedingReaction | undefined) ?? 'none',
-          notes: (row.payload.notes as string | null | undefined) ?? null,
-        }}
-        trigger={trigger}
-      />
-    );
-  }
-
-  if (row.event_type === 'sleep') {
-    return (
-      <EditSleepSheet
-        eventId={row.id}
-        initial={{
-          started_at: (row.payload.started_at as string) ?? row.occurred_at,
-          ended_at: (row.payload.ended_at as string | null | undefined) ?? null,
-          quality: (row.payload.quality as SleepQuality | undefined) ?? 'unknown',
-          is_nap: (row.payload.is_nap as boolean | undefined) ?? false,
-          notes: (row.payload.notes as string | null | undefined) ?? null,
-        }}
-        trigger={trigger}
-      />
-    );
-  }
-
-  return null;
-}
-
-function describeEvent(row: TimelineRow): {
-  Icon: typeof Milk;
-  title: string;
-  detail: string | null;
-} {
-  if (row.event_type === 'feeding') {
-    const type = row.payload.type as FeedingType | undefined;
-    const side = row.payload.side as keyof typeof BREAST_SIDE_LABELS | undefined;
-    const duration = row.payload.duration_minutes as number | null | undefined;
-    const amount = row.payload.amount_ml as number | null | undefined;
-    const parts: string[] = [];
-    if (type === 'breastfeeding' && side) parts.push(BREAST_SIDE_LABELS[side]);
-    if (duration) parts.push(`${duration} min`);
-    if (amount) parts.push(`${amount} ml`);
-    return {
-      Icon: Milk,
-      title: type ? FEEDING_TYPE_LABELS[type] : 'Toma',
-      detail: parts.length > 0 ? parts.join(' · ') : null,
-    };
-  }
-  if (row.event_type === 'sleep') {
-    const quality = row.payload.quality as keyof typeof SLEEP_QUALITY_LABELS | undefined;
-    const isNap = row.payload.is_nap as boolean | undefined;
-    return {
-      Icon: Moon,
-      title: isNap ? 'Siesta' : 'Sueño',
-      detail: quality ? SLEEP_QUALITY_LABELS[quality] : null,
-    };
-  }
-  if (row.event_type === 'diaper') {
-    const type = row.payload.type as DiaperType | undefined;
-    return {
-      Icon: Baby,
-      title: 'Pañal',
-      detail: type ? DIAPER_TYPE_LABELS[type] : null,
-    };
-  }
-  return { Icon: Baby, title: row.event_type, detail: null };
 }

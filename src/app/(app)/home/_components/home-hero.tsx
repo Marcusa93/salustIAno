@@ -1,0 +1,147 @@
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { babyAgeFromBirth, durationLabel } from '@/lib/baby-age';
+import { dateLabel, greetingFor } from '@/lib/greeting';
+import { cn } from '@/lib/utils';
+import { suggestNextSleep } from '@/lib/wake-windows';
+import { Moon, Sun } from 'lucide-react';
+import type { ReactElement } from 'react';
+import { CloseSleepSheet } from './close-sleep-sheet';
+
+interface HomeHeroProps {
+  displayName: string | null;
+  childName: string;
+  birthDate: string | null;
+  active: { id: string; started_at: string; is_nap: boolean } | null;
+  lastWokeUpAt: string | null;
+  /**
+   * Opcional: trigger custom para "Anotar siesta" cuando el bebé está
+   * despierto. La page lo provee porque el SleepQuickAdd es un client
+   * component que vive afuera del Server Component.
+   */
+  awakeCta?: ReactElement;
+}
+
+/**
+ * Hero del /home: saludo + estado vivo del bebé.
+ *
+ * Estructura
+ *   ┌──────────────────────────────────────────┐
+ *   │ Eyebrow (fecha)                          │
+ *   │ Hola, {nombre}.                          │
+ *   │ {childName}, {edad}.                     │
+ *   ├──────────────────────────────────────────┤
+ *   │ [Avatar] {DURMIENDO|DESPIERTO}           │
+ *   │         Detalle (desde / hasta)          │
+ *   │                              [CTA]       │
+ *   └──────────────────────────────────────────┘
+ *
+ * Si el bebé está dormido, muestra "Se despertó" (cierra la sesión).
+ * Si está despierto, sugiere la próxima ventana de sueño cuando hay edad
+ * y un último despertar.
+ */
+export function HomeHero({
+  displayName,
+  childName,
+  birthDate,
+  active,
+  lastWokeUpAt,
+  awakeCta,
+}: HomeHeroProps) {
+  const greeting = greetingFor();
+  const today = dateLabel();
+  const age = babyAgeFromBirth(birthDate);
+  const ageDays = age?.days ?? null;
+  const suggestion = !active && lastWokeUpAt ? suggestNextSleep(ageDays, lastWokeUpAt) : null;
+
+  return (
+    <header className="animate-stagger-up flex flex-col gap-5" style={{ animationDelay: '0ms' }}>
+      <div className="flex flex-col gap-2">
+        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
+          {today}
+        </span>
+        <h1 className="font-display text-[clamp(2.25rem,5vw,3.5rem)] text-foreground leading-[1.05] tracking-tight">
+          {greeting}
+          {displayName ? `, ${displayName}` : ''}.
+        </h1>
+        <p className="max-w-md text-base text-muted-foreground sm:text-lg">
+          {age?.unborn ? `Esperando a ${childName}.` : `${childName}, ${age?.label ?? '—'}.`}
+        </p>
+      </div>
+
+      {/* Estado vivo */}
+      {active ? (
+        <Card
+          className={cn(
+            'relative flex flex-col gap-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/[0.10] via-primary/[0.04] to-card p-5',
+            'sm:flex-row sm:items-center sm:gap-5',
+          )}
+        >
+          {/* Glow sutil */}
+          <span
+            aria-hidden
+            className="-top-12 -left-12 absolute size-40 rounded-full bg-primary/20 blur-3xl"
+          />
+          <div className="relative flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/20">
+            <Moon className="size-6 animate-breathe" aria-hidden />
+          </div>
+          <div className="relative flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="font-medium text-foreground text-lg">
+              {active.is_nap ? 'Está en la siesta' : 'Está durmiendo'}
+            </span>
+            <span className="text-muted-foreground text-sm">
+              Empezó a las {formatTime(active.started_at)} · lleva{' '}
+              <strong className="text-foreground">{durationLabel(active.started_at)}</strong>.
+            </span>
+          </div>
+          <CloseSleepSheet
+            sessionId={active.id}
+            startedAt={active.started_at}
+            trigger={
+              <Button type="button" size="default" className="relative shrink-0">
+                <Sun className="size-4" aria-hidden />
+                Se despertó
+              </Button>
+            }
+          />
+        </Card>
+      ) : (
+        <Card className="relative flex flex-col gap-4 overflow-hidden border-border/60 bg-gradient-to-br from-card via-card to-accent/20 p-5 sm:flex-row sm:items-center sm:gap-5">
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-accent/40 text-accent-foreground ring-1 ring-accent/30">
+            <Sun className="size-6" aria-hidden />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="font-medium text-foreground text-lg">
+              {age?.unborn ? `${childName} está esperando.` : 'Está despierto.'}
+            </span>
+            {!age?.unborn && lastWokeUpAt ? (
+              <span className="text-muted-foreground text-sm">
+                Se despertó {durationLabel(lastWokeUpAt)} (a las {formatTime(lastWokeUpAt)}).
+                {suggestion && (
+                  <>
+                    {' · '}
+                    <span className="font-medium text-foreground">Próximo sueño:</span>{' '}
+                    {formatTime(suggestion.rangeStart.toISOString())}
+                    {' – '}
+                    {formatTime(suggestion.rangeEnd.toISOString())}
+                  </>
+                )}
+              </span>
+            ) : (
+              <span className="text-muted-foreground text-sm">
+                {age?.unborn
+                  ? 'Cuando llegue, este lugar va a contarte cómo durmió, comió y cómo viene su día.'
+                  : 'Sin sueños cerrados todavía. Cuando duerma una siesta, anotala para empezar a ver el ritmo.'}
+              </span>
+            )}
+          </div>
+          {awakeCta}
+        </Card>
+      )}
+    </header>
+  );
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
