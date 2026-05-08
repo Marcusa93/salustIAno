@@ -5,6 +5,7 @@ import {
   type ChatHistoryEntry,
   clearChatHistoryAction,
   loadChatHistoryAction,
+  sendPhotoToChatAction,
 } from '@/app/(app)/chat/actions';
 import { SaluBotAvatar } from '@/components/salu/salu-bot-avatar';
 import { SpeechToTextButton } from '@/components/salu/speech-to-text-button';
@@ -20,14 +21,21 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import type { Proposal } from '@/lib/ai/agents/salustia/proposals';
 import { cn } from '@/lib/utils';
-import { Loader2, Send, X } from 'lucide-react';
+import { ImageIcon, Loader2, Send, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { type KeyboardEvent, useEffect, useRef, useState, useTransition } from 'react';
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 import { toast } from 'sonner';
 import { type ClientMessage, sendBabyMessageAction } from './actions';
 
 type ChatEntry =
-  | { role: 'user'; content: string }
+  | { role: 'user'; content: string; photoUrl?: string }
   | { role: 'assistant'; content: string; proposals: Proposal[] };
 
 const SUGGESTIONS = [
@@ -69,8 +77,10 @@ export function FloatingSalu() {
   const [hydrating, setHydrating] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [clearing, startClearTransition] = useTransition();
+  const [uploadingPhoto, startUploadPhoto] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Hidratación: la primera vez que el user abre el sheet, traemos los
   // últimos N mensajes de chat_messages (mismos que ve /chat). Si vuelve
@@ -147,6 +157,46 @@ export function FloatingSalu() {
       e.preventDefault();
       if (!pending) send(draft);
     }
+  }
+
+  function handlePickPhoto() {
+    photoInputRef.current?.click();
+  }
+
+  function handlePhotoFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (event.target) event.target.value = '';
+    if (!file) return;
+
+    const localPreview = URL.createObjectURL(file);
+    setEntries((prev) => [
+      ...prev,
+      { role: 'user', content: '📷 Subiendo foto…', photoUrl: localPreview },
+    ]);
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    startUploadPhoto(async () => {
+      const result = await sendPhotoToChatAction(formData);
+      if (!result.ok) {
+        toast.error(result.error);
+        setEntries((prev) =>
+          prev.filter((e) => !(e.role === 'user' && e.photoUrl === localPreview)),
+        );
+        URL.revokeObjectURL(localPreview);
+        return;
+      }
+      setEntries((prev) => {
+        const next = prev.map((e) =>
+          e.role === 'user' && e.photoUrl === localPreview
+            ? { ...e, content: '📷 Foto subida', photoUrl: result.photoUrl }
+            : e,
+        );
+        return [...next, { role: 'assistant', content: result.assistantReply, proposals: [] }];
+      });
+      URL.revokeObjectURL(localPreview);
+    });
   }
 
   function clearChat() {
@@ -336,6 +386,27 @@ export function FloatingSalu() {
               className="max-h-32 flex-1 resize-none"
               aria-label="Mensaje para Salu"
             />
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              aria-label="Subir foto al álbum"
+              disabled={pending || uploadingPhoto}
+              onClick={handlePickPhoto}
+            >
+              {uploadingPhoto ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <ImageIcon className="size-4" aria-hidden />
+              )}
+            </Button>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              className="hidden"
+              onChange={handlePhotoFile}
+            />
             <SpeechToTextButton
               disabled={pending}
               onTranscript={(text) => {
@@ -367,16 +438,34 @@ export function FloatingSalu() {
 
 function MessageBubble({ entry }: { entry: ChatEntry }) {
   const isUser = entry.role === 'user';
-  if (!entry.content) return null;
+  const photoUrl = entry.role === 'user' ? entry.photoUrl : null;
+  if (!entry.content && !photoUrl) return null;
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <Card
         className={cn(
-          'max-w-[85%] whitespace-pre-wrap px-3.5 py-2 text-sm leading-relaxed',
+          'flex max-w-[85%] flex-col gap-2 overflow-hidden text-sm leading-relaxed',
           isUser ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground',
+          photoUrl ? 'p-1.5' : 'whitespace-pre-wrap px-3.5 py-2',
         )}
       >
-        {entry.content}
+        {photoUrl && (
+          <img
+            src={photoUrl}
+            alt="Foto subida al álbum"
+            className="max-h-72 w-full rounded-md object-cover"
+          />
+        )}
+        {entry.content && (
+          <span
+            className={cn(
+              'whitespace-pre-wrap',
+              photoUrl ? 'px-2 pb-1.5 text-xs leading-snug' : '',
+            )}
+          >
+            {entry.content}
+          </span>
+        )}
       </Card>
     </div>
   );

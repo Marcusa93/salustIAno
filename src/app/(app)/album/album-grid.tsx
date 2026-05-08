@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import {
   Check,
   Copy,
+  ExternalLink,
   FolderOpen,
   ImageIcon,
   Link2,
@@ -421,17 +422,31 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
       )}
 
       {photos.length === 0 ? (
-        <Card className="flex flex-col items-center gap-4 p-12 text-center">
-          <div className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
-            <ImageIcon className="size-7" aria-hidden />
+        <Card className="flex flex-col items-center gap-5 border-primary/15 bg-gradient-to-br from-primary/[0.06] via-card to-card p-10 text-center sm:p-12">
+          <div className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15">
+            <ImageIcon className="size-8" aria-hidden />
           </div>
-          <p className="max-w-sm text-muted-foreground leading-relaxed">
-            Todavía no hay fotos. Subí las primeras y se van a agrupar automáticamente por mes.
-          </p>
-          <Button type="button" onClick={handlePickFiles} disabled={uploading}>
+          <div className="flex max-w-md flex-col gap-2">
+            <h3 className="font-display text-foreground text-xl tracking-tight">
+              Empezá el álbum de Salu.
+            </h3>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Subí varias fotos a la vez. Se agrupan automáticamente por mes ("Mayo 2026", "Junio
+              2026"…). Si querés un álbum propio para un hito (cumpleaños, viaje), lo creás con
+              "Nuevo álbum".
+            </p>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Cualquier álbum se puede compartir con la familia que no usa la app: te genera un link
+              público (sin login) que mandás por WhatsApp.
+            </p>
+          </div>
+          <Button type="button" size="lg" onClick={handlePickFiles} disabled={uploading}>
             <Upload className="size-4" aria-hidden />
-            Subir fotos
+            Subir las primeras fotos
           </Button>
+          <p className="text-muted-foreground/80 text-xs">
+            También podés mandarle una foto al chat de SalustIA y queda guardada acá.
+          </p>
         </Card>
       ) : filteredPhotos.length === 0 ? (
         <Card className="flex flex-col items-center gap-3 p-10 text-center">
@@ -567,72 +582,91 @@ function AlbumShareBar({
 
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
+  const sharedSinceLabel = album.sharedAt
+    ? new Date(album.sharedAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
+    : null;
+
   return (
-    <Card className="flex flex-col gap-3 border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center">
-      {isShared ? (
-        <>
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="font-medium text-foreground text-sm">{album.name}</span>
-            <span className="truncate text-muted-foreground text-xs">{fullUrl}</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5 sm:flex-nowrap">
-            {canNativeShare && (
+    <Card className="flex flex-col gap-3 border-primary/25 bg-gradient-to-br from-primary/[0.06] to-card p-4 sm:flex-row sm:items-start sm:gap-4">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/15">
+        {isShared ? (
+          <Link2 className="size-5" aria-hidden />
+        ) : (
+          <Share2 className="size-5" aria-hidden />
+        )}
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        {isShared ? (
+          <>
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium text-foreground text-sm">
+                "{album.name}" — link activo
+                {sharedSinceLabel ? ` desde el ${sharedSinceLabel}` : ''}
+              </span>
+              <span className="line-clamp-1 break-all text-muted-foreground text-xs">
+                {fullUrl}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {canNativeShare && (
+                <Button type="button" size="sm" variant="default" onClick={handleNativeShare}>
+                  <Share2 className="size-4" aria-hidden />
+                  Compartir
+                </Button>
+              )}
+              <Button type="button" size="sm" variant="outline" onClick={handleCopy}>
+                {copied ? (
+                  <Check className="size-4" aria-hidden />
+                ) : (
+                  <Copy className="size-4" aria-hidden />
+                )}
+                {copied ? 'Copiado' : 'Copiar link'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                render={
+                  <a href={fullUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="size-4" aria-hidden />
+                    Ver cómo se ve
+                  </a>
+                }
+              />
               <Button
                 type="button"
                 size="sm"
-                variant="default"
-                onClick={handleNativeShare}
-                className="flex-1 sm:flex-initial"
+                variant="ghost"
+                onClick={handleRevoke}
+                disabled={pending}
+                className="text-muted-foreground"
               >
-                <Share2 className="size-4" aria-hidden />
-                Compartir
+                <Link2Off className="size-4" aria-hidden />
+                Revocar
               </Button>
-            )}
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={handleCopy}
-              className="flex-1 sm:flex-initial"
-            >
-              {copied ? (
-                <Check className="size-4" aria-hidden />
-              ) : (
-                <Copy className="size-4" aria-hidden />
-              )}
-              {copied ? 'Copiado' : 'Copiar'}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={handleRevoke}
-              disabled={pending}
-              className="flex-1 sm:flex-initial"
-            >
-              <Link2Off className="size-4" aria-hidden />
-              Revocar
-            </Button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="font-medium text-foreground text-sm">{album.name}</span>
-            <span className="text-muted-foreground text-xs">
-              Compartilo con la familia extensa con un link público sin login.
-            </span>
-          </div>
-          <Button type="button" size="sm" onClick={handleShare} disabled={pending}>
-            {pending ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <Link2 className="size-4" aria-hidden />
-            )}
-            Compartir álbum
-          </Button>
-        </>
-      )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium text-foreground text-sm">Compartir "{album.name}"</span>
+              <span className="text-muted-foreground text-xs leading-relaxed">
+                Generamos un link público (sin login) para mandar por WhatsApp a la familia que no
+                usa la app. Lo podés revocar cuando quieras.
+              </span>
+            </div>
+            <div>
+              <Button type="button" size="sm" onClick={handleShare} disabled={pending}>
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Link2 className="size-4" aria-hidden />
+                )}
+                Generar link de este álbum
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
     </Card>
   );
 }

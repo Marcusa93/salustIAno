@@ -6,6 +6,7 @@ import {
   createSleepAction,
 } from '@/app/(app)/cuidar/eventos/actions';
 import { salustiaChat } from '@/lib/ai/agents';
+import { tagPhoto } from '@/lib/ai/agents/photo-tagger';
 import { detectMedicalIntent } from '@/lib/ai/agents/salustia/medical-intent';
 import {
   type Proposal,
@@ -674,5 +675,202 @@ function applyHallucinationGuard(input: HallucinationGuardInput): { reply: strin
     reply: [
       'Ah, perdón — lo dije pero todavía no apreté el botón. ¿Me lo decís de nuevo con más detalle? (qué fue, a qué hora) y te dejo abajo la card para confirmar.',
     ].join('\n'),
+  };
+}
+
+// ============================================================================
+// Photo upload via chat
+// ============================================================================
+
+/**
+ * Configuración del upload de fotos por chat. Replicada de
+ * `src/app/(app)/album/actions.ts` a propósito — son dos callers con el
+ * mismo bucket pero distinto flow. Si aparece un tercer caller, vale la
+ * pena extraer un helper compartido.
+ */
+const PHOTOS_BUCKET = 'photos';
+const PHOTO_ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const PHOTO_VISION_FRIENDLY_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const PHOTO_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
+const PHOTO_MAX_TAGGABLE_BYTES = 8 * 1024 * 1024; // 8 MB
+
+export type SendPhotoToChatResult =
+  | {
+      ok: true;
+      photoUrl: string;
+      albumName: string;
+      tags: string[];
+      assistantReply: string;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Sube una foto desde el composer del chat (botón 📎). La foto se guarda
+ * en el mismo bucket/álbum que /album: queda automáticamente en el álbum
+ * mensual del mes en curso y se auto-etiqueta con el agente photo-tagger.
+ *
+ * Persiste un par user→assistant en `chat_messages` para que la
+ * conversación tenga rastro. Devuelve los datos para que la UI pueda
+ * insertar las burbujas localmente sin tener que rehidratar.
+ */
+export async function sendPhotoToChatAction(formData: FormData): Promise<SendPhotoToChatResult> {
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: 'No recibimos ninguna foto.' };
+  }
+  if (file.size > PHOTO_MAX_BYTES) {
+    return { ok: false, error: 'La foto supera los 20 MB.' };
+  }
+  if (!PHOTO_ALLOWED_MIME.includes(file.type)) {
+    return { ok: false, error: 'Formato no soportado. Probá con JPG, PNG o WebP.' };
+  }
+
+  const supabase = await createClient();
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData.user) {
+    return { ok: false, error: 'Sesión expirada.' };
+  }
+
+  const { data: membership } = await supabase
+    .from('family_memberships')
+    .select('family_group_id')
+    .eq('user_id', userData.user.id)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!membership?.family_group_id) {
+    return { ok: false, error: 'No encontramos tu grupo familiar.' };
+  }
+  const familyGroupId = membership.family_group_id as string;
+
+  const { data: child } = await supabase
+    .from('child_profiles')
+    .select('id')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const childId = (child?.id as string | undefined) ?? null;
+
+  // 1. Upload al Storage.
+  const ext =
+    (file.name.split('.').pop() ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const rand = Math.random().toString(36).slice(2, 8);
+  const storagePath = `${familyGroupId}/${Date.now()}-${rand}.${ext}`;
+  const arrayBuffer = await file.arrayBuffer();
+
+  const { error: uploadErr } = await supabase.storage
+    .from(PHOTOS_BUCKET)
+    .upload(storagePath, arrayBuffer, {
+      contentType: file.type,
+      cacheControl: '31536000',
+      upsert: false,
+    });
+  if (uploadErr) {
+    return { ok: false, error: 'No pudimos subir la foto. Probá de nuevo.' };
+  }
+
+  // 2. Resolver/crear el álbum mensual del momento.
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const monthName = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  const albumName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+  // biome-ignore lint/suspicious/noExplicitAny: types stale para albums/media_items.
+  const sb = supabase as any;
+  let albumId: string | null = null;
+  const { data: existingAlbum } = await sb
+    .from('albums')
+    .select('id')
+    .eq('family_group_id', familyGroupId)
+    .eq('month_key', monthKey)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (existingAlbum?.id) {
+    albumId = existingAlbum.id as string;
+  } else {
+    const { data: createdAlbum } = await sb
+      .from('albums')
+      .insert({
+        family_group_id: familyGroupId,
+        child_id: childId,
+        name: albumName,
+        kind: 'monthly',
+        month_key: monthKey,
+        created_by: userData.user.id,
+      })
+      .select('id')
+      .single();
+    albumId = (createdAlbum?.id as string | undefined) ?? null;
+  }
+
+  // 3. Auto-tag (best-effort).
+  const takenAtIso = new Date(file.lastModified || Date.now()).toISOString();
+  let aiTags: string[] = [];
+  let aiCaption: string | null = null;
+  if (PHOTO_VISION_FRIENDLY_MIME.has(file.type) && file.size <= PHOTO_MAX_TAGGABLE_BYTES) {
+    try {
+      const dataUrl = `data:${file.type};base64,${Buffer.from(arrayBuffer).toString('base64')}`;
+      const result = await tagPhoto(
+        { imageDataUrl: dataUrl, takenAtIso },
+        {
+          familyGroupId,
+          ...(childId ? { childId } : {}),
+          actorUserId: userData.user.id,
+        },
+      );
+      aiTags = result.tags;
+      aiCaption = result.caption.length > 0 ? result.caption : null;
+    } catch {
+      // best-effort; si falla, dejamos tags=[] y caption=null.
+    }
+  }
+
+  // 4. Insertar media_items.
+  const { error: insertErr } = await sb.from('media_items').insert({
+    child_id: childId,
+    family_group_id: familyGroupId,
+    album_id: albumId,
+    storage_path: storagePath,
+    mime_type: file.type,
+    size_bytes: file.size,
+    caption: aiCaption,
+    tags: aiTags,
+    taken_at: takenAtIso,
+    created_by: userData.user.id,
+  });
+  if (insertErr) {
+    // Si el insert falla, borramos el blob para no dejar huérfano.
+    await supabase.storage.from(PHOTOS_BUCKET).remove([storagePath]);
+    return { ok: false, error: 'Subimos la foto pero no pudimos guardarla en el álbum.' };
+  }
+
+  // 5. Signed URL para mostrar en el chat (1 hora, alcanza para el turno).
+  const { data: signed } = await supabase.storage
+    .from(PHOTOS_BUCKET)
+    .createSignedUrl(storagePath, 3600);
+  const photoUrl = signed?.signedUrl ?? '';
+
+  // 6. Persistir el par user→assistant en chat_messages.
+  const userMessage = aiCaption ? `📷 Foto subida — "${aiCaption}"` : '📷 Foto subida';
+  const tagsLine = aiTags.length > 0 ? ` Te puse tags: ${aiTags.slice(0, 5).join(', ')}.` : '';
+  const assistantReply = `Listo, la guardé en el álbum **${albumName}**.${tagsLine} La podés ver y compartir desde /album.`;
+
+  await persistMessages(supabase, userData.user.id, familyGroupId, [
+    { role: 'user', content: userMessage },
+    { role: 'assistant', content: assistantReply },
+  ]);
+
+  // Refrescar la grilla del álbum para que la nueva foto aparezca al
+  // navegar.
+  revalidatePath('/album');
+
+  return {
+    ok: true,
+    photoUrl,
+    albumName,
+    tags: aiTags,
+    assistantReply,
   };
 }

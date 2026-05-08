@@ -7,14 +7,22 @@ import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import type { Proposal } from '@/lib/ai/agents/salustia/proposals';
 import { cn } from '@/lib/utils';
-import { Loader2, Send, Sparkles, Trash2 } from 'lucide-react';
-import { type KeyboardEvent, useEffect, useRef, useState, useTransition } from 'react';
+import { ImageIcon, Loader2, Send, Sparkles, Trash2 } from 'lucide-react';
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 import { toast } from 'sonner';
 import {
   type ChatHistoryEntry,
   type ClientMessage,
   clearChatHistoryAction,
   sendMessageAction,
+  sendPhotoToChatAction,
 } from '../actions';
 import { ProposalCard } from './proposal-card';
 
@@ -34,7 +42,7 @@ const SUGGESTIONS = [
  * ClientMessage[] (que solo tiene role + content).
  */
 type ChatEntry =
-  | { role: 'user'; content: string }
+  | { role: 'user'; content: string; photoUrl?: string }
   | { role: 'assistant'; content: string; proposals: Proposal[] };
 
 interface ChatThreadProps {
@@ -57,8 +65,10 @@ export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) 
   const [draft, setDraft] = useState('');
   const [pending, startTransition] = useTransition();
   const [clearing, startClearTransition] = useTransition();
+  const [uploadingPhoto, startUploadPhoto] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   function clearHistory() {
     if (!window.confirm('¿Borrar la conversación con SalustIA? No se puede deshacer.')) return;
@@ -70,6 +80,56 @@ export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) 
       }
       setEntries([]);
       toast.success('Conversación limpia.');
+    });
+  }
+
+  function handlePickPhoto() {
+    photoInputRef.current?.click();
+  }
+
+  function handlePhotoFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Resetear el input para que el onChange dispare aunque elijan la
+    // misma foto dos veces.
+    if (event.target) event.target.value = '';
+    if (!file) return;
+
+    // Optimistic: insertar burbuja del user con la preview localmente.
+    const localPreview = URL.createObjectURL(file);
+    setEntries((prev) => [
+      ...prev,
+      { role: 'user', content: '📷 Subiendo foto…', photoUrl: localPreview },
+    ]);
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    startUploadPhoto(async () => {
+      const result = await sendPhotoToChatAction(formData);
+      if (!result.ok) {
+        toast.error(result.error);
+        // Quitar la burbuja optimista que dejó el rolling en estado raro.
+        setEntries((prev) =>
+          prev.filter((e) => !(e.role === 'user' && e.photoUrl === localPreview)),
+        );
+        URL.revokeObjectURL(localPreview);
+        return;
+      }
+      // Reemplazar la burbuja optimista con la "real" (signed URL del
+      // server) y agregar la respuesta del assistant.
+      setEntries((prev) => {
+        const next = prev.map((e) =>
+          e.role === 'user' && e.photoUrl === localPreview
+            ? {
+                ...e,
+                content: '📷 Foto subida',
+                photoUrl: result.photoUrl,
+              }
+            : e,
+        );
+        return [...next, { role: 'assistant', content: result.assistantReply, proposals: [] }];
+      });
+      URL.revokeObjectURL(localPreview);
     });
   }
 
@@ -282,6 +342,27 @@ export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) 
           className="flex-1 resize-none"
           aria-label="Mensaje para SalustIA"
         />
+        <Button
+          type="button"
+          size="icon"
+          variant="outline"
+          aria-label="Subir foto al álbum"
+          disabled={pending || uploadingPhoto}
+          onClick={handlePickPhoto}
+        >
+          {uploadingPhoto ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          ) : (
+            <ImageIcon className="size-4" aria-hidden />
+          )}
+        </Button>
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          className="hidden"
+          onChange={handlePhotoFile}
+        />
         <SpeechToTextButton
           disabled={pending}
           onTranscript={(text) => {
@@ -309,16 +390,34 @@ function lastIsUser(entries: ChatEntry[]): boolean {
 
 function MessageBubble({ entry }: { entry: ChatEntry }) {
   const isUser = entry.role === 'user';
-  if (!entry.content) return null;
+  const photoUrl = entry.role === 'user' ? entry.photoUrl : null;
+  if (!entry.content && !photoUrl) return null;
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <Card
         className={cn(
-          'max-w-[85%] whitespace-pre-wrap px-4 py-2.5 text-sm leading-relaxed',
+          'flex max-w-[85%] flex-col gap-2 overflow-hidden text-sm leading-relaxed',
           isUser ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground',
+          photoUrl ? 'p-1.5' : 'whitespace-pre-wrap px-4 py-2.5',
         )}
       >
-        {entry.content}
+        {photoUrl && (
+          <img
+            src={photoUrl}
+            alt="Foto subida al álbum"
+            className="max-h-72 w-full rounded-md object-cover"
+          />
+        )}
+        {entry.content && (
+          <span
+            className={cn(
+              'whitespace-pre-wrap',
+              photoUrl ? 'px-2.5 pb-1.5 text-xs leading-snug' : '',
+            )}
+          >
+            {entry.content}
+          </span>
+        )}
       </Card>
     </div>
   );
