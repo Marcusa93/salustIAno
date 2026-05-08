@@ -380,6 +380,60 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
     return { ok: true, eventId: noteData.id, summary: summarizeProposal(proposal) };
   }
 
+  if (proposal.kind === 'memory') {
+    // Memoria persistente — INSERT en family_memories. RLS exige
+    // is_family_member + created_by = auth.uid().
+    const supabase = await createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      return { ok: false, error: { type: 'validation', message: 'Sesión expirada.' } };
+    }
+
+    const { data: memMembership } = await supabase
+      .from('family_memberships')
+      .select('family_group_id')
+      .eq('user_id', userData.user.id)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (!memMembership?.family_group_id) {
+      return {
+        ok: false,
+        error: { type: 'validation', message: 'No encontramos tu grupo familiar.' },
+      };
+    }
+
+    // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar Supabase types con la migration 022.
+    const sb = supabase as any;
+    const { data: memoryData, error: memoryErr } = await sb
+      .from('family_memories')
+      .insert({
+        family_group_id: memMembership.family_group_id,
+        content: proposal.content,
+        kind: proposal.category ?? null,
+        private_to_user: proposal.scope === 'private' ? userData.user.id : null,
+        created_by: userData.user.id,
+      })
+      .select('id')
+      .single();
+
+    if (memoryErr || !memoryData) {
+      return {
+        ok: false,
+        error: {
+          type: 'provider',
+          message:
+            'No pudimos guardar la memoria. Si recién aplicaste la migration, refrescá el chat.',
+        },
+      };
+    }
+
+    revalidatePath('/chat');
+    await logProposalConfirm(proposal.kind, memoryData.id);
+    return { ok: true, eventId: memoryData.id, summary: summarizeProposal(proposal) };
+  }
+
   // proposal.kind === 'milestone' — turno médico, vacuna, control, etc.
   // Insert directo en medical_milestones. La RLS exige is_family_admin,
   // así que solo admins pueden agendar via chat (igual que el form de

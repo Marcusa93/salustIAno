@@ -4,18 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { Proposal } from '@/lib/ai/agents/salustia/proposals';
 import { summarizeProposal } from '@/lib/ai/agents/salustia/proposals';
-import { Baby, BookHeart, CalendarClock, Check, Loader2, Milk, Moon, X } from 'lucide-react';
+import { Baby, BookHeart, Brain, CalendarClock, Check, Loader2, Milk, Moon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { executeProposalAction, logProposalDeclineAction } from '../actions';
 
-const KIND_META: Record<Proposal['kind'], { Icon: typeof Milk; label: string }> = {
-  feeding: { Icon: Milk, label: 'Toma' },
-  sleep: { Icon: Moon, label: 'Sueño' },
-  diaper: { Icon: Baby, label: 'Pañal' },
-  note: { Icon: BookHeart, label: 'Momento' },
-  milestone: { Icon: CalendarClock, label: 'Turno' },
+const KIND_META: Record<Proposal['kind'], { Icon: typeof Milk; label: string; verb: string }> = {
+  feeding: { Icon: Milk, label: 'Toma', verb: 'Anoto' },
+  sleep: { Icon: Moon, label: 'Sueño', verb: 'Anoto' },
+  diaper: { Icon: Baby, label: 'Pañal', verb: 'Anoto' },
+  note: { Icon: BookHeart, label: 'Momento', verb: 'Anoto' },
+  milestone: { Icon: CalendarClock, label: 'Turno', verb: 'Agendo' },
+  memory: { Icon: Brain, label: 'Memoria', verb: 'Recuerdo' },
 };
 
 type CardState =
@@ -82,7 +83,8 @@ export function ProposalCard({ proposal }: { proposal: Proposal }) {
         </div>
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="font-medium text-foreground text-sm">
-            ¿Anoto este {meta.label.toLowerCase()}?
+            ¿{meta.verb}{' '}
+            {proposal.kind === 'memory' ? 'esta memoria' : `este ${meta.label.toLowerCase()}`}?
           </span>
           <span className="text-muted-foreground text-xs">{summarizeProposal(proposal)}</span>
         </div>

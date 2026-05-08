@@ -7,6 +7,7 @@ import { callLLM } from '@/lib/ai/client';
 import { AIError } from '@/lib/ai/errors';
 import { logStore } from '@/lib/ai/logger';
 import type { ChatMessage } from '@/lib/ai/types';
+import { babyAgeFromBirth } from '@/lib/baby-age';
 import { createClient } from '@/lib/supabase/server';
 import type { Proposal } from './proposals';
 import { TOOL_DEFINITIONS, TOOL_HANDLERS, type ToolContext } from './tools';
@@ -16,8 +17,13 @@ export { proposalSchema, summarizeProposal } from './proposals';
 
 const AGENT_NAME = 'salustia';
 const MODEL = 'anthropic/claude-haiku-4-5';
-const PROMPT_VERSION = 'salustia-v2';
+// v3: inyectamos perfil del bebé + memorias persistentes al system prompt.
+const PROMPT_VERSION = 'salustia-v3';
 const MAX_ITERATIONS = 5;
+// Cota de inyección: si la familia acumula 200 memorias, no las metemos
+// todas en cada turno. Cortamos por cantidad y por chars.
+const MAX_INJECTED_MEMORIES = 30;
+const MAX_INJECTED_MEMORIES_CHARS = 4000;
 
 const SYSTEM_PROMPT = readFileSync(
   join(process.cwd(), 'src/lib/ai/agents/salustia/prompt.md'),
@@ -68,13 +74,30 @@ interface AgentContext {
   actorUserId?: string;
 }
 
+interface ResolvedContext {
+  toolCtx: ToolContext;
+  /**
+   * Snippet ya formateado con datos del bebé (nombre, edad, pediatra) +
+   * memorias persistentes activas. Se appendea al system prompt para que
+   * el modelo no tenga que llamar `get_child_info` ni `recall_memories`
+   * en cada turno.
+   */
+  ambientContext: string;
+}
+
 /**
- * Resuelve el contexto del usuario actual desde el cliente Supabase
- * server-side. Si no hay child_profile activo el agente igual responde —
- * algunas tools devolverán "no hay bebé" pero la conversación general
- * funciona.
+ * Resuelve user, child y memoria persistente en una sola pasada. Devuelve
+ * tanto el ToolContext (para tool handlers) como un snippet de "ambient
+ * context" listo para inyectar al system prompt.
+ *
+ * Si no hay child_profile activo el agente igual responde — algunas tools
+ * devolverán "no hay bebé" pero la conversación general funciona.
+ *
+ * Si la migration 022 (family_memories) todavía no está aplicada, el
+ * fetch falla silencioso y se omite la sección de memorias — el chat
+ * sigue andando como antes.
  */
-async function resolveToolContext(): Promise<ToolContext> {
+async function resolveContext(): Promise<ResolvedContext> {
   const supabase = await createClient();
   const { data: userData, error } = await supabase.auth.getUser();
   if (error || !userData.user) {
@@ -83,18 +106,117 @@ async function resolveToolContext(): Promise<ToolContext> {
 
   const { data: child } = await supabase
     .from('child_profiles')
-    .select('id')
+    .select(
+      'id, name, birth_date, pediatrician_name, pediatrician_phone, blood_type, health_insurance, gestational_weeks_at_birth, is_preterm',
+    )
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
 
+  // Lookup del family_group para fetchar memorias compartidas.
+  const { data: membership } = await supabase
+    .from('family_memberships')
+    .select('family_group_id')
+    .eq('user_id', userData.user.id)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
+  let memories: Array<{ content: string; private: boolean }> = [];
+  if (membership?.family_group_id) {
+    // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar Supabase types con la migration 022.
+    const sb = supabase as any;
+    const { data, error: memErr } = await sb
+      .from('family_memories')
+      .select('content, kind, private_to_user, created_at')
+      .eq('family_group_id', membership.family_group_id)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(MAX_INJECTED_MEMORIES);
+    if (!memErr && Array.isArray(data)) {
+      memories = (data as Array<{ content: string; private_to_user: string | null }>).map((m) => ({
+        content: m.content,
+        private: m.private_to_user !== null,
+      }));
+    }
+  }
+
   return {
-    supabase,
-    userId: userData.user.id,
-    childId: child?.id ?? null,
-    proposals: [],
+    toolCtx: {
+      supabase,
+      userId: userData.user.id,
+      childId: child?.id ?? null,
+      proposals: [],
+    },
+    ambientContext: buildAmbientContext(child, memories),
   };
+}
+
+interface ChildSnapshot {
+  name: string;
+  birth_date: string | null;
+  pediatrician_name: string | null;
+  pediatrician_phone: string | null;
+  blood_type: string | null;
+  health_insurance: string | null;
+  gestational_weeks_at_birth: number | null;
+  is_preterm: boolean | null;
+}
+
+function buildAmbientContext(
+  child: ChildSnapshot | null,
+  memories: ReadonlyArray<{ content: string; private: boolean }>,
+): string {
+  const sections: string[] = [];
+
+  if (child) {
+    const lines: string[] = [`- Nombre: ${child.name}`];
+    if (child.birth_date) {
+      const age = babyAgeFromBirth(child.birth_date);
+      if (age) {
+        lines.push(
+          age.unborn
+            ? `- Fecha esperada: ${child.birth_date} (todavía no nació, ${age.label.toLowerCase()})`
+            : `- Edad: ${age.label} (nacido el ${child.birth_date})`,
+        );
+      } else {
+        lines.push(`- Fecha de nacimiento: ${child.birth_date}`);
+      }
+    }
+    if (child.is_preterm && child.gestational_weeks_at_birth !== null) {
+      lines.push(`- Prematuro (${child.gestational_weeks_at_birth} semanas de gestación)`);
+    }
+    if (child.pediatrician_name) {
+      const phone = child.pediatrician_phone ? ` (${child.pediatrician_phone})` : '';
+      lines.push(`- Pediatra: ${child.pediatrician_name}${phone}`);
+    }
+    if (child.health_insurance) {
+      lines.push(`- Obra social: ${child.health_insurance}`);
+    }
+    if (child.blood_type) {
+      lines.push(`- Grupo sanguíneo: ${child.blood_type}`);
+    }
+    sections.push(['## Acerca del bebé (ya lo sabés, no preguntes)', '', ...lines].join('\n'));
+  }
+
+  if (memories.length > 0) {
+    let totalChars = 0;
+    const used: string[] = [];
+    for (const m of memories) {
+      const line = `- ${m.content}${m.private ? ' (privado tuyo)' : ''}`;
+      if (totalChars + line.length > MAX_INJECTED_MEMORIES_CHARS) break;
+      used.push(line);
+      totalChars += line.length;
+    }
+    const truncated = used.length < memories.length;
+    const header = truncated
+      ? `## Memoria persistente (${used.length} de ${memories.length}; resto disponible vía recall_memories)`
+      : '## Memoria persistente (estos hechos los recordás siempre)';
+    sections.push([header, '', ...used].join('\n'));
+  }
+
+  return sections.length > 0 ? sections.join('\n\n') : '';
 }
 
 /**
@@ -118,8 +240,11 @@ export async function chat(
   const agentLabel = voice === 'baby' ? `${AGENT_NAME}-baby` : AGENT_NAME;
 
   let toolCtx: ToolContext;
+  let ambientContext = '';
   try {
-    toolCtx = await resolveToolContext();
+    const resolved = await resolveContext();
+    toolCtx = resolved.toolCtx;
+    ambientContext = resolved.ambientContext;
   } catch (err) {
     await logStore.record({
       agent: agentLabel,
@@ -177,10 +302,11 @@ export async function chat(
     '- El sistema convierte tu ISO a UTC automáticamente. Vos siempre escribís en hora AR sin sufijo.',
   ].join('\n');
 
+  const ambientBlock = ambientContext ? `\n\n---\n\n${ambientContext}` : '';
   const systemContent =
     voice === 'baby'
-      ? `${VOICE_BABY_PREFIX}\n\n---\n\n${SYSTEM_PROMPT}\n\n---\n\n${timeAnchor}`
-      : `${SYSTEM_PROMPT}\n\n---\n\n${timeAnchor}`;
+      ? `${VOICE_BABY_PREFIX}\n\n---\n\n${SYSTEM_PROMPT}\n\n---\n\n${timeAnchor}${ambientBlock}`
+      : `${SYSTEM_PROMPT}\n\n---\n\n${timeAnchor}${ambientBlock}`;
   const messages: ChatMessage[] = [{ role: 'system', content: systemContent }, ...input.messages];
 
   const toolCallsMade: string[] = [];

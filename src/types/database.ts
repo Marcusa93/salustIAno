@@ -357,6 +357,50 @@ export type Database = {
         };
         Relationships: [];
       };
+      family_memories: {
+        Row: {
+          content: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          family_group_id: string;
+          id: string;
+          kind: string | null;
+          private_to_user: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          content: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id: string;
+          id?: string;
+          kind?: string | null;
+          private_to_user?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          content?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          id?: string;
+          kind?: string | null;
+          private_to_user?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'family_memories_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       family_memberships: {
         Row: {
           accepted_at: string;

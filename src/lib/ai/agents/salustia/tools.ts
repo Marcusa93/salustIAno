@@ -98,6 +98,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'recall_memories',
+      description:
+        'Devuelve la lista de memorias persistentes que la familia te pidió recordar (obra social, pediatra, alergias, preferencias, etc.). Las memorias compartidas las ve toda la familia; las privadas sólo quien las creó. Llamala sólo si necesitás revisar memorias que NO están en tu system prompt actual (por ejemplo si el system prompt te marcó "memoria truncada"). En condiciones normales, las memorias activas ya están inyectadas y no necesitás llamarla.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
   // ===== Tools de PROPUESTA — no escriben, solo proponen para confirmación =====
   {
     type: 'function',
@@ -218,6 +227,36 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
               'memory: recuerdo. observation: cosa observada (algo que la familia notó pero no necesariamente preocupante). milestone: hito vivido (primera sonrisa, primer rollo). other: otra cosa. Default memory.',
           },
           content: { type: 'string', description: 'El texto del momento. Obligatorio.' },
+        },
+        required: ['content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_memory',
+      description:
+        'Cuando la familia te pide explícitamente que RECUERDES algo para siempre — "anotá que mi obra social es OSDE", "recordá que es alérgico a la proteína de leche", "guardá que el pediatra de cabecera es la Dra. Belén López". Genera una propuesta que la familia confirma con un botón. Es para HECHOS PERSISTENTES que querés tener disponibles en futuros chats, no para eventos puntuales (esos van con propose_feeding/sleep/diaper/note). Mantené el content compacto y declarativo: "Obra social: OSDE", no "La obra social del bebé es OSDE y le cubre todo". Si la familia no aclaró si es privado, asumí scope="family".',
+      parameters: {
+        type: 'object',
+        properties: {
+          content: {
+            type: 'string',
+            description:
+              'Hecho a recordar, declarativo y compacto. Máximo 500 caracteres. Ejemplos: "Obra social: OSDE", "Alergia conocida: proteína de leche de vaca (APLV)", "Pediatra de cabecera: Dra. Belén López, consultorio Av. Mitre 250".',
+          },
+          scope: {
+            type: 'string',
+            enum: ['family', 'private'],
+            description:
+              'family: la ven todos los miembros activos de la familia (default). private: sólo la ve el user que la creó. Asumí family salvo que la familia diga "es solo para mí".',
+          },
+          category: {
+            type: 'string',
+            description:
+              'Etiqueta corta opcional para futura UI: "salud", "logística", "preferencia", etc. Si no es claro, omitilo.',
+          },
         },
         required: ['content'],
       },
@@ -414,13 +453,13 @@ const listPendingMilestones: ToolHandler = async (_args, ctx) => {
 // ============================================================================
 
 function proposeHandlerFor(
-  kind: 'feeding' | 'sleep' | 'diaper' | 'note' | 'milestone',
+  kind: 'feeding' | 'sleep' | 'diaper' | 'note' | 'milestone' | 'memory',
 ): ToolHandler {
   return async (rawArgs, ctx) => {
-    // Para 'milestone' el child puede no existir todavía (ej. agendar
-    // turnos antes del nacimiento) — el milestone va a la familia, no al
-    // child específico. Para los otros kinds sí necesitamos child_id.
-    if (kind !== 'milestone' && !ctx.childId) {
+    // 'milestone' y 'memory' pueden vivir sin child (turnos antes del
+    // nacimiento, hechos de la familia que no atan a un bebé). El resto
+    // sí necesita child_id.
+    if (kind !== 'milestone' && kind !== 'memory' && !ctx.childId) {
       return jsonError(
         'Todavía no hay perfil de bebé creado. La familia tiene que crearlo desde Familia.',
       );
@@ -441,6 +480,41 @@ function proposeHandlerFor(
   };
 }
 
+const recallMemories: ToolHandler = async (_args, ctx) => {
+  const { data: userData } = await ctx.supabase.auth.getUser();
+  if (!userData.user) return jsonError('Sesión inválida.');
+
+  const { data: membership } = await ctx.supabase
+    .from('family_memberships')
+    .select('family_group_id')
+    .eq('user_id', userData.user.id)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!membership?.family_group_id) {
+    return jsonOk({ memories: [] });
+  }
+
+  // Types stale hasta regenerar después de aplicar la migration 022.
+  // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar Supabase types.
+  const sb = ctx.supabase as any;
+  const { data, error } = await sb
+    .from('family_memories')
+    .select('id, content, kind, private_to_user, created_at')
+    .eq('family_group_id', membership.family_group_id)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    // Si la tabla todavía no existe (migration no aplicada), degradamos.
+    return jsonOk({ memories: [], note: 'Memoria persistente no disponible.' });
+  }
+
+  return jsonOk({ memories: data ?? [] });
+};
+
 export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   get_today_summary: getTodaySummary,
   get_child_info: getChildInfo,
@@ -452,4 +526,6 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   propose_diaper: proposeHandlerFor('diaper'),
   propose_note: proposeHandlerFor('note'),
   propose_milestone: proposeHandlerFor('milestone'),
+  propose_memory: proposeHandlerFor('memory'),
+  recall_memories: recallMemories,
 };

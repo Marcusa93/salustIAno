@@ -5,8 +5,8 @@ import { TOOL_DEFINITIONS, TOOL_HANDLERS } from '@/lib/ai/agents/salustia/tools'
 describe('SalustIA tool definitions', () => {
   it('exporta read tools + propose tools', () => {
     const names = TOOL_DEFINITIONS.map((t) => t.function.name);
-    // 5 read + 5 propose = 10
-    expect(TOOL_DEFINITIONS).toHaveLength(10);
+    // 6 read (incluye recall_memories) + 6 propose (incluye propose_memory) = 12
+    expect(TOOL_DEFINITIONS).toHaveLength(12);
     expect(names).toEqual(
       expect.arrayContaining([
         'get_today_summary',
@@ -14,11 +14,13 @@ describe('SalustIA tool definitions', () => {
         'list_recent_events',
         'search_care_guides',
         'list_pending_milestones',
+        'recall_memories',
         'propose_feeding',
         'propose_sleep',
         'propose_diaper',
         'propose_note',
         'propose_milestone',
+        'propose_memory',
       ]),
     );
   });
@@ -187,5 +189,58 @@ describe('SalustIA propose tools', () => {
     const parsed = JSON.parse(result as string);
     expect(parsed.ok).toBe(true);
     expect(ctx.proposals[0]?.kind).toBe('note');
+  });
+
+  it('propose_memory acepta content válido y default scope=family', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_memory?.(
+      { content: 'Obra social: OSDE' },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(true);
+    const stored = ctx.proposals[0] as { kind: string; scope?: string; content?: string };
+    expect(stored?.kind).toBe('memory');
+    expect(stored?.scope).toBe('family');
+    expect(stored?.content).toBe('Obra social: OSDE');
+  });
+
+  it('propose_memory rechaza content vacío', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_memory?.({ content: '' }, ctx as never);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(false);
+    expect(ctx.proposals).toHaveLength(0);
+  });
+
+  it('propose_memory rechaza content > 500 chars', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_memory?.({ content: 'x'.repeat(501) }, ctx as never);
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(false);
+    expect(ctx.proposals).toHaveLength(0);
+  });
+
+  it('propose_memory funciona sin child (memoria de la familia, no del bebé)', async () => {
+    const ctx = { ...makeCtx(), childId: null };
+    const result = await TOOL_HANDLERS.propose_memory?.(
+      { content: 'Pediatra: Dra. López' },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(true);
+    expect(ctx.proposals[0]?.kind).toBe('memory');
+  });
+
+  it('propose_memory acepta scope=private', async () => {
+    const ctx = makeCtx();
+    const result = await TOOL_HANDLERS.propose_memory?.(
+      { content: 'Algo personal mío', scope: 'private' },
+      ctx as never,
+    );
+    const parsed = JSON.parse(result as string);
+    expect(parsed.ok).toBe(true);
+    const stored = ctx.proposals[0] as { scope?: string };
+    expect(stored?.scope).toBe('private');
   });
 });

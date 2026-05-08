@@ -126,12 +126,33 @@ export const milestoneProposalSchema = z.object({
   notes: z.string().max(5000).optional(),
 });
 
+/**
+ * Propuesta de memoria persistente — el agente la usa cuando la familia le
+ * pide "recordá que…". El content tiene que ser declarativo y compacto:
+ * "Obra social: OSDE", "Pediatra de cabecera: Dra. Belén López".
+ *
+ * scope='family' (default) → todos los miembros la ven en futuros chats.
+ * scope='private' → sólo quien la creó la ve.
+ *
+ * El kind es opcional, libre, sirve para futura UI de gestión.
+ */
+export const memoryProposalSchema = z.object({
+  kind: z.literal('memory'),
+  content: z
+    .string()
+    .min(1, 'El contenido no puede ser vacío')
+    .max(500, 'Máximo 500 caracteres por memoria'),
+  scope: z.enum(['family', 'private']).default('family'),
+  category: z.string().min(1).max(40).optional(),
+});
+
 export const proposalSchema = z.discriminatedUnion('kind', [
   feedingProposalSchema,
   sleepProposalSchema,
   diaperProposalSchema,
   noteProposalSchema,
   milestoneProposalSchema,
+  memoryProposalSchema,
 ]);
 
 export type FeedingProposal = z.infer<typeof feedingProposalSchema>;
@@ -139,6 +160,7 @@ export type SleepProposal = z.infer<typeof sleepProposalSchema>;
 export type DiaperProposal = z.infer<typeof diaperProposalSchema>;
 export type NoteProposal = z.infer<typeof noteProposalSchema>;
 export type MilestoneProposal = z.infer<typeof milestoneProposalSchema>;
+export type MemoryProposal = z.infer<typeof memoryProposalSchema>;
 export type Proposal = z.infer<typeof proposalSchema>;
 
 /**
@@ -211,6 +233,11 @@ export function summarizeProposal(p: Proposal): string {
         ? ` ${date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
         : '';
       return `${labels[p.category]} — ${p.title} · ${dateLabel}${timeLabel}`;
+    }
+    case 'memory': {
+      const scopeLabel = p.scope === 'private' ? 'sólo para vos' : 'para la familia';
+      const head = p.category ? `${p.category}: ` : '';
+      return `${head}${p.content} · ${scopeLabel}`;
     }
   }
 }
