@@ -22,6 +22,7 @@ function formatDate(iso: string): string {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    timeZone: 'America/Argentina/Buenos_Aires',
   });
 }
 

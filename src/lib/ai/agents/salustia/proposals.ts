@@ -191,12 +191,16 @@ export function summarizeProposal(p: Proposal): string {
       const start = new Date(p.started_at).toLocaleTimeString('es-AR', {
         hour: '2-digit',
         minute: '2-digit',
+        hour12: false,
+        timeZone: 'America/Argentina/Buenos_Aires',
       });
       parts.push(`empezó ${start}`);
       if (p.ended_at) {
         const end = new Date(p.ended_at).toLocaleTimeString('es-AR', {
           hour: '2-digit',
           minute: '2-digit',
+          hour12: false,
+          timeZone: 'America/Argentina/Buenos_Aires',
         });
         parts.push(`hasta ${end}`);
       }
@@ -226,12 +230,18 @@ export function summarizeProposal(p: Proposal): string {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
+        timeZone: 'America/Argentina/Buenos_Aires',
       });
-      // Si la hora no es 00:00, la mostramos también.
-      const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0;
-      const timeLabel = hasTime
-        ? ` ${date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
-        : '';
+      // Hora en AR — `getHours/getMinutes` usan TZ del runtime, así que
+      // chequeamos directo si el ISO trae T00:00 al parsearlo en AR.
+      const arHourMin = date.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'America/Argentina/Buenos_Aires',
+      });
+      const hasTime = arHourMin !== '00:00';
+      const timeLabel = hasTime ? ` ${arHourMin}` : '';
       return `${labels[p.category]} — ${p.title} · ${dateLabel}${timeLabel}`;
     }
     case 'memory': {

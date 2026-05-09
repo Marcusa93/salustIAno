@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { babyAgeFromBirth, durationLabel } from '@/lib/baby-age';
+import { formatTimeAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import { SLEEP_QUALITY_LABELS, type SleepQuality } from '@/lib/validators/events';
 import { suggestNextSleep } from '@/lib/wake-windows';
@@ -33,11 +34,11 @@ const SAFE_SLEEP_TIPS = [
 ];
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return formatTimeAr(iso);
 }
 
 function formatRangeTime(d: Date): string {
-  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return formatTimeAr(d);
 }
 
 function totalMinutesIn(sessions: ReadonlyArray<SleepRow>, since: Date): number {

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { babyAgeFromBirth, durationLabel } from '@/lib/baby-age';
+import { formatTimeAr } from '@/lib/format-ar';
 import { dateLabel, greetingFor } from '@/lib/greeting';
 import { cn } from '@/lib/utils';
 import { suggestNextSleep } from '@/lib/wake-windows';
@@ -181,5 +182,5 @@ export function HomeHero({
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return formatTimeAr(iso);
 }

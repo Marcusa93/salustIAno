@@ -142,21 +142,35 @@ export function predictNextDiaper(
 
 /**
  * Format para UI: "16:30" ó "mañana 09:15" si está fuera del día.
+ *
+ * `toDateString()` y operaciones similares usan la TZ del runtime, lo
+ * que en Vercel (UTC) da día equivocado para horarios AR. Convertimos
+ * todo a hora AR antes de comparar día.
  */
 export function formatPredictionTime(d: Date, now: Date = new Date()): string {
-  // hour12:false forzado: en AR se usa 24h pero el locale es-AR por
-  // default vuelve "05:30 p. m." que rompe el layout compacto.
+  // hour12:false + timeZone AR: la familia siempre quiere ver hora local
+  // de Argentina aunque el server esté en UTC.
   const time = d.toLocaleTimeString('es-AR', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    timeZone: 'America/Argentina/Buenos_Aires',
   });
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) return time;
+  // Comparación de día en hora AR (no en TZ del runtime).
+  const arDayKey = (date: Date) =>
+    date.toLocaleDateString('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'America/Argentina/Buenos_Aires',
+    });
+  const dKey = arDayKey(d);
+  const nowKey = arDayKey(now);
+  if (dKey === nowKey) return time;
   const tomorrow = new Date(now);
   tomorrow.setDate(now.getDate() + 1);
-  if (d.toDateString() === tomorrow.toDateString()) return `mañana ${time}`;
-  return `${d.toLocaleDateString('es-AR', { weekday: 'short' })} ${time}`;
+  if (dKey === arDayKey(tomorrow)) return `mañana ${time}`;
+  return `${d.toLocaleDateString('es-AR', { weekday: 'short', timeZone: 'America/Argentina/Buenos_Aires' })} ${time}`;
 }
 
 /**

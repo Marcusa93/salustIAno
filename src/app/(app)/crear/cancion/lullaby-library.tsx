@@ -301,5 +301,9 @@ function formatRelative(iso: string): string {
   if (days === 1) return 'ayer';
   if (days < 7) return `hace ${days} días`;
   if (days < 30) return `hace ${Math.round(days / 7)} sem`;
-  return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+  return new Date(iso).toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
 }

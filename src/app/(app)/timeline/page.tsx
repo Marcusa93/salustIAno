@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { bucketByDayLast7, groupEventsByDay } from '@/lib/event-grouping';
+import { formatTimeAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
 import {
@@ -69,10 +70,7 @@ interface PageProps {
 }
 
 function formatTimeOnly(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatTimeAr(iso);
 }
 
 function dayCounts(items: ReadonlyArray<TimelineRow>): Array<{ Icon: LucideIcon; n: number }> {

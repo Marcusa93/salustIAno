@@ -1,3 +1,4 @@
+import { formatDateAr, formatTimeAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import {
   BREAST_SIDE_LABELS,
@@ -35,8 +36,7 @@ function parseDateOrFallback(input: string | undefined, fallback: Date): Date {
 }
 
 function formatDay(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-AR', {
+  return formatDateAr(iso, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -45,7 +45,7 @@ function formatDay(iso: string): string {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return formatTimeAr(iso);
 }
 
 function dayKey(iso: string): string {
@@ -187,7 +187,7 @@ export default async function TimelinePrintPage({ searchParams }: PageProps) {
     {} as Record<string, number>,
   );
 
-  const periodLabel = `Del ${start.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })} al ${end.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  const periodLabel = `Del ${formatDateAr(start, { day: 'numeric', month: 'long', year: 'numeric' })} al ${formatDateAr(end, { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
   return (
     <div

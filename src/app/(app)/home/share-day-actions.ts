@@ -1,5 +1,6 @@
 'use server';
 
+import { formatDateAr, formatTimeAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 
 export interface DayShareSnapshot {
@@ -93,7 +94,7 @@ export async function getDayShareSnapshotAction(): Promise<DayShareSnapshot | nu
   // Texto. Idioma: rioplatense, 1ra persona del plural cuando aplique
   // ("hoy tuvimos"). Si todavía no hay datos, lo decimos honesto.
   const today = new Date();
-  const dayLabel = today.toLocaleDateString('es-AR', {
+  const dayLabel = formatDateAr(today, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -122,11 +123,7 @@ export async function getDayShareSnapshotAction(): Promise<DayShareSnapshot | nu
     photoUrl = signed?.signedUrl ?? null;
   }
 
-  const generatedAtAr = today.toLocaleTimeString('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+  const generatedAtAr = formatTimeAr(today);
 
   return {
     text,

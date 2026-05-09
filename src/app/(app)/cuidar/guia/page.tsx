@@ -30,7 +30,12 @@ function snippet(content: string, max = 140): string {
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+  return d.toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
 }
 
 export default async function CareGuidesListPage({ searchParams }: PageProps) {

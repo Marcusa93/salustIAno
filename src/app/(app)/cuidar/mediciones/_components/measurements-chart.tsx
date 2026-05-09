@@ -204,5 +204,9 @@ function formatTick(v: number, m: Metric): string {
 }
 
 function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+  return new Date(ts).toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
 }

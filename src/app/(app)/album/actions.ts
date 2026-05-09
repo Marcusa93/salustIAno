@@ -192,8 +192,21 @@ async function getOrCreateMonthlyAlbum(
   createdBy: string,
   date: Date,
 ): Promise<string | null> {
-  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
-  const monthName = date.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  // monthKey en hora AR — sin esto, una foto subida a las 23 AR (= 02
+  // UTC del día siguiente) caería en el álbum del mes equivocado.
+  const arParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(date);
+  const arYear = arParts.find((p) => p.type === 'year')?.value ?? '';
+  const arMonth = arParts.find((p) => p.type === 'month')?.value ?? '';
+  const monthKey = `${arYear}-${arMonth}-01`;
+  const monthName = date.toLocaleDateString('es-AR', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
   const capitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
   const { data: existing } = await supabase

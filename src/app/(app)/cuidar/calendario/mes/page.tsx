@@ -153,9 +153,10 @@ export default async function CalendarioMesPage({ searchParams }: PageProps) {
   }
 
   const monthLabel = capitalize(
-    new Date(year, month - 1, 1).toLocaleDateString('es-AR', {
+    new Date(Date.UTC(year, month - 1, 15, 12, 0, 0)).toLocaleDateString('es-AR', {
       month: 'long',
       year: 'numeric',
+      timeZone: 'America/Argentina/Buenos_Aires',
     }),
   );
 
@@ -346,13 +347,21 @@ function UpcomingRow({ milestone }: { milestone: MilestoneRow }) {
           weekday: 'long',
           day: 'numeric',
           month: 'long',
+          timeZone: 'America/Argentina/Buenos_Aires',
         }),
       )
     : 'Sin fecha';
-  const hasTime = date && (date.getHours() !== 0 || date.getMinutes() !== 0);
-  const timeLabel = hasTime
-    ? date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+  // hasTime en hora AR — `getHours/getMinutes` usan TZ del runtime.
+  const arHourMin = date
+    ? date.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'America/Argentina/Buenos_Aires',
+      })
     : null;
+  const hasTime = arHourMin !== null && arHourMin !== '00:00';
+  const timeLabel = hasTime ? arHourMin : null;
   return (
     <Link
       href={`/cuidar/calendario/${milestone.id}` as Route}

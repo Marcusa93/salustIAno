@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { durationLabel } from '@/lib/baby-age';
+import { formatTimeAr } from '@/lib/format-ar';
 import { type Prediction, formatPredictionTime } from '@/lib/predictions';
 import { Baby, Milk, Moon, Sparkles } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -75,13 +76,7 @@ export function LastEventsStrip({
 
 function Cell({ Icon, label, whenISO, todayCount, prediction }: CellProps) {
   const when = whenISO ? `Hace ${durationLabel(whenISO)}` : 'Sin registros';
-  const time = whenISO
-    ? new Date(whenISO).toLocaleTimeString('es-AR', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      })
-    : null;
+  const time = whenISO ? formatTimeAr(whenISO) : null;
   return (
     <Card className="flex flex-col gap-2 border-border/60 bg-gradient-to-b from-card to-muted/15 p-4">
       <div className="flex items-center gap-3">

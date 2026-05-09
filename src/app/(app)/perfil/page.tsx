@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/salu/page-header';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
+import { formatDateAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import type { Metadata } from 'next';
 import { NotificationPrefsCard } from './_components/notification-prefs';
@@ -39,7 +40,7 @@ export default async function PerfilPage() {
 
   const initial = (displayName?.[0] ?? email?.[0] ?? '?').toUpperCase();
   const memberSinceLabel = memberSince
-    ? `Miembro desde ${new Date(memberSince).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`
+    ? `Miembro desde ${formatDateAr(memberSince, { month: 'long', year: 'numeric' })}`
     : null;
 
   return (

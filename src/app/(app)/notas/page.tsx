@@ -3,6 +3,7 @@ import { NoteEmptyIllustration } from '@/components/salu/illustrations/note-empt
 import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { formatDateAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
 import { NOTE_CATEGORY_LABELS, type NoteCategory, noteCategoryEnum } from '@/lib/validators/note';
@@ -33,7 +34,7 @@ function snippet(content: string, max = 180): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-AR', {
+  return formatDateAr(iso, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',

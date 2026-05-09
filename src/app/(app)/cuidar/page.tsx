@@ -57,7 +57,10 @@ function relativeUntil(iso: string, now: Date = new Date()): string {
 }
 
 function shortWeekday(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-AR', { weekday: 'long' });
+  return new Date(iso).toLocaleDateString('es-AR', {
+    weekday: 'long',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
 }
 
 function minutesBetween(start: string, end: string): number {

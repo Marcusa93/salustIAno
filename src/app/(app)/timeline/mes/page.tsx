@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { formatDateAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
 import { Baby, BookHeart, ChevronLeft, ChevronRight, Milk, Moon } from 'lucide-react';
@@ -144,8 +145,12 @@ export default async function TimelineMesPage({ searchParams }: PageProps) {
     });
   }
 
+  // Día 15 a midday UTC = no cambia de mes al convertirse a TZ AR.
+  // Necesario para que el label muestre el mes correcto cuando corre en
+  // Vercel UTC (un Date al primer día del mes a las 00:00 UTC se ve como
+  // el último día del mes anterior a las 21:00 AR).
   const monthLabel = capitalize(
-    new Date(year, month - 1, 1).toLocaleDateString('es-AR', {
+    formatDateAr(new Date(Date.UTC(year, month - 1, 15, 12, 0, 0)), {
       month: 'long',
       year: 'numeric',
     }),

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { groupEventsByTime } from '@/lib/event-grouping';
+import { formatTimeAr } from '@/lib/format-ar';
 import { cn } from '@/lib/utils';
 import {
   BREAST_SIDE_LABELS,
@@ -66,7 +67,7 @@ export function RecentEventsGrouped({ rows, emptyState }: Props) {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return formatTimeAr(iso);
 }
 
 function EventRow({ row }: { row: RecentTimelineRow }) {
