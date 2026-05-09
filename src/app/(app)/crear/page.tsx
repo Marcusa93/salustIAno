@@ -1,4 +1,5 @@
 import { PageHeader } from '@/components/salu/page-header';
+import { SpotifyEmbed } from '@/components/salu/spotify-embed';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { BookOpen, Music, Sparkles } from 'lucide-react';
@@ -7,7 +8,7 @@ import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Crear',
+  title: 'Diversión',
 };
 
 interface CreateOption {
@@ -18,7 +19,7 @@ interface CreateOption {
   badge?: string;
 }
 
-const OPTIONS: CreateOption[] = [
+const AI_OPTIONS: CreateOption[] = [
   {
     href: '/crear/cuento' as Route,
     title: 'Cuento personalizado',
@@ -37,20 +38,67 @@ const OPTIONS: CreateOption[] = [
   },
 ];
 
+/**
+ * Playlist de Spotify de la familia. Cuando Marco/Abril armen otra
+ * para un momento distinto, basta con sumar otra entrada acá. Las URL
+ * tienen que ser de spotify.com — el componente se encarga del embed.
+ */
+const SPOTIFY_PLAYLISTS: ReadonlyArray<{ url: string; title: string }> = [
+  {
+    url: 'https://open.spotify.com/playlist/3U5CcYIMZo3BRnD2JV4I0c',
+    title: 'Música para Salu',
+  },
+];
+
 export default function CrearPage() {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
       <PageHeader
-        eyebrow="Crear"
-        title="Cuentos y canciones para Salu."
-        description="Pequeñas obras hechas para él. Se quedan guardadas para volver a leerlas o escucharlas."
+        eyebrow="Diversión"
+        title="Cuentos, canciones y música."
+        description="Pequeñas obras hechas con IA y la playlist que la familia eligió a mano."
       />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {OPTIONS.map((opt, idx) => (
-          <CreateCard key={opt.title} option={opt} index={idx} />
-        ))}
-      </div>
+      {/* Sección "Generado con IA" — los creadores que ya teníamos. */}
+      <section
+        className="animate-stagger-up flex flex-col gap-4"
+        style={{ animationDelay: '60ms' }}
+      >
+        <header className="flex flex-col gap-1">
+          <span className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+            Generado con IA
+          </span>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Cuentos y nanas hechos a medida. La IA escribe, vos guardás.
+          </p>
+        </header>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {AI_OPTIONS.map((opt, idx) => (
+            <CreateCard key={opt.title} option={opt} index={idx} />
+          ))}
+        </div>
+      </section>
+
+      {/* Sección "Sin IA" — música humana que la familia eligió. */}
+      <section
+        className="animate-stagger-up flex flex-col gap-4"
+        style={{ animationDelay: '140ms' }}
+      >
+        <header className="flex flex-col gap-1">
+          <span className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+            Sin IA
+          </span>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            La playlist de Spotify que la familia eligió. Reproducción completa con cuenta de
+            Spotify; sin cuenta, previews de 30 segundos.
+          </p>
+        </header>
+        <div className="flex flex-col gap-4">
+          {SPOTIFY_PLAYLISTS.map((p) => (
+            <SpotifyEmbed key={p.url} url={p.url} title={p.title} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

@@ -14,7 +14,7 @@ const navItems = [
   { href: '/cuidar', label: 'Cuidar', icon: Baby },
   { href: '/timeline', label: 'Registro', icon: BookHeart },
   { href: '/album', label: 'Álbum', icon: ImageIcon },
-  { href: '/crear', label: 'Crear', icon: Sparkles },
+  { href: '/crear', label: 'Diversión', icon: Sparkles },
   { href: '/familia', label: 'Familia', icon: Users },
 ] as const;
 
