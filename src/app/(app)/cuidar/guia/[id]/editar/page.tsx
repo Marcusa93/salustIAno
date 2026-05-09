@@ -1,9 +1,9 @@
+import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/server';
 import type { CareGuideCategory } from '@/lib/validators/care-guide';
 import { ChevronLeft } from 'lucide-react';
-import type { Metadata } from 'next';
-import type { Route } from 'next';
+import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CareGuideForm } from '../../_components/care-guide-form';
@@ -33,23 +33,18 @@ export default async function EditCareGuidePage({ params }: PageProps) {
   const onSubmit = updateCareGuideAction.bind(null, guide.id);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-3">
-        <Button
-          render={<Link href={`/cuidar/guia/${guide.id}` as Route} />}
-          variant="ghost"
-          size="sm"
-          className="self-start"
-        >
-          <ChevronLeft className="size-4" aria-hidden />
-          Volver
-        </Button>
-        <div className="flex flex-col gap-2">
-          <h1 className="font-display text-3xl text-foreground tracking-tight sm:text-4xl">
-            Editar entrada
-          </h1>
-        </div>
-      </header>
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
+      <Button
+        render={<Link href={`/cuidar/guia/${guide.id}` as Route} />}
+        variant="ghost"
+        size="sm"
+        className="-mb-2 self-start text-muted-foreground"
+      >
+        <ChevronLeft className="size-4" aria-hidden />
+        Volver a la entrada
+      </Button>
+
+      <PageHeader eyebrow="Cuidar · Guía" title="Editar entrada." />
 
       <CareGuideForm
         defaultValues={{
