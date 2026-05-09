@@ -21,9 +21,11 @@ import { HomeHero } from './_components/home-hero';
 import { LastEventsStrip } from './_components/last-events-strip';
 import { QuickActionTile } from './_components/quick-action-tile';
 import { RecentEventsGrouped, type RecentTimelineRow } from './_components/recent-events-grouped';
+import { ShareDayCard } from './_components/share-day-card';
 import { SleepQuickAdd } from './_components/sleep-quick-add';
 import { UpcomingControlsCard } from './_components/upcoming-controls-card';
 import { getTodayActivityByMemberAction } from './family-activity-actions';
+import { getDayShareSnapshotAction } from './share-day-actions';
 
 export const metadata: Metadata = {
   title: 'Casa',
@@ -109,6 +111,7 @@ export default async function HomePage() {
     { data: diapersLast7 },
     { data: sleepsLast7 },
     todayActivity,
+    shareSnapshot,
     { data: upcomingMilestones },
   ] = await Promise.all([
     supabase.rpc('get_timeline', {
@@ -179,6 +182,7 @@ export default async function HomePage() {
       .is('deleted_at', null)
       .gte('started_at', since7d.toISOString()),
     getTodayActivityByMemberAction(),
+    getDayShareSnapshotAction(),
     supabase
       .from('medical_milestones')
       .select('id, title, category, due_at, completed_at')
@@ -480,6 +484,10 @@ export default async function HomePage() {
           </Card>
         )}
       </section>
+
+      {/* Compartir el día con la familia extendida — texto + foto del
+          día. Usa Web Share API en mobile, fallback a copy en desktop. */}
+      <ShareDayCard initial={shareSnapshot} />
     </div>
   );
 }
