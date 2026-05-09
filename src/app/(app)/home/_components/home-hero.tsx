@@ -1,3 +1,4 @@
+import { Salu360Avatar } from '@/components/salu/salu-360-avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { babyAgeFromBirth, durationLabel } from '@/lib/baby-age';
@@ -94,8 +95,18 @@ export function HomeHero({
             aria-hidden
             className="-top-12 -left-12 absolute size-40 rounded-full bg-primary/20 blur-3xl"
           />
-          <div className="relative flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/20">
-            <Moon className="size-6 animate-breathe" aria-hidden />
+          {/* Avatar 360 del bebé en loop. El badge Moon arriba indica
+              estado (durmiendo) sin necesidad de leer el texto.
+              `w-fit` evita que el wrapper crezca al ancho del flex item
+              y empuje el badge fuera del avatar en mobile. */}
+          <div className="relative w-fit shrink-0">
+            <Salu360Avatar size={76} className="ring-primary/25" />
+            <span
+              aria-hidden
+              className="-bottom-1 -right-1 absolute flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow ring-2 ring-card"
+            >
+              <Moon className="size-3 animate-breathe" />
+            </span>
           </div>
           <div className="relative flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="font-medium text-foreground text-lg">
@@ -126,19 +137,25 @@ export function HomeHero({
             lateNight && 'border-primary/20 from-card via-primary/[0.04] to-primary/[0.08]',
           )}
         >
-          <div
-            className={cn(
-              'flex size-14 shrink-0 items-center justify-center rounded-full ring-1',
-              lateNight
-                ? 'bg-primary/12 text-primary ring-primary/15'
-                : 'bg-accent/40 text-accent-foreground ring-accent/30',
-            )}
-          >
-            {lateNight ? (
-              <Moon className="size-6 animate-breathe" aria-hidden />
-            ) : (
-              <Sun className="size-6" aria-hidden />
-            )}
+          {/* Avatar 360 + badge de estado (despierto = Sun, madrugada
+              despierto = Moon). El bebé en loop le da vida al hero.
+              `w-fit` evita que el wrapper crezca al ancho del flex item. */}
+          <div className="relative w-fit shrink-0">
+            <Salu360Avatar
+              size={76}
+              className={cn(lateNight ? 'ring-primary/20' : 'ring-accent/30')}
+            />
+            <span
+              aria-hidden
+              className={cn(
+                '-bottom-1 -right-1 absolute flex size-6 items-center justify-center rounded-full shadow ring-2 ring-card',
+                lateNight
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-accent text-accent-foreground',
+              )}
+            >
+              {lateNight ? <Moon className="size-3 animate-breathe" /> : <Sun className="size-3" />}
+            </span>
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="font-medium text-foreground text-lg">
