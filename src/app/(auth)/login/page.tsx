@@ -14,10 +14,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3">
-        <h1 className="font-heading text-4xl leading-tight tracking-tight">Entrá a Salu.</h1>
-        <p className="text-muted-foreground">Tu casa te está esperando.</p>
+    <div className="flex flex-col gap-7">
+      <div className="flex flex-col gap-2.5">
+        <span className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+          Entrá
+        </span>
+        <h1 className="font-display text-[clamp(1.875rem,5vw,2.5rem)] text-foreground leading-[1.1] tracking-tight">
+          A tu casa, Salu.
+        </h1>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          Te está esperando lo del día — tomas, sueños, fotos, lo que registró la familia.
+        </p>
       </div>
 
       <LoginForm
@@ -30,7 +37,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         ¿Todavía no tenés casa?{' '}
         <Link
           href="/signup"
-          className="font-heading text-foreground italic underline-offset-4 hover:underline"
+          className="font-display text-foreground italic underline-offset-4 hover:underline"
         >
           Creá una.
         </Link>

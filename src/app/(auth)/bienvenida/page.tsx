@@ -58,14 +58,14 @@ export default async function BienvenidaPage() {
 
   return (
     <div className="flex flex-col gap-7">
-      <header className="flex flex-col gap-2">
-        <span className="font-medium text-muted-foreground/80 text-[11px] uppercase tracking-[0.22em]">
+      <header className="flex flex-col gap-2.5">
+        <span className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
           Te invitaron
         </span>
-        <h1 className="font-heading text-3xl leading-tight tracking-tight sm:text-4xl">
+        <h1 className="font-display text-[clamp(1.625rem,5vw,2.25rem)] text-foreground leading-[1.1] tracking-tight">
           {firstName ? `¡Hola, ${firstName}!` : '¡Hola!'} Bienvenida a Salu.
         </h1>
-        <p className="text-muted-foreground leading-relaxed">
+        <p className="text-muted-foreground text-sm leading-relaxed">
           Es el lugar donde la familia guarda todo lo de Salustiano, mes a mes. Antes de empezar
           elegí una contraseña nueva — la temporal era solo para el primer login.
         </p>
