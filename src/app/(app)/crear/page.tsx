@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/salu/page-header';
 import { SpotifyEmbed } from '@/components/salu/spotify-embed';
+import { YouTubeEmbed } from '@/components/salu/youtube-embed';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { BookOpen, Music, Sparkles } from 'lucide-react';
@@ -50,6 +51,18 @@ const SPOTIFY_PLAYLISTS: ReadonlyArray<{ url: string; title: string }> = [
   },
 ];
 
+/**
+ * Playlists / videos de YouTube. Funciona para videos individuales,
+ * playlists y mezclas. El componente usa youtube-nocookie + rel=0 así
+ * que no aparecen recomendaciones turbias al terminar.
+ */
+const YOUTUBE_PLAYLISTS: ReadonlyArray<{ url: string; title: string }> = [
+  {
+    url: 'https://youtube.com/playlist?list=PLRYqBfd7pEKweV1tY8zxwX8KD1svZ4nlD',
+    title: 'Videos para Salu',
+  },
+];
+
 export default function CrearPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
@@ -79,7 +92,7 @@ export default function CrearPage() {
         </div>
       </section>
 
-      {/* Sección "Sin IA" — música humana que la familia eligió. */}
+      {/* Sección "Sin IA" — música y videos humanos que la familia eligió. */}
       <section
         className="animate-stagger-up flex flex-col gap-4"
         style={{ animationDelay: '140ms' }}
@@ -89,13 +102,16 @@ export default function CrearPage() {
             Sin IA
           </span>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            La playlist de Spotify que la familia eligió. Reproducción completa con cuenta de
-            Spotify; sin cuenta, previews de 30 segundos.
+            Música y videos elegidos a mano por la familia. La playlist de Spotify reproduce entera
+            con cuenta (free o premium); los videos de YouTube andan sin login.
           </p>
         </header>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
           {SPOTIFY_PLAYLISTS.map((p) => (
             <SpotifyEmbed key={p.url} url={p.url} title={p.title} />
+          ))}
+          {YOUTUBE_PLAYLISTS.map((p) => (
+            <YouTubeEmbed key={p.url} url={p.url} title={p.title} />
           ))}
         </div>
       </section>
