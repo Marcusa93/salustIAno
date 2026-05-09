@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   title: 'Cuidar',
 };
 
+type SectionId = 'salud' | 'patrones' | 'aprender';
+
 interface CuidarOption {
   href: Route;
   title: string;
@@ -27,7 +29,43 @@ interface CuidarOption {
   Icon: LucideIcon;
   badge?: string;
   microInfo?: string;
+  section: SectionId;
 }
+
+interface SectionMeta {
+  id: SectionId;
+  eyebrow: string;
+  description: string;
+}
+
+/**
+ * Las 7 herramientas se agrupan en 3 secciones para no abrumar:
+ *   - Salud:    cosas clínicas, peso, controles, alarmas.
+ *   - Patrones: cómo viene la rutina (sueño, observaciones de IA).
+ *   - Aprender: referencia de la pediatra.
+ *
+ * Sin tabs interactivas: 3 bloques con headers claros bastan para
+ * que la familia ubique rápido la herramienta que busca, sin romper
+ * URLs ni flow.
+ */
+const SECTIONS: ReadonlyArray<SectionMeta> = [
+  {
+    id: 'salud',
+    eyebrow: 'Salud',
+    description:
+      'Lo clínico: peso, controles del pediatra, análisis de pañal, borrador de consulta.',
+  },
+  {
+    id: 'patrones',
+    eyebrow: 'Patrones',
+    description: 'Cómo viene la rutina diaria — sueño, alimentación, observaciones con IA.',
+  },
+  {
+    id: 'aprender',
+    eyebrow: 'Aprender',
+    description: 'La biblioteca de la familia: lo que dijo la pediatra, lo que aprendieron juntos.',
+  },
+];
 
 function relativeDays(iso: string, now: Date = new Date()): string {
   const ms = now.getTime() - new Date(iso).getTime();
@@ -220,14 +258,17 @@ export default async function CuidarPage() {
       ? 'Sin entradas todavía'
       : `${guidesCount} entrada${guidesCount === 1 ? '' : 's'}`;
 
-  // Cards en orden de frecuencia de uso real.
+  // Cards con su sección asignada — el orden de OPTIONS no importa
+  // visualmente porque el render las agrupa por sección abajo.
   const OPTIONS: CuidarOption[] = [
+    // Salud — lo clínico, lo que llevarías al pediatra.
     {
-      href: '/cuidar/sueno' as Route,
-      title: 'Sueño',
-      description: 'Cómo viene el descanso, ventana de vigilia y guía de sueño seguro.',
-      Icon: Moon,
-      microInfo: sleepMicro,
+      href: '/cuidar/calendario' as Route,
+      title: 'Calendario de controles',
+      description: 'Pesquisa neonatal, ecografías, vacunas — lo que viene.',
+      Icon: CalendarClock,
+      microInfo: calendarMicro,
+      section: 'salud',
     },
     {
       href: '/cuidar/mediciones' as Route,
@@ -235,6 +276,7 @@ export default async function CuidarPage() {
       description: 'Peso, talla, perímetro cefálico — cómo va creciendo.',
       Icon: Ruler,
       microInfo: measurementMicro,
+      section: 'salud',
     },
     {
       href: '/cuidar/panal-foto' as Route,
@@ -243,13 +285,7 @@ export default async function CuidarPage() {
       Icon: Camera,
       badge: 'Beta',
       microInfo: aquitappMicro,
-    },
-    {
-      href: '/cuidar/calendario' as Route,
-      title: 'Calendario de controles',
-      description: 'Pesquisa neonatal, ecografías, vacunas — lo que viene.',
-      Icon: CalendarClock,
-      microInfo: calendarMicro,
+      section: 'salud',
     },
     {
       href: '/cuidar/control' as Route,
@@ -258,6 +294,16 @@ export default async function CuidarPage() {
       Icon: ClipboardCheck,
       badge: 'Beta',
       microInfo: controlMicro,
+      section: 'salud',
+    },
+    // Patrones — cómo viene la rutina diaria.
+    {
+      href: '/cuidar/sueno' as Route,
+      title: 'Sueño',
+      description: 'Cómo viene el descanso, ventana de vigilia y guía de sueño seguro.',
+      Icon: Moon,
+      microInfo: sleepMicro,
+      section: 'patrones',
     },
     {
       href: '/cuidar/patrones' as Route,
@@ -266,25 +312,52 @@ export default async function CuidarPage() {
       Icon: Sparkles,
       badge: 'IA',
       microInfo: 'Se genera on demand',
+      section: 'patrones',
     },
+    // Aprender — referencia.
     {
       href: '/cuidar/guia' as Route,
       title: 'Guía de cuidado',
       description: 'Lo que la pediatra te dijo, lo que aprendieron en familia.',
       Icon: BookHeart,
       microInfo: guideMicro,
+      section: 'aprender',
     },
   ];
 
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
-      <PageHeader eyebrow="Cuidar" title="El día a día de Salu, ordenado." />
+  // Agrupamos para el render. Mantenemos el orden de SECTIONS.
+  const grouped = SECTIONS.map((section) => ({
+    section,
+    options: OPTIONS.filter((o) => o.section === section.id),
+  })).filter((g) => g.options.length > 0);
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {OPTIONS.map((opt, idx) => (
-          <CuidarCard key={opt.title} option={opt} index={idx} />
-        ))}
-      </div>
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
+      <PageHeader
+        eyebrow="Cuidar"
+        title="El día a día de Salu, ordenado."
+        description="Tres áreas: Salud, Patrones y Aprender. Tocá una herramienta para entrar."
+      />
+
+      {grouped.map(({ section, options }, sectionIdx) => (
+        <section
+          key={section.id}
+          className="animate-stagger-up flex flex-col gap-4"
+          style={{ animationDelay: `${60 + sectionIdx * 80}ms` }}
+        >
+          <header className="flex flex-col gap-1">
+            <span className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+              {section.eyebrow}
+            </span>
+            <p className="text-muted-foreground text-sm leading-relaxed">{section.description}</p>
+          </header>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {options.map((opt, idx) => (
+              <CuidarCard key={opt.title} option={opt} index={idx} />
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
