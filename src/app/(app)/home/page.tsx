@@ -248,8 +248,12 @@ export default async function HomePage() {
     sleep: averagePerDay((sleepsLast7 ?? []).length, 7),
   };
 
+  // Total de eventos del día — usado para gatear cards que sólo aportan
+  // cuando hay actividad cargada (ShareDayCard).
+  const totalEventsToday = todaySummary.feeding + todaySummary.sleep + todaySummary.diaper;
+
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
       {/* Realtime: si otro miembro de la familia carga un evento desde
           su dispositivo, refresca la página automáticamente. */}
       <RealtimeRefresher childId={child.id as string} />
@@ -309,10 +313,7 @@ export default async function HomePage() {
 
       {/* Resumen del día con IA */}
       <div className="animate-stagger-up" style={{ animationDelay: '120ms' }}>
-        <DailySummaryCard
-          childId={child.id as string}
-          todayEventCount={todaySummary.feeding + todaySummary.sleep + todaySummary.diaper}
-        />
+        <DailySummaryCard childId={child.id as string} todayEventCount={totalEventsToday} />
       </div>
 
       {/* Cómo va el día — comparado contra rangos AAP por edad. La sección
@@ -493,8 +494,12 @@ export default async function HomePage() {
       </section>
 
       {/* Compartir el día con la familia extendida — texto + foto del
-          día. Usa Web Share API en mobile, fallback a copy en desktop. */}
-      <ShareDayCard initial={shareSnapshot} />
+          día. Usa Web Share API en mobile, fallback a copy en desktop.
+          Se oculta:
+            - En madrugada (compartir a las 3am es raro y rompe el
+              "modo silencioso").
+            - Si no hay eventos del día (no hay nada que compartir). */}
+      {!lateNight && totalEventsToday > 0 && <ShareDayCard initial={shareSnapshot} />}
     </div>
   );
 }
