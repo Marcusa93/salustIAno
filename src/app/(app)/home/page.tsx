@@ -2,6 +2,8 @@ import { CradleIllustration } from '@/components/salu/illustrations/cradle';
 import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timeline-empty';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { babyAgeFromBirth } from '@/lib/baby-age';
+import { expectationsFor } from '@/lib/baby-expectations';
 import { greetingFor } from '@/lib/greeting';
 import { createClient } from '@/lib/supabase/server';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
@@ -11,6 +13,7 @@ import Link from 'next/link';
 import { CloseSleepSheet } from './_components/close-sleep-sheet';
 import { DailySummaryCard } from './_components/daily-summary-card';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
+import { ExpectationsCard } from './_components/expectations-card';
 import { FamilyActivityCard } from './_components/family-activity-card';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
 import { HomeHero } from './_components/home-hero';
@@ -174,6 +177,26 @@ export default async function HomePage() {
     diaper: today.filter((e) => e.event_type === 'diaper').length,
   };
 
+  // Total de horas de sueño cargadas hoy: cerradas (ended_at - started_at)
+  // + activa en curso (started_at hasta ahora). Solo cuenta lo que ya
+  // tiene rastro en la base — para que la card "Cómo va el día" pueda
+  // detectar siestas sin cerrar.
+  const todaySleepMs = today
+    .filter((e) => e.event_type === 'sleep')
+    .reduce((acc, e) => {
+      const started = e.payload.started_at as string | undefined;
+      const ended = e.payload.ended_at as string | undefined;
+      if (!started) return acc;
+      const startMs = new Date(started).getTime();
+      const endMs = ended ? new Date(ended).getTime() : Date.now();
+      const delta = endMs - startMs;
+      return acc + Math.max(0, delta);
+    }, 0);
+  const todaySleepHours = todaySleepMs / (1000 * 60 * 60);
+
+  const ageDays = babyAgeFromBirth(child.birth_date)?.days ?? null;
+  const expectations = expectationsFor(ageDays);
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
       {/* ZONA 1 — HERO: estado vivo del bebé. */}
@@ -235,6 +258,47 @@ export default async function HomePage() {
           todayEventCount={todaySummary.feeding + todaySummary.sleep + todaySummary.diaper}
         />
       </div>
+
+      {/* Cómo va el día — comparado contra rangos AAP por edad. La sección
+          arma triggers chicos para que cada barra abra el QuickAdd
+          correspondiente con un toque. */}
+      {expectations && (
+        <ExpectationsCard
+          expectations={expectations}
+          todayCounts={{
+            feedingsCount: todaySummary.feeding,
+            diapersCount: todaySummary.diaper,
+            sleepHours: todaySleepHours,
+          }}
+          feedingTrigger={
+            <FeedingQuickAdd
+              trigger={
+                <Button type="button" size="xs" variant="ghost" aria-label="Anotar toma">
+                  <Plus className="size-3.5" aria-hidden />
+                </Button>
+              }
+            />
+          }
+          diaperTrigger={
+            <DiaperQuickAdd
+              trigger={
+                <Button type="button" size="xs" variant="ghost" aria-label="Anotar pañal">
+                  <Plus className="size-3.5" aria-hidden />
+                </Button>
+              }
+            />
+          }
+          sleepTrigger={
+            <SleepQuickAdd
+              trigger={
+                <Button type="button" size="xs" variant="ghost" aria-label="Anotar sueño">
+                  <Plus className="size-3.5" aria-hidden />
+                </Button>
+              }
+            />
+          }
+        />
+      )}
 
       {/* Próximos controles (vencidos + 14 días) */}
       {upcomingMilestones && upcomingMilestones.length > 0 && (
