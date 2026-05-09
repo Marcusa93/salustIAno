@@ -24,7 +24,7 @@ import {
   sendMessageAction,
   sendPhotoToChatAction,
 } from '../actions';
-import { ProposalCard } from './proposal-card';
+import { ProposalGroup } from './proposal-group';
 
 const SUGGESTIONS = [
   'Anotá una toma de pecho izquierdo, 15 minutos, hace una hora',
@@ -296,8 +296,9 @@ export function ChatThread({ childName, initialHistory = [] }: ChatThreadProps) 
                 <SpeakButton text={e.content} />
               </div>
             )}
-            {e.role === 'assistant' &&
-              e.proposals.map((p, j) => <ProposalCard key={`${i}-${j}-${p.kind}`} proposal={p} />)}
+            {e.role === 'assistant' && e.proposals.length > 0 && (
+              <ProposalGroup proposals={e.proposals} />
+            )}
           </div>
         ))}
 

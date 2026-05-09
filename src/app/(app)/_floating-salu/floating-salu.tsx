@@ -1,6 +1,6 @@
 'use client';
 
-import { ProposalCard } from '@/app/(app)/chat/_components/proposal-card';
+import { ProposalGroup } from '@/app/(app)/chat/_components/proposal-group';
 import {
   type ChatHistoryEntry,
   clearChatHistoryAction,
@@ -403,10 +403,9 @@ export function FloatingSalu() {
                 {entries.map((e, i) => (
                   <div key={`${e.role}-${i}`} className="flex flex-col gap-2">
                     <MessageBubble entry={e} />
-                    {e.role === 'assistant' &&
-                      e.proposals.map((p, j) => (
-                        <ProposalCard key={`${i}-${j}-${p.kind}`} proposal={p} />
-                      ))}
+                    {e.role === 'assistant' && e.proposals.length > 0 && (
+                      <ProposalGroup proposals={e.proposals} />
+                    )}
                   </div>
                 ))}
                 {pending && (
