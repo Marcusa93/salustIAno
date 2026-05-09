@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
 import type { Metadata } from 'next';
+import { NotificationPrefsCard } from './_components/notification-prefs';
 import { PushToggle } from './_components/push-toggle';
 import { PerfilForm } from './perfil-form';
 
@@ -77,6 +78,10 @@ export default async function PerfilPage() {
 
       <div className="animate-stagger-up" style={{ animationDelay: '120ms' }}>
         <PushToggle />
+      </div>
+
+      <div className="animate-stagger-up" style={{ animationDelay: '180ms' }}>
+        <NotificationPrefsCard />
       </div>
     </div>
   );
