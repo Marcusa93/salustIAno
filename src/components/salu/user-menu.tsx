@@ -14,7 +14,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CheckIcon, LogOut, User } from 'lucide-react';
+import { BookHeart, LogOut, User, Users } from 'lucide-react';
+import type { Route } from 'next';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 
@@ -49,6 +50,14 @@ export function UserMenu() {
         <DropdownMenuItem render={<Link href="/perfil" />}>
           <User />
           Mi cuenta
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/familia" />}>
+          <Users />
+          Familia
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href={'/notas' as Route} />}>
+          <BookHeart />
+          Notas
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
