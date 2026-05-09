@@ -345,31 +345,6 @@
   animation: salu-typing-dot 1.2s ease-in-out infinite;
 }
 
-/* ===========================================================================
- * HUD-style animations para el Salu360Hub: las líneas conectoras tienen un
- * "flow" tipo terminal/sci-fi (dashes que se desplazan a lo largo del path)
- * y el anillo de circuito gira muy lento.
- * ===========================================================================*/
-@keyframes salu-hud-flow {
-  to {
-    stroke-dashoffset: -10;
-  }
-}
-
-.animate-hud-flow {
-  animation: salu-hud-flow 1.8s linear infinite;
-}
-
-@keyframes salu-spin-slow {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.animate-spin-slow {
-  animation: salu-spin-slow 32s linear infinite;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .animate-page-enter,
   .animate-twinkle,
@@ -378,9 +353,7 @@
   .animate-orbit,
   .animate-shimmer,
   .animate-stagger-up,
-  .animate-typing-dot,
-  .animate-hud-flow,
-  .animate-spin-slow {
+  .animate-typing-dot {
     animation: none;
   }
   .animate-breathe {

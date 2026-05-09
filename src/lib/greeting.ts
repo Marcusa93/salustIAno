@@ -36,33 +36,6 @@ export function isLateNightAr(now: Date = new Date()): boolean {
 }
 
 /**
- * Franjas horarias del día en hora AR — usadas para el TimeOfDayBackdrop
- * (atmósfera viva del front). Cada franja tiene una paleta y energía
- * propia: la app cambia con el día como cambia la luz en una casa real.
- *
- *   madrugada (22-04, 7h): noche profunda, estrellas, silencio
- *   amanecer  (05-07, 3h): cielo se prende, naranjas suaves
- *   mañana    (08-11, 4h): luz blanca, partículas en el aire
- *   mediodia  (12-15, 4h): cálido, siesta, beige tibio
- *   tarde     (16-19, 4h): dorado, polvo de sol, nostalgia
- *   anochecer (20-21, 2h): púrpura, transición, cierre del día
- *
- * Total: 24h. Cada hora cae en exactamente una franja.
- */
-export type TimeOfDay = 'madrugada' | 'amanecer' | 'manana' | 'mediodia' | 'tarde' | 'anochecer';
-
-export function getTimeOfDayAr(now: Date = new Date()): TimeOfDay {
-  const utcHour = now.getUTCHours();
-  const arHour = (utcHour + AR_OFFSET_HOURS + 24) % 24;
-  if (arHour >= 22 || arHour < 5) return 'madrugada';
-  if (arHour < 8) return 'amanecer';
-  if (arHour < 12) return 'manana';
-  if (arHour < 16) return 'mediodia';
-  if (arHour < 20) return 'tarde';
-  return 'anochecer';
-}
-
-/**
  * Etiqueta de fecha completa en español ("Jueves, 8 de mayo"). Usa el
  * locale del runtime — Next la corre server-side, así que el resultado es
  * estable independientemente del browser del usuario. Sigue dependiendo
