@@ -323,8 +323,8 @@ export default async function TimelinePage({ searchParams }: PageProps) {
               <TimelineEmptyIllustration size={140} />
             </div>
           }
-          title="Todavía no hay registros"
-          description="Anotá algo desde Casa y volvé acá para verlo."
+          title="Acá va a vivir el día a día."
+          description="Cada toma, sueño, pañal y momento que registres aparece en este timeline ordenado por día. Empezá anotando algo desde Casa o decíselo a SaluIA — ella lo agrega por vos."
           action={{ label: 'Ir a Casa', href: '/home' as Route }}
         />
       ) : (

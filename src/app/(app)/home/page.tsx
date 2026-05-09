@@ -1,6 +1,7 @@
 import { CradleIllustration } from '@/components/salu/illustrations/cradle';
 import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timeline-empty';
 import { Salu360Hub } from '@/components/salu/salu-hub';
+import { WelcomeOverlay } from '@/components/salu/welcome-overlay';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { babyAgeFromBirth } from '@/lib/baby-age';
@@ -254,6 +255,18 @@ export default async function HomePage() {
       {/* Realtime: si otro miembro de la familia carga un evento desde
           su dispositivo, refresca la página automáticamente. */}
       <RealtimeRefresher childId={child.id as string} />
+
+      {/* Bienvenida primer-login: solo aparece la PRIMERA vez para cada
+          user (flag por userId en localStorage). Para los miembros nuevos
+          que llegan con código de invitación o cuenta recién creada por
+          un admin — los recibe con un mini-tour de 4 slides. */}
+      {userData.user && (
+        <WelcomeOverlay
+          userId={userData.user.id}
+          childName={child.name as string}
+          displayName={displayName}
+        />
+      )}
 
       {/* ZONA 1 — HUB SPATIAL: avatar 360 al centro + 6 acciones orbitando
           con líneas estilo HUD. Reemplaza el hero clásico, la "tira de
