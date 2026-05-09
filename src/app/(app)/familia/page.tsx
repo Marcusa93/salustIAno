@@ -9,8 +9,10 @@ import { Baby, BookHeart, Milk, Moon, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { getTodayActivityByMemberAction } from '../home/family-activity-actions';
+import { InvitationsSection } from './_components/invitations-section';
 import { MembersSection } from './_components/members-section';
 import { listMembersAction } from './miembros/actions';
+import { listInvitationsAction } from './miembros/invitations-actions';
 
 export const metadata: Metadata = {
   title: 'Familia',
@@ -33,16 +35,18 @@ const ROLE_LABEL: Record<'admin' | 'caregiver' | 'family' | 'viewer', string> = 
 export default async function FamiliaPage() {
   const supabase = await createClient();
 
-  const [{ data: userData }, { data: children }, members, todayActivity] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase
-      .from('child_profiles')
-      .select('id, name, birth_date, is_preterm')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true }),
-    listMembersAction(),
-    getTodayActivityByMemberAction(),
-  ]);
+  const [{ data: userData }, { data: children }, members, invitations, todayActivity] =
+    await Promise.all([
+      supabase.auth.getUser(),
+      supabase
+        .from('child_profiles')
+        .select('id, name, birth_date, is_preterm')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true }),
+      listMembersAction(),
+      listInvitationsAction(),
+      getTodayActivityByMemberAction(),
+    ]);
 
   type Role = 'admin' | 'caregiver' | 'family' | 'viewer';
   let myRole: Role | null = null;
@@ -171,6 +175,10 @@ export default async function FamiliaPage() {
       <div className="animate-stagger-up" style={{ animationDelay: '180ms' }}>
         <MembersSection initialMembers={members} isAdmin={isAdmin} />
       </div>
+
+      <div className="animate-stagger-up" style={{ animationDelay: '240ms' }}>
+        <InvitationsSection initialInvitations={invitations} isAdmin={isAdmin} />
+      </div>
     </div>
   );
 }
@@ -185,6 +193,7 @@ function ChildCard({ child }: { child: ChildSummary }) {
           {
             day: 'numeric',
             month: 'long',
+            timeZone: 'America/Argentina/Buenos_Aires',
           },
         )}`
     : 'Sin fecha de nacimiento todavía';

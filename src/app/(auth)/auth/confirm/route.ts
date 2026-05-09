@@ -37,10 +37,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=confirm_failed`);
   }
 
-  // Bootstrap idempotente: si es la primera vez del user, le crea
-  // family_group + admin membership leyendo el metadata del signup.
+  // Lookup de familia: si el user no tiene membership (caso raro: alguien
+  // confirmó un mail viejo de cuando había signup público, o un magic
+  // link de recovery sin grupo asignado), lo mandamos a /signup con un
+  // mensaje claro. La función ya no auto-crea grupos — eso pasa solo
+  // vía redeem de código o createMemberAction.
   if (data.user) {
-    await ensureFamilyForUser(data.user.id);
+    const groupId = await ensureFamilyForUser(data.user.id);
+    if (!groupId) {
+      return NextResponse.redirect(`${origin}/signup?error=no_family`);
+    }
   }
 
   const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/home';
