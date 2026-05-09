@@ -82,6 +82,11 @@ export function FloatingSalu() {
   const [hydrated, setHydrated] = useState(false);
   const [clearing, startClearTransition] = useTransition();
   const [uploadingPhoto, startUploadPhoto] = useTransition();
+  // Foto staged: la familia toca el botón de imagen, elige el archivo,
+  // pero no sube nada todavía. El upload pasa cuando aprietan Send junto
+  // con el texto que hayan escrito como caption. previewUrl es un blob:
+  // URL local que revoca cuando se manda o cuando se descarta.
+  const [pendingPhoto, setPendingPhoto] = useState<{ file: File; previewUrl: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -152,6 +157,13 @@ export function FloatingSalu() {
 
   function send(text: string) {
     const value = text.trim();
+    // Si hay una foto staged, mandamos foto + caption (aunque el
+    // caption esté vacío). Si no hay foto, solo texto y al menos
+    // necesitamos algo escrito.
+    if (pendingPhoto) {
+      sendWithPhoto(pendingPhoto.file, pendingPhoto.previewUrl, value);
+      return;
+    }
     if (!value) return;
 
     const nextEntries: ChatEntry[] = [...entries, { role: 'user', content: value }];
@@ -177,10 +189,57 @@ export function FloatingSalu() {
     });
   }
 
+  function sendWithPhoto(file: File, previewUrl: string, caption: string) {
+    // Optimistic: mostramos la burbuja con la foto + caption mientras sube.
+    const trimmed = caption.trim();
+    setEntries((prev) => [
+      ...prev,
+      {
+        role: 'user',
+        content: trimmed.length > 0 ? `📷 ${trimmed}` : '📷 Subiendo foto…',
+        photoUrl: previewUrl,
+      },
+    ]);
+    setDraft('');
+    setPendingPhoto(null);
+
+    const formData = new FormData();
+    formData.append('photo', file);
+    if (trimmed.length > 0) formData.append('caption', trimmed);
+
+    startUploadPhoto(async () => {
+      const result = await sendPhotoToChatAction(formData);
+      if (!result.ok) {
+        toast.error(result.error);
+        // Removemos la burbuja optimistic para no mentirle a la familia.
+        setEntries((prev) => prev.filter((e) => !(e.role === 'user' && e.photoUrl === previewUrl)));
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
+      setEntries((prev) => {
+        const next = prev.map((e) =>
+          e.role === 'user' && e.photoUrl === previewUrl
+            ? {
+                ...e,
+                content: trimmed.length > 0 ? `📷 ${trimmed}` : '📷 Foto subida',
+                photoUrl: result.photoUrl,
+              }
+            : e,
+        );
+        return [...next, { role: 'assistant', content: result.assistantReply, proposals: [] }];
+      });
+      URL.revokeObjectURL(previewUrl);
+    });
+  }
+
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!pending) send(draft);
+      if (pending) return;
+      // Permitimos enviar foto sin texto, pero si no hay foto staged
+      // exigimos al menos algo escrito.
+      if (!pendingPhoto && draft.trim().length === 0) return;
+      send(draft);
     }
   }
 
@@ -193,35 +252,21 @@ export function FloatingSalu() {
     if (event.target) event.target.value = '';
     if (!file) return;
 
-    const localPreview = URL.createObjectURL(file);
-    setEntries((prev) => [
-      ...prev,
-      { role: 'user', content: '📷 Subiendo foto…', photoUrl: localPreview },
-    ]);
+    // Si ya había una foto staged, revocamos su preview antes de
+    // reemplazarla (evitamos blob: leak en memoria).
+    if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.previewUrl);
 
-    const formData = new FormData();
-    formData.append('photo', file);
+    const previewUrl = URL.createObjectURL(file);
+    setPendingPhoto({ file, previewUrl });
+    // Foco al textarea para que la familia escriba el caption sin un
+    // toque extra. Si no escriben nada, igual pueden mandar.
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
 
-    startUploadPhoto(async () => {
-      const result = await sendPhotoToChatAction(formData);
-      if (!result.ok) {
-        toast.error(result.error);
-        setEntries((prev) =>
-          prev.filter((e) => !(e.role === 'user' && e.photoUrl === localPreview)),
-        );
-        URL.revokeObjectURL(localPreview);
-        return;
-      }
-      setEntries((prev) => {
-        const next = prev.map((e) =>
-          e.role === 'user' && e.photoUrl === localPreview
-            ? { ...e, content: '📷 Foto subida', photoUrl: result.photoUrl }
-            : e,
-        );
-        return [...next, { role: 'assistant', content: result.assistantReply, proposals: [] }];
-      });
-      URL.revokeObjectURL(localPreview);
-    });
+  function discardPendingPhoto() {
+    if (!pendingPhoto) return;
+    URL.revokeObjectURL(pendingPhoto.previewUrl);
+    setPendingPhoto(null);
   }
 
   function clearChat() {
@@ -390,71 +435,102 @@ export function FloatingSalu() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (!pending) send(draft);
+              if (pending) return;
+              if (!pendingPhoto && draft.trim().length === 0) return;
+              send(draft);
             }}
             className={cn(
-              'flex items-end gap-2 border-border/60 border-t p-3',
+              'flex flex-col gap-2 border-border/60 border-t p-3',
               // Safe-area en mobile para iPhone con home indicator.
               'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
               'sm:pb-3',
             )}
           >
-            <Textarea
-              ref={inputRef}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Hablame o tocá el micrófono…"
-              rows={1}
-              maxLength={1500}
-              disabled={pending}
-              className="max-h-32 flex-1 resize-none"
-              aria-label="Mensaje para Salu"
-            />
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              aria-label="Subir foto al álbum"
-              disabled={pending || uploadingPhoto}
-              onClick={handlePickPhoto}
-            >
-              {uploadingPhoto ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <ImageIcon className="size-4" aria-hidden />
-              )}
-            </Button>
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-              className="hidden"
-              onChange={handlePhotoFile}
-            />
-            <SpeechToTextButton
-              disabled={pending}
-              autoStart={voiceAuto}
-              onTranscript={(text) => {
-                // Append al draft con un espacio. Si el usuario ya tenía
-                // texto, no lo pisa.
-                setDraft((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
-                // Foco al textarea para que pueda corregir o tocar Enter.
-                requestAnimationFrame(() => inputRef.current?.focus());
-              }}
-            />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={pending || draft.trim().length === 0}
-              aria-label="Enviar"
-            >
-              {pending ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <Send className="size-4" aria-hidden />
-              )}
-            </Button>
+            {pendingPhoto && (
+              <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 p-1.5">
+                <img
+                  src={pendingPhoto.previewUrl}
+                  alt="Foto a enviar"
+                  className="size-12 shrink-0 rounded-lg object-cover ring-1 ring-border/50"
+                />
+                <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
+                  Foto lista. Escribí algo abajo si querés (opcional) y tocá enviar.
+                </span>
+                <Button
+                  type="button"
+                  size="icon-xs"
+                  variant="ghost"
+                  onClick={discardPendingPhoto}
+                  disabled={pending || uploadingPhoto}
+                  aria-label="Descartar foto"
+                  className="shrink-0"
+                >
+                  <X className="size-3.5" aria-hidden />
+                </Button>
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <Textarea
+                ref={inputRef}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  pendingPhoto
+                    ? 'Escribí un caption para la foto (opcional)…'
+                    : 'Hablame o tocá el micrófono…'
+                }
+                rows={1}
+                maxLength={1500}
+                disabled={pending}
+                className="max-h-32 flex-1 resize-none"
+                aria-label="Mensaje para Salu"
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label="Subir foto al álbum"
+                disabled={pending || uploadingPhoto}
+                onClick={handlePickPhoto}
+              >
+                {uploadingPhoto ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <ImageIcon className="size-4" aria-hidden />
+                )}
+              </Button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                className="hidden"
+                onChange={handlePhotoFile}
+              />
+              <SpeechToTextButton
+                disabled={pending}
+                autoStart={voiceAuto}
+                onTranscript={(text) => {
+                  // Append al draft con un espacio. Si el usuario ya tenía
+                  // texto, no lo pisa.
+                  setDraft((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+                  // Foco al textarea para que pueda corregir o tocar Enter.
+                  requestAnimationFrame(() => inputRef.current?.focus());
+                }}
+              />
+              <Button
+                type="submit"
+                size="icon"
+                disabled={pending || uploadingPhoto || (!pendingPhoto && draft.trim().length === 0)}
+                aria-label={pendingPhoto ? 'Enviar foto' : 'Enviar'}
+              >
+                {pending || uploadingPhoto ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Send className="size-4" aria-hidden />
+                )}
+              </Button>
+            </div>
           </form>
         </SheetContent>
       </Sheet>

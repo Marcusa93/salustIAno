@@ -607,7 +607,11 @@ function AlbumShareBar({
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   const sharedSinceLabel = album.sharedAt
-    ? new Date(album.sharedAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
+    ? new Date(album.sharedAt).toLocaleDateString('es-AR', {
+        day: 'numeric',
+        month: 'long',
+        timeZone: 'America/Argentina/Buenos_Aires',
+      })
     : null;
 
   return (
@@ -982,20 +986,28 @@ function PhotoModal({
     });
   }
 
+  // El modal NO puede ser un <button> envolvente: hacerlo así provoca que
+  // los botones internos (Borrar foto, Auto-etiquetar, etc.) no reciban
+  // los clicks porque `onClickCapture + stopPropagation` en el span hijo
+  // los frena en la fase de captura. Usamos backdrop absoluto separado:
+  // el backdrop cierra cuando se clickea la zona vacía, y los botones
+  // internos quedan en una capa por encima sin conflicto.
   return (
-    <button
-      type="button"
-      onClick={onClose}
-      aria-label="Cerrar"
-      className="fixed inset-0 z-50 flex items-stretch justify-center bg-foreground/60 backdrop-blur-sm sm:items-center sm:p-4"
+    <dialog
+      open
+      aria-modal="true"
+      aria-label="Detalle de foto"
+      className="fixed inset-0 z-50 m-0 flex h-full max-h-none w-full max-w-none items-stretch justify-center bg-transparent text-foreground sm:items-center sm:p-4"
     >
-      <span
-        role="presentation"
-        onClickCapture={(e) => e.stopPropagation()}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Cerrar"
+        className="absolute inset-0 bg-foreground/60 backdrop-blur-sm"
+      />
+      <div
         className={cn(
-          // Mobile: full-screen sin gaps ni rounded — la foto ocupa toda la
-          // pantalla y abajo tiene el panel scrollable.
-          'relative flex w-full flex-col overflow-hidden bg-card text-left shadow-2xl',
+          'relative z-10 flex w-full flex-col overflow-hidden bg-card text-left shadow-2xl',
           // Mobile: full viewport con safe-area insets para iPhone notch.
           'h-[100dvh] max-h-none rounded-none',
           // Desktop: caja flotante centrada con altura cómoda.
@@ -1140,8 +1152,8 @@ function PhotoModal({
             </Button>
           </div>
         </div>
-      </span>
-    </button>
+      </div>
+    </dialog>
   );
 }
 
@@ -1272,8 +1284,14 @@ function chunkUploadFiles(files: File[]): File[][] {
 function formatMonth(key: string): string {
   const [year, month] = key.split('-');
   if (!year || !month) return key;
-  const d = new Date(Number(year), Number(month) - 1, 1);
-  const label = d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  // Día 15 a midday UTC: anchor seguro contra cambios de TZ que harían
+  // el primer día caer en el mes anterior.
+  const d = new Date(Date.UTC(Number(year), Number(month) - 1, 15, 12, 0, 0));
+  const label = d.toLocaleDateString('es-AR', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -1283,5 +1301,6 @@ function formatDate(iso: string): string {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    timeZone: 'America/Argentina/Buenos_Aires',
   });
 }

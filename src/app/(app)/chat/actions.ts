@@ -724,6 +724,17 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
   if (!PHOTO_ALLOWED_MIME.includes(file.type)) {
     return { ok: false, error: 'Formato no soportado. Probá con JPG, PNG o WebP.' };
   }
+  // Caption opcional que la familia escribió junto con la foto en el
+  // composer del chat. Se usa para:
+  //   - El mensaje user que queda en chat_messages (queda lindo verlo
+  //     después en el historial: "📷 Bañera del primer día").
+  //   - Como caption preferida del media_item (sobreescribe lo que dice
+  //     la IA con la palabra de la familia, que siempre es mejor).
+  const captionRaw = formData.get('caption');
+  const userCaption =
+    typeof captionRaw === 'string' && captionRaw.trim().length > 0
+      ? captionRaw.trim().slice(0, 500)
+      : null;
 
   const supabase = await createClient();
   const { data: userData, error: userErr } = await supabase.auth.getUser();
@@ -771,10 +782,22 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
     return { ok: false, error: 'No pudimos subir la foto. Probá de nuevo.' };
   }
 
-  // 2. Resolver/crear el álbum mensual del momento.
+  // 2. Resolver/crear el álbum mensual del momento (en hora AR — el
+  // server corre en UTC, que a las 23h AR ya está en el mes siguiente).
   const now = new Date();
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const monthName = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  const arParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(now);
+  const arYear = arParts.find((p) => p.type === 'year')?.value ?? '';
+  const arMonth = arParts.find((p) => p.type === 'month')?.value ?? '';
+  const monthKey = `${arYear}-${arMonth}-01`;
+  const monthName = now.toLocaleDateString('es-AR', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
   const albumName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
   // biome-ignore lint/suspicious/noExplicitAny: types stale para albums/media_items.
@@ -827,7 +850,9 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
     }
   }
 
-  // 4. Insertar media_items.
+  // 4. Insertar media_items. Si la familia escribió un caption, ese
+  // gana sobre el de la IA — su voz va primero.
+  const captionForAlbum = userCaption ?? aiCaption;
   const { error: insertErr } = await sb.from('media_items').insert({
     child_id: childId,
     family_group_id: familyGroupId,
@@ -835,7 +860,7 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
     storage_path: storagePath,
     mime_type: file.type,
     size_bytes: file.size,
-    caption: aiCaption,
+    caption: captionForAlbum,
     tags: aiTags,
     taken_at: takenAtIso,
     created_by: userData.user.id,
@@ -852,8 +877,14 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
     .createSignedUrl(storagePath, 3600);
   const photoUrl = signed?.signedUrl ?? '';
 
-  // 6. Persistir el par user→assistant en chat_messages.
-  const userMessage = aiCaption ? `📷 Foto subida — "${aiCaption}"` : '📷 Foto subida';
+  // 6. Persistir el par user→assistant en chat_messages. Si la familia
+  // escribió algo junto con la foto, ese texto va primero — es lo que
+  // ellos quisieron decir, no lo que adivinó la IA.
+  const userMessage = userCaption
+    ? `📷 ${userCaption}`
+    : aiCaption
+      ? `📷 Foto subida — "${aiCaption}"`
+      : '📷 Foto subida';
   const tagsLine = aiTags.length > 0 ? ` Te puse tags: ${aiTags.slice(0, 5).join(', ')}.` : '';
   const assistantReply = `Listo, la guardé en el álbum **${albumName}**.${tagsLine} La podés ver y compartir desde /album.`;
 
