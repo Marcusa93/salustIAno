@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
@@ -166,14 +167,29 @@ export default async function CalendarioMesPage({ searchParams }: PageProps) {
     .filter((m) => !m.completed_at && m.due_at && new Date(m.due_at) >= today)
     .slice(0, 3);
 
+  const monthDescription =
+    milestones.length > 0
+      ? `${milestones.length} turno${milestones.length === 1 ? '' : 's'} este mes.`
+      : undefined;
+
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <Button render={<Link href={'/cuidar/calendario' as Route} />} variant="ghost" size="sm">
-            <ChevronLeft className="size-4" aria-hidden /> Lista
-          </Button>
-          <div className="flex items-center gap-1.5">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+      <Button
+        render={<Link href={'/cuidar/calendario' as Route} />}
+        variant="ghost"
+        size="sm"
+        className="-mb-2 self-start text-muted-foreground"
+      >
+        <ChevronLeft className="size-4" aria-hidden />
+        Lista
+      </Button>
+
+      <PageHeader
+        eyebrow="Cuidar · Calendario · Vista mensual"
+        title={`${monthLabel}.`}
+        description={monthDescription}
+        action={
+          <>
             <Button variant="outline" size="icon-sm" render={<Link href={`?mes=${prevMonth}`} />}>
               <ChevronLeft className="size-4" aria-hidden />
               <span className="sr-only">Mes anterior</span>
@@ -186,20 +202,9 @@ export default async function CalendarioMesPage({ searchParams }: PageProps) {
               <Plus className="size-4" aria-hidden />
               Agregar
             </Button>
-          </div>
-        </div>
-        <span className="font-medium text-[11px] text-muted-foreground/80 uppercase tracking-[0.22em]">
-          Calendario · vista mensual
-        </span>
-        <h1 className="font-display text-[clamp(2rem,5vw,3rem)] text-foreground leading-[1.05] tracking-tight">
-          {monthLabel}
-        </h1>
-        {milestones.length > 0 && (
-          <p className="text-muted-foreground">
-            {milestones.length} turno{milestones.length === 1 ? '' : 's'} este mes.
-          </p>
-        )}
-      </header>
+          </>
+        }
+      />
 
       <Card className="overflow-hidden p-3 sm:p-4">
         <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
@@ -221,7 +226,9 @@ export default async function CalendarioMesPage({ searchParams }: PageProps) {
       {/* Próximos turnos del mes — atajo para no tener que escanear el grid. */}
       {upcoming.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="font-semibold text-foreground text-sm">Próximos del mes</h2>
+          <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+            Próximos del mes
+          </h2>
           <ul className="flex flex-col gap-2">
             {upcoming.map((m) => (
               <li key={m.id}>

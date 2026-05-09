@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
@@ -164,17 +165,29 @@ export default async function TimelineMesPage({ searchParams }: PageProps) {
     { feeding: 0, sleep: 0, diaper: 0 },
   );
 
+  const description =
+    child && events.length > 0
+      ? `${events.length} eventos · ${totals.feeding} tomas, ${totals.sleep} sueños, ${totals.diaper} pañales.`
+      : undefined;
+
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
-      <header className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href={'/timeline' as Route}
-            className="inline-flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground"
-          >
-            <ChevronLeft className="size-4" aria-hidden /> Registro
-          </Link>
-          <div className="flex items-center gap-1.5">
+      <Button
+        render={<Link href={'/timeline' as Route} />}
+        variant="ghost"
+        size="sm"
+        className="-mb-2 self-start text-muted-foreground"
+      >
+        <ChevronLeft className="size-4" aria-hidden />
+        Registro
+      </Button>
+
+      <PageHeader
+        eyebrow="Registro · Calendario mensual"
+        title={`${monthLabel}.`}
+        description={description}
+        action={
+          <>
             <Button variant="outline" size="icon-sm" render={<Link href={`?mes=${prevMonth}`} />}>
               <ChevronLeft className="size-4" aria-hidden />
               <span className="sr-only">Mes anterior</span>
@@ -183,21 +196,9 @@ export default async function TimelineMesPage({ searchParams }: PageProps) {
               <ChevronRight className="size-4" aria-hidden />
               <span className="sr-only">Mes siguiente</span>
             </Button>
-          </div>
-        </div>
-        <span className="font-medium text-[11px] text-muted-foreground/80 uppercase tracking-[0.22em]">
-          Calendario mensual
-        </span>
-        <h1 className="font-display text-[clamp(2rem,5vw,3rem)] text-foreground leading-[1.05] tracking-tight">
-          {monthLabel}
-        </h1>
-        {child && events.length > 0 && (
-          <p className="text-muted-foreground">
-            {events.length} eventos · {totals.feeding} tomas, {totals.sleep} sueños, {totals.diaper}{' '}
-            pañales.
-          </p>
-        )}
-      </header>
+          </>
+        }
+      />
 
       <Card className="overflow-hidden p-3 sm:p-4">
         <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
