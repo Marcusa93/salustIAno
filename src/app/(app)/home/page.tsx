@@ -19,6 +19,7 @@ import { FamilyActivityCard } from './_components/family-activity-card';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
 import { HomeHero } from './_components/home-hero';
 import { LastEventsStrip } from './_components/last-events-strip';
+import { NightCoachCard } from './_components/night-coach-card';
 import { QuickActionTile } from './_components/quick-action-tile';
 import { RealtimeRefresher } from './_components/realtime-refresher';
 import { RecentEventsGrouped, type RecentTimelineRow } from './_components/recent-events-grouped';
@@ -277,6 +278,16 @@ export default async function HomePage() {
           />
         }
       />
+
+      {/* Coach pediátrico de sueño — solo en modo madrugada (22-06 AR).
+          Lee la situación del bebé y devuelve diagnóstico + sugerencia.
+          La card cachea el resultado 30min en localStorage para no
+          quemar tokens si la familia abre la app varias veces. */}
+      {lateNight && (
+        <div className="animate-stagger-up" style={{ animationDelay: '60ms' }}>
+          <NightCoachCard childId={child.id as string} />
+        </div>
+      )}
 
       {/* SalustIA — el card es 100% link a /chat (con un overlay
           absoluto), pero el botón de mic queda por encima y abre el
