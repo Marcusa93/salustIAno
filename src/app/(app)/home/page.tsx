@@ -1,14 +1,15 @@
 import { CradleIllustration } from '@/components/salu/illustrations/cradle';
 import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timeline-empty';
+import { Salu360Hub } from '@/components/salu/salu-hub';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { babyAgeFromBirth } from '@/lib/baby-age';
 import { expectationsFor } from '@/lib/baby-expectations';
 import { greetingFor, isLateNightAr } from '@/lib/greeting';
-import { averagePerDay, predictNextDiaper, predictNextFeeding } from '@/lib/predictions';
+import { averagePerDay } from '@/lib/predictions';
 import { createClient } from '@/lib/supabase/server';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
-import { Baby, BookHeart, Mic, Milk, Moon, Plus, Sparkles } from 'lucide-react';
+import { Baby, BookHeart, Milk, Moon, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { CloseSleepSheet } from './_components/close-sleep-sheet';
@@ -17,10 +18,7 @@ import { DiaperQuickAdd } from './_components/diaper-quick-add';
 import { ExpectationsCard } from './_components/expectations-card';
 import { FamilyActivityCard } from './_components/family-activity-card';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
-import { HomeHero } from './_components/home-hero';
-import { LastEventsStrip } from './_components/last-events-strip';
 import { NightCoachCard } from './_components/night-coach-card';
-import { QuickActionTile } from './_components/quick-action-tile';
 import { RealtimeRefresher } from './_components/realtime-refresher';
 import { RecentEventsGrouped, type RecentTimelineRow } from './_components/recent-events-grouped';
 import { ShareDayCard } from './_components/share-day-card';
@@ -238,8 +236,6 @@ export default async function HomePage() {
   // Pueden ser null si no hay suficientes datos.
   const feedings7Iso = (feedingsLast7 ?? []).map((e) => (e as { occurred_at: string }).occurred_at);
   const diapers7Iso = (diapersLast7 ?? []).map((e) => (e as { occurred_at: string }).occurred_at);
-  const nextFeeding = lastFeedingAt ? predictNextFeeding(feedings7Iso, lastFeedingAt) : null;
-  const nextDiaper = lastDiaperAt ? predictNextDiaper(diapers7Iso, lastDiaperAt) : null;
 
   // Tendencia semanal: promedio de eventos por día en los últimos 7 días
   // (incluyendo hoy). Para sueño usamos el conteo de sesiones, no horas.
@@ -259,24 +255,22 @@ export default async function HomePage() {
           su dispositivo, refresca la página automáticamente. */}
       <RealtimeRefresher childId={child.id as string} />
 
-      {/* ZONA 1 — HERO: estado vivo del bebé. */}
-      <HomeHero
+      {/* ZONA 1 — HUB SPATIAL: avatar 360 al centro + 6 acciones orbitando
+          con líneas estilo HUD. Reemplaza el hero clásico, la "tira de
+          últimas" y la grilla "Anotar en dos toques" — toda la
+          información viva del bebé y los 6 quick-adds en un único
+          objeto cohesivo. */}
+      <Salu360Hub
         displayName={displayName}
         childName={child.name}
-        birthDate={child.birth_date}
+        childAgeLabel={babyAgeFromBirth(child.birth_date)?.label ?? null}
+        greeting={greetingFor()}
         active={activeSleep}
         lastWokeUpAt={lastClosedSleepAt}
+        lastFeedingAt={lastFeedingAt}
+        lastDiaperAt={lastDiaperAt}
+        todayCounts={todaySummary}
         lateNight={lateNight}
-        awakeCta={
-          <SleepQuickAdd
-            trigger={
-              <Button type="button" size="default" variant="outline" className="shrink-0">
-                <Moon className="size-4" aria-hidden />
-                Anotar siesta
-              </Button>
-            }
-          />
-        }
       />
 
       {/* Coach pediátrico de sueño — solo en modo madrugada (22-06 AR).
@@ -288,55 +282,6 @@ export default async function HomePage() {
           <NightCoachCard childId={child.id as string} />
         </div>
       )}
-
-      {/* SalustIA — el card es 100% link a /chat (con un overlay
-          absoluto), pero el botón de mic queda por encima y abre el
-          FloatingSalu con el dictado ya activo via ?voz=1. */}
-      <div className="animate-stagger-up" style={{ animationDelay: '90ms' }}>
-        <Card className="relative flex items-center gap-3 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-accent/30 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/10">
-          <Link
-            href="/chat"
-            aria-label="Abrir chat con SalustIA"
-            className="absolute inset-0 z-0 rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          />
-          <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 items-center gap-4">
-            <div className="relative flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/10">
-              <Sparkles className="size-5 animate-breathe" aria-hidden />
-              <span
-                aria-hidden
-                className="absolute inset-0 origin-center"
-                style={{ animation: 'salu-orbit 9s linear infinite' }}
-              >
-                <span className="-translate-x-1/2 -translate-y-1 absolute top-0 left-1/2 size-1 rounded-full bg-primary/60" />
-              </span>
-              <span
-                aria-hidden
-                className="absolute inset-0 origin-center"
-                style={{
-                  animation: 'salu-orbit 7s linear infinite reverse',
-                  animationDelay: '-2s',
-                }}
-              >
-                <span className="-translate-x-1 -translate-y-1/2 absolute top-1/2 left-0 size-1 rounded-full bg-accent-foreground/40" />
-              </span>
-            </div>
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-medium text-foreground">Preguntale a SalustIA</span>
-              <span className="text-muted-foreground text-sm">
-                Anotá una toma, un pañal o un sueño con tu voz, o preguntale cómo viene el día.
-              </span>
-            </div>
-          </div>
-          <Link
-            href="/home?voz=1"
-            aria-label="Anotar por voz, abrir el dictado"
-            title="Anotar por voz"
-            className="relative z-[2] flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20 transition-transform duration-200 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            <Mic className="size-5" aria-hidden />
-          </Link>
-        </Card>
-      </div>
 
       {/* Resumen del día con IA */}
       <div className="animate-stagger-up" style={{ animationDelay: '120ms' }}>
@@ -399,68 +344,6 @@ export default async function HomePage() {
           />
         </div>
       )}
-
-      {/* ZONA 2 — ACCIÓN: tira de últimas + carga rápida. */}
-      <LastEventsStrip
-        lastFeedingAt={lastFeedingAt}
-        lastDiaperAt={lastDiaperAt}
-        lastSleepClosedAt={activeSleep ? activeSleep.started_at : lastClosedSleepAt}
-        todayCounts={todaySummary}
-        nextFeeding={nextFeeding}
-        nextDiaper={nextDiaper}
-      />
-
-      <section
-        className="animate-stagger-up flex flex-col gap-3"
-        style={{ animationDelay: '210ms' }}
-      >
-        <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
-          Anotar en dos toques
-        </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <FeedingQuickAdd
-            trigger={
-              <button type="button" className="contents">
-                <QuickActionTile
-                  Icon={Milk}
-                  label="Tomó"
-                  lastAt={lastFeedingAt}
-                  todayCount={todaySummary.feeding}
-                  emphasis="primary"
-                />
-              </button>
-            }
-          />
-          <SleepQuickAdd
-            trigger={
-              <button type="button" className="contents">
-                <QuickActionTile
-                  Icon={Moon}
-                  label={activeSleep ? 'Durmiendo' : 'Durmió'}
-                  lastAt={activeSleep ? null : lastClosedSleepAt}
-                  todayCount={todaySummary.sleep}
-                  microInfoOverride={activeSleep ? 'En curso' : undefined}
-                />
-              </button>
-            }
-          />
-          <DiaperQuickAdd
-            trigger={
-              <button type="button" className="contents">
-                <QuickActionTile
-                  Icon={Baby}
-                  label="Pañal"
-                  lastAt={lastDiaperAt}
-                  todayCount={todaySummary.diaper}
-                />
-              </button>
-            }
-          />
-          <Link href="/notas/nuevo" className="contents">
-            <QuickActionTile Icon={BookHeart} label="Momento" />
-          </Link>
-        </div>
-      </section>
 
       {/* Actividad por miembro */}
       {todayActivity.length > 0 && (
