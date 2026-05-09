@@ -21,6 +21,21 @@ export function greetingFor(now: Date = new Date()): string {
 }
 
 /**
+ * Madrugada en hora AR — ventana 22:00–05:59. Usado en /home para
+ * activar un modo más sosegado: paleta cálida-oscura y copy que
+ * enfatiza el descanso (en lugar del registro frenético del día).
+ *
+ * Pensado para los turnos nocturnos: la familia abre el home a las 3am
+ * porque está dando una toma o cambiando un pañal. La app no tiene que
+ * gritar — tiene que estar tranquila.
+ */
+export function isLateNightAr(now: Date = new Date()): boolean {
+  const utcHour = now.getUTCHours();
+  const arHour = (utcHour + AR_OFFSET_HOURS + 24) % 24;
+  return arHour >= 22 || arHour < 6;
+}
+
+/**
  * Etiqueta de fecha completa en español ("Jueves, 8 de mayo"). Usa el
  * locale del runtime — Next la corre server-side, así que el resultado es
  * estable independientemente del browser del usuario. Sigue dependiendo

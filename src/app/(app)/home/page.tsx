@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { babyAgeFromBirth } from '@/lib/baby-age';
 import { expectationsFor } from '@/lib/baby-expectations';
-import { greetingFor } from '@/lib/greeting';
+import { greetingFor, isLateNightAr } from '@/lib/greeting';
 import { averagePerDay, predictNextDiaper, predictNextFeeding } from '@/lib/predictions';
 import { createClient } from '@/lib/supabase/server';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
@@ -229,6 +229,7 @@ export default async function HomePage() {
 
   const ageDays = babyAgeFromBirth(child.birth_date)?.days ?? null;
   const expectations = expectationsFor(ageDays);
+  const lateNight = isLateNightAr();
 
   // Predicciones rule-based: mediana del intervalo entre eventos
   // consecutivos en los últimos 7 días, proyectada desde el último.
@@ -255,6 +256,7 @@ export default async function HomePage() {
         birthDate={child.birth_date}
         active={activeSleep}
         lastWokeUpAt={lastClosedSleepAt}
+        lateNight={lateNight}
         awakeCta={
           <SleepQuickAdd
             trigger={

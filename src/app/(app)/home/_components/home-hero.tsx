@@ -20,6 +20,12 @@ interface HomeHeroProps {
    * component que vive afuera del Server Component.
    */
   awakeCta?: ReactElement;
+  /**
+   * Modo madrugada (22h–6h AR). Cuando true, el card de estado usa una
+   * paleta más sosegada y suma un microcopy "la madrugada es del sueño".
+   * No esconde nada — sólo cambia tono.
+   */
+  lateNight?: boolean;
 }
 
 /**
@@ -47,6 +53,7 @@ export function HomeHero({
   active,
   lastWokeUpAt,
   awakeCta,
+  lateNight = false,
 }: HomeHeroProps) {
   const greeting = greetingFor();
   const today = dateLabel();
@@ -75,6 +82,10 @@ export function HomeHero({
           className={cn(
             'relative flex flex-col gap-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/[0.10] via-primary/[0.04] to-card p-5',
             'sm:flex-row sm:items-center sm:gap-5',
+            // Madrugada: el azul-violeta del primary se vuelve aún más
+            // protagónico — saca la mezcla cálida del to-card.
+            lateNight &&
+              'border-primary/40 from-primary/[0.18] via-primary/[0.08] to-primary/[0.04]',
           )}
         >
           {/* Glow sutil */}
@@ -106,13 +117,35 @@ export function HomeHero({
           />
         </Card>
       ) : (
-        <Card className="relative flex flex-col gap-4 overflow-hidden border-border/60 bg-gradient-to-br from-card via-card to-accent/20 p-5 sm:flex-row sm:items-center sm:gap-5">
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-accent/40 text-accent-foreground ring-1 ring-accent/30">
-            <Sun className="size-6" aria-hidden />
+        <Card
+          className={cn(
+            'relative flex flex-col gap-4 overflow-hidden border-border/60 bg-gradient-to-br from-card via-card to-accent/20 p-5 sm:flex-row sm:items-center sm:gap-5',
+            // Madrugada despierto: paleta sosegada que se inclina al
+            // azul-noche en vez del accent cálido.
+            lateNight && 'border-primary/20 from-card via-primary/[0.04] to-primary/[0.08]',
+          )}
+        >
+          <div
+            className={cn(
+              'flex size-14 shrink-0 items-center justify-center rounded-full ring-1',
+              lateNight
+                ? 'bg-primary/12 text-primary ring-primary/15'
+                : 'bg-accent/40 text-accent-foreground ring-accent/30',
+            )}
+          >
+            {lateNight ? (
+              <Moon className="size-6 animate-breathe" aria-hidden />
+            ) : (
+              <Sun className="size-6" aria-hidden />
+            )}
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="font-medium text-foreground text-lg">
-              {age?.unborn ? `${childName} está esperando.` : 'Está despierto.'}
+              {age?.unborn
+                ? `${childName} está esperando.`
+                : lateNight
+                  ? 'Despierto a esta hora.'
+                  : 'Está despierto.'}
             </span>
             {!age?.unborn && lastWokeUpAt ? (
               <span className="text-muted-foreground text-sm">
@@ -132,6 +165,11 @@ export function HomeHero({
                 {age?.unborn
                   ? 'Cuando llegue, este lugar va a contarte cómo durmió, comió y cómo viene su día.'
                   : 'Sin sueños cerrados todavía. Cuando duerma una siesta, anotala para empezar a ver el ritmo.'}
+              </span>
+            )}
+            {lateNight && (
+              <span className="mt-0.5 text-[11px] text-muted-foreground/70 italic">
+                La madrugada es del sueño — sin apuro.
               </span>
             )}
           </div>
