@@ -20,6 +20,7 @@ import { FeedingQuickAdd } from './_components/feeding-quick-add';
 import { HomeHero } from './_components/home-hero';
 import { LastEventsStrip } from './_components/last-events-strip';
 import { QuickActionTile } from './_components/quick-action-tile';
+import { RealtimeRefresher } from './_components/realtime-refresher';
 import { RecentEventsGrouped, type RecentTimelineRow } from './_components/recent-events-grouped';
 import { ShareDayCard } from './_components/share-day-card';
 import { SleepQuickAdd } from './_components/sleep-quick-add';
@@ -249,6 +250,10 @@ export default async function HomePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
+      {/* Realtime: si otro miembro de la familia carga un evento desde
+          su dispositivo, refresca la página automáticamente. */}
+      <RealtimeRefresher childId={child.id as string} />
+
       {/* ZONA 1 — HERO: estado vivo del bebé. */}
       <HomeHero
         displayName={displayName}
