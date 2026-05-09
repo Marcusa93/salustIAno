@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { babyAgeFromBirth } from '@/lib/baby-age';
 import { expectationsFor } from '@/lib/baby-expectations';
 import { greetingFor } from '@/lib/greeting';
+import { averagePerDay, predictNextDiaper, predictNextFeeding } from '@/lib/predictions';
 import { createClient } from '@/lib/supabase/server';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
 import { Baby, BookHeart, Milk, Moon, Plus, Sparkles } from 'lucide-react';
@@ -93,6 +94,10 @@ export default async function HomePage() {
   const upcomingHorizon = new Date();
   upcomingHorizon.setDate(upcomingHorizon.getDate() + 14);
 
+  // Ventana de 7 días para tendencia semanal y predicciones rule-based.
+  const since7d = new Date();
+  since7d.setDate(since7d.getDate() - 7);
+
   const [
     { data: recentEvents },
     { data: todayEvents },
@@ -100,6 +105,9 @@ export default async function HomePage() {
     { data: lastClosedSleep },
     { data: lastFeeding },
     { data: lastDiaper },
+    { data: feedingsLast7 },
+    { data: diapersLast7 },
+    { data: sleepsLast7 },
     todayActivity,
     { data: upcomingMilestones },
   ] = await Promise.all([
@@ -149,6 +157,27 @@ export default async function HomePage() {
       .order('occurred_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Últimos 7 días — para predicciones y tendencia semanal.
+    supabase
+      .from('feeding_events')
+      .select('occurred_at')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .gte('occurred_at', since7d.toISOString())
+      .order('occurred_at', { ascending: true }),
+    supabase
+      .from('diaper_events')
+      .select('occurred_at')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .gte('occurred_at', since7d.toISOString())
+      .order('occurred_at', { ascending: true }),
+    supabase
+      .from('sleep_sessions')
+      .select('started_at')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .gte('started_at', since7d.toISOString()),
     getTodayActivityByMemberAction(),
     supabase
       .from('medical_milestones')
@@ -196,6 +225,22 @@ export default async function HomePage() {
 
   const ageDays = babyAgeFromBirth(child.birth_date)?.days ?? null;
   const expectations = expectationsFor(ageDays);
+
+  // Predicciones rule-based: mediana del intervalo entre eventos
+  // consecutivos en los últimos 7 días, proyectada desde el último.
+  // Pueden ser null si no hay suficientes datos.
+  const feedings7Iso = (feedingsLast7 ?? []).map((e) => (e as { occurred_at: string }).occurred_at);
+  const diapers7Iso = (diapersLast7 ?? []).map((e) => (e as { occurred_at: string }).occurred_at);
+  const nextFeeding = lastFeedingAt ? predictNextFeeding(feedings7Iso, lastFeedingAt) : null;
+  const nextDiaper = lastDiaperAt ? predictNextDiaper(diapers7Iso, lastDiaperAt) : null;
+
+  // Tendencia semanal: promedio de eventos por día en los últimos 7 días
+  // (incluyendo hoy). Para sueño usamos el conteo de sesiones, no horas.
+  const weeklyAvg = {
+    feeding: averagePerDay(feedings7Iso.length, 7),
+    diaper: averagePerDay(diapers7Iso.length, 7),
+    sleep: averagePerDay((sleepsLast7 ?? []).length, 7),
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
@@ -270,6 +315,7 @@ export default async function HomePage() {
             diapersCount: todaySummary.diaper,
             sleepHours: todaySleepHours,
           }}
+          weeklyAverage={weeklyAvg}
           feedingTrigger={
             <FeedingQuickAdd
               trigger={
@@ -321,6 +367,8 @@ export default async function HomePage() {
         lastDiaperAt={lastDiaperAt}
         lastSleepClosedAt={activeSleep ? activeSleep.started_at : lastClosedSleepAt}
         todayCounts={todaySummary}
+        nextFeeding={nextFeeding}
+        nextDiaper={nextDiaper}
       />
 
       <section

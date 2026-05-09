@@ -20,6 +20,16 @@ interface ExpectationsCardProps {
     /** Horas totales de sueño hoy (sumando siestas + nocturno cargado). */
     sleepHours: number;
   };
+  /**
+   * Promedio diario de los últimos 7 días para cada tipo (cantidad
+   * de eventos, no horas). Para sueño cuenta sesiones, no horas.
+   * Si están en 0, se omite el sublabel "promedio semanal".
+   */
+  weeklyAverage: {
+    feeding: number;
+    diaper: number;
+    sleep: number;
+  };
   /** Triggers reusables del Sheet de cada quick-add — pasados como render-prop. */
   feedingTrigger: ReactElement;
   diaperTrigger: ReactElement;
@@ -37,9 +47,15 @@ interface ExpectationsCardProps {
  * No se muestra si no hay edad razonable (recién nacido sin fecha o
  * mayor de 2 años).
  */
+function fmtAvg(n: number): string {
+  if (n <= 0) return '';
+  return n.toFixed(1).replace(/\.0$/, '');
+}
+
 export function ExpectationsCard({
   expectations,
   todayCounts,
+  weeklyAverage,
   feedingTrigger,
   diaperTrigger,
   sleepTrigger,
@@ -78,6 +94,7 @@ export function ExpectationsCard({
           range={expectations.feedings}
           status={feedings}
           unit="hoy"
+          weeklyAvg={fmtAvg(weeklyAverage.feeding)}
           lowHint="¿Te faltó anotar alguna toma?"
           highHint="Más cargas de las habituales."
           inRangeHint="Vas en el rango."
@@ -92,6 +109,7 @@ export function ExpectationsCard({
           range={expectations.diapers}
           status={diapers}
           unit="hoy"
+          weeklyAvg={fmtAvg(weeklyAverage.diaper)}
           lowHint="¿Te faltó anotar alguno?"
           highHint="Más cargas que lo habitual."
           inRangeHint="Vas en el rango."
@@ -106,6 +124,8 @@ export function ExpectationsCard({
           range={expectations.sleepHours}
           status={sleep}
           unit="h hoy"
+          weeklyAvg={fmtAvg(weeklyAverage.sleep)}
+          weeklyAvgUnit="siestas/día"
           lowHint="¿Falta cerrar alguna siesta?"
           highHint="Más sueño cargado que lo habitual."
           inRangeHint="Vas en el rango."
@@ -132,6 +152,10 @@ interface ProgressRowProps {
   range: ExpectationRange;
   status: CompareStatus;
   unit: string;
+  /** Promedio diario de los últimos 7 días, formateado como string. */
+  weeklyAvg: string;
+  /** Unidad del weeklyAvg si difiere del default ("/día"). */
+  weeklyAvgUnit?: string;
   lowHint: string;
   inRangeHint: string;
   highHint: string;
@@ -146,6 +170,8 @@ function ProgressRow({
   range,
   status,
   unit,
+  weeklyAvg,
+  weeklyAvgUnit = '/día',
   lowHint,
   inRangeHint,
   highHint,
@@ -186,6 +212,13 @@ function ProgressRow({
             )}
           >
             {hint}
+            {weeklyAvg && (
+              <span className="text-muted-foreground/60">
+                {' '}
+                · prom 7d {weeklyAvg}
+                {weeklyAvgUnit}
+              </span>
+            )}
           </span>
         </div>
         <div className="shrink-0">{actionTrigger}</div>

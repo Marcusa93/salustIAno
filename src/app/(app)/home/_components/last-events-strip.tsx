@@ -1,6 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { durationLabel } from '@/lib/baby-age';
-import { Baby, Milk, Moon } from 'lucide-react';
+import { type Prediction, formatPredictionTime } from '@/lib/predictions';
+import { Baby, Milk, Moon, Sparkles } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface LastEventsStripProps {
@@ -12,6 +13,13 @@ export interface LastEventsStripProps {
    */
   lastSleepClosedAt: string | null;
   todayCounts: { feeding: number; sleep: number; diaper: number };
+  /**
+   * Predicciones rule-based. Si null, no se muestra el "próxima". El
+   * hero ya provee la sugerencia para sueño con wake-windows, así que
+   * acá no duplicamos predicción de sueño.
+   */
+  nextFeeding?: Prediction | null;
+  nextDiaper?: Prediction | null;
 }
 
 interface CellProps {
@@ -19,22 +27,22 @@ interface CellProps {
   label: string;
   whenISO: string | null;
   todayCount: number;
+  prediction?: Prediction | null;
 }
 
 /**
  * Tira con tres celdas — toma, pañal, sueño — mostrando "hace cuánto" en
- * lugar del contador puro. Cuando no hay registros, queda en silencio
- * ("Sin registros") en vez de "0".
- *
- * Reemplaza la grilla previa de tres `SummaryCard` con AnimatedCount.
- * Trade: perdimos el conteo grande, ganamos saber cuándo fue lo último —
- * que es la pregunta real que se hace la familia con el bebé encima.
+ * lugar del contador puro y, opcionalmente, una estimación de cuándo
+ * viene la próxima ("~17:00"). Cuando no hay registros, queda en
+ * silencio ("Sin registros") en vez de "0".
  */
 export function LastEventsStrip({
   lastFeedingAt,
   lastDiaperAt,
   lastSleepClosedAt,
   todayCounts,
+  nextFeeding,
+  nextDiaper,
 }: LastEventsStripProps) {
   return (
     <section
@@ -46,12 +54,14 @@ export function LastEventsStrip({
         label="Última toma"
         whenISO={lastFeedingAt}
         todayCount={todayCounts.feeding}
+        prediction={nextFeeding}
       />
       <Cell
         Icon={Baby}
         label="Último pañal"
         whenISO={lastDiaperAt}
         todayCount={todayCounts.diaper}
+        prediction={nextDiaper}
       />
       <Cell
         Icon={Moon}
@@ -63,26 +73,47 @@ export function LastEventsStrip({
   );
 }
 
-function Cell({ Icon, label, whenISO, todayCount }: CellProps) {
+function Cell({ Icon, label, whenISO, todayCount, prediction }: CellProps) {
   const when = whenISO ? `Hace ${durationLabel(whenISO)}` : 'Sin registros';
   const time = whenISO
-    ? new Date(whenISO).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(whenISO).toLocaleTimeString('es-AR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      })
     : null;
   return (
-    <Card className="flex items-center gap-3 border-border/60 bg-gradient-to-b from-card to-muted/15 p-4">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
-        <Icon className="size-5" aria-hidden />
-      </span>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="font-medium text-[10.5px] text-muted-foreground uppercase tracking-[0.18em]">
-          {label}
+    <Card className="flex flex-col gap-2 border-border/60 bg-gradient-to-b from-card to-muted/15 p-4">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
+          <Icon className="size-5" aria-hidden />
         </span>
-        <span className="font-medium text-foreground text-sm leading-tight">{when}</span>
-        <span className="text-muted-foreground text-xs">
-          {time ? `${time} · ` : ''}
-          {todayCount > 0 ? `${todayCount} hoy` : 'sin registros hoy'}
-        </span>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="font-medium text-[10.5px] text-muted-foreground uppercase tracking-[0.18em]">
+            {label}
+          </span>
+          <span className="font-medium text-foreground text-sm leading-tight">{when}</span>
+          <span className="text-muted-foreground text-xs">
+            {time ? `${time} · ` : ''}
+            {todayCount > 0 ? `${todayCount} hoy` : 'sin registros hoy'}
+          </span>
+        </div>
       </div>
+      {prediction && (
+        <div className="flex items-center gap-1.5 border-border/40 border-t pt-2 text-[11px] text-muted-foreground/90">
+          <Sparkles className="size-3 text-primary/70" aria-hidden />
+          <span>
+            <span className="text-muted-foreground/70">Próxima ~</span>
+            <span className="font-medium text-foreground/85 tabular-nums">
+              {formatPredictionTime(prediction.expectedAt)}
+            </span>
+            <span className="text-muted-foreground/70">
+              {' '}
+              · cada {Math.round((prediction.medianIntervalMinutes / 60) * 10) / 10}h
+            </span>
+          </span>
+        </div>
+      )}
     </Card>
   );
 }
