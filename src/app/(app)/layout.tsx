@@ -1,4 +1,5 @@
 import { BottomNav } from '@/components/salu/bottom-nav';
+import { CommandPalette, CommandPaletteTrigger } from '@/components/salu/command-palette';
 import { DesktopSidebar } from '@/components/salu/desktop-sidebar';
 import { InstallHint } from '@/components/salu/install-hint';
 import { MobileMenu } from '@/components/salu/mobile-menu';
@@ -31,6 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SaluLogo size="default" />
           </Link>
           <div className="flex-1" />
+          <CommandPaletteTrigger />
           <UserMenu />
         </div>
       </header>
@@ -53,6 +55,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <BottomNav />
         <InstallHint />
         <FloatingSalu />
+        <CommandPalette />
       </div>
     </div>
   );

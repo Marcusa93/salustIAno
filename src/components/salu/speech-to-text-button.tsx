@@ -26,6 +26,18 @@ import { toast } from 'sonner';
  * transcript con un input controlado lo decide el caller via `onTranscript`.
  */
 
+/**
+ * Cuando autoStart === true, el componente intenta iniciar el reconocimiento
+ * apenas se monta (en el effect de detección de soporte). Útil para
+ * triggear voice quick-add desde el home: la URL trae `?voz=1`, el sheet
+ * abre, y el SpeechToTextButton arranca solo sin que la familia tenga que
+ * tocar el mic una segunda vez.
+ *
+ * Si el browser pide permiso de mic por primera vez, autoStart va a fallar
+ * con `not-allowed` la primera vez — el callback de error muestra el
+ * toast y la familia toca el botón para reintentar (ya con permiso
+ * concedido).
+ */
 interface SpeechToTextButtonProps {
   /**
    * Callback cuando el reconocimiento devuelve un transcript final
@@ -45,6 +57,12 @@ interface SpeechToTextButtonProps {
   disabled?: boolean;
   size?: 'sm' | 'icon' | 'icon-sm';
   className?: string;
+  /**
+   * Si true, el botón intenta iniciar el reconocimiento apenas se
+   * monta. Pensado para flows tipo "abrir el chat con voice ya activo
+   * desde el home". El user puede cancelar tocando de nuevo.
+   */
+  autoStart?: boolean;
 }
 
 // El typing oficial de Web Speech API no está en lib.dom.d.ts de TS por
@@ -96,6 +114,7 @@ export function SpeechToTextButton({
   disabled,
   size = 'icon',
   className,
+  autoStart = false,
 }: SpeechToTextButtonProps) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -115,6 +134,24 @@ export function SpeechToTextButton({
       }
     };
   }, []);
+
+  // autoStart: una vez detectado el soporte, intentamos iniciar. Pequeño
+  // retraso de 250ms para que la animación del Sheet asiente y el
+  // permiso del browser no se confunda con el render del backdrop.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo queremos
+  // disparar en el primer mount con autoStart, no en cada cambio de start.
+  useEffect(() => {
+    if (!autoStart || !supported || disabled || listening) return;
+    const t = setTimeout(() => {
+      try {
+        start();
+      } catch {
+        /* manejado por onerror */
+      }
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, supported]);
 
   function start() {
     if (typeof window === 'undefined') return;

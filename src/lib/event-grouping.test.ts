@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { arDayKeyFor, classifyEvent, groupEventsByDay, groupEventsByTime } from './event-grouping';
+import {
+  arDayKeyFor,
+  bucketByDayLast7,
+  classifyEvent,
+  groupEventsByDay,
+  groupEventsByTime,
+} from './event-grouping';
 
 describe('classifyEvent', () => {
   // Ahora referencia: 2026-05-08 18:00 UTC (15:00 AR del viernes 8).
@@ -129,5 +135,55 @@ describe('groupEventsByDay', () => {
     const groups = groupEventsByDay(events, now);
     // 04 mayo 2026 fue lunes.
     expect(groups[0]?.label).toBe('Lunes 4 de mayo');
+  });
+});
+
+describe('bucketByDayLast7', () => {
+  // Ahora: viernes 2026-05-08 18:00 UTC = 15:00 AR.
+  const now = new Date('2026-05-08T18:00:00Z');
+
+  it('devuelve siempre 7 elementos', () => {
+    expect(bucketByDayLast7([], now)).toHaveLength(7);
+  });
+
+  it('lista vacía devuelve [0,0,0,0,0,0,0]', () => {
+    expect(bucketByDayLast7([], now)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  it('hoy va en el índice 6', () => {
+    const result = bucketByDayLast7(['2026-05-08T14:00:00Z'], now);
+    expect(result[6]).toBe(1);
+    expect(result[5]).toBe(0);
+  });
+
+  it('ayer va en el índice 5', () => {
+    const result = bucketByDayLast7(['2026-05-07T14:00:00Z'], now);
+    expect(result[5]).toBe(1);
+    expect(result[6]).toBe(0);
+  });
+
+  it('hace 6 días va en el índice 0', () => {
+    const result = bucketByDayLast7(['2026-05-02T14:00:00Z'], now);
+    expect(result[0]).toBe(1);
+  });
+
+  it('eventos antes de la ventana se ignoran', () => {
+    const result = bucketByDayLast7(['2026-05-01T14:00:00Z'], now);
+    expect(result.reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
+  it('cuenta múltiples eventos en el mismo día', () => {
+    const result = bucketByDayLast7(
+      ['2026-05-08T08:00:00Z', '2026-05-08T12:00:00Z', '2026-05-08T16:00:00Z'],
+      now,
+    );
+    expect(result[6]).toBe(3);
+  });
+
+  it('respeta hora AR — 22 AR del 7 cae en ayer (índice 5), no en hoy', () => {
+    // 2026-05-08T01:00:00Z = 22:00 AR del 7.
+    const result = bucketByDayLast7(['2026-05-08T01:00:00Z'], now);
+    expect(result[5]).toBe(1);
+    expect(result[6]).toBe(0);
   });
 });

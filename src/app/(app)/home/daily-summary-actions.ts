@@ -134,7 +134,16 @@ export async function generateDailySummaryAction(): Promise<DailySummaryResult> 
       highlight: result.highlight,
       eventCount,
     };
-  } catch {
+  } catch (err) {
+    // Mensaje al user opaco a propósito (no exponemos detalle de provider).
+    // En dev imprimimos la causa al log para que sea debuggable: si el
+    // resumen no aparece, el server log dice si fue config (key faltante),
+    // network, parse, etc. El logStore.record server-side ya guarda
+    // detalle en ai_logs, pero ese viaje a Supabase es asincrónico y no
+    // ayuda a Marco mirando la terminal.
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[generateDailySummaryAction] summarizeDay failed:', err);
+    }
     return { ok: false, error: 'No pudimos generar el resumen ahora. Probá de nuevo en un rato.' };
   }
 }

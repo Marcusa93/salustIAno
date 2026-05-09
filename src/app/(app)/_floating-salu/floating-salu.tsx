@@ -22,7 +22,8 @@ import { Textarea } from '@/components/ui/textarea';
 import type { Proposal } from '@/lib/ai/agents/salustia/proposals';
 import { cn } from '@/lib/utils';
 import { ImageIcon, Loader2, Send, X } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import type { Route } from 'next';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   type ChangeEvent,
   type KeyboardEvent,
@@ -70,7 +71,10 @@ function historyToEntries(history: ChatHistoryEntry[]): ChatEntry[] {
  */
 export function FloatingSalu() {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
+  const [voiceAuto, setVoiceAuto] = useState(false);
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [draft, setDraft] = useState('');
   const [pending, startTransition] = useTransition();
@@ -81,6 +85,27 @@ export function FloatingSalu() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Voice quick-add: si la URL trae ?voz=1, abrimos el sheet y
+  // pedimos al SpeechToTextButton que arranque solo. Limpiamos el param
+  // del URL para que un refresh / back no re-triggeree el mic.
+  useEffect(() => {
+    if (searchParams.get('voz') !== '1') return;
+    setOpen(true);
+    setVoiceAuto(true);
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    params.delete('voz');
+    const qs = params.toString();
+    const next = (qs ? `${pathname}?${qs}` : pathname) as Route;
+    router.replace(next, { scroll: false });
+  }, [searchParams, router, pathname]);
+
+  // Reset del flag de voice-auto al cerrar — si la familia abre el sheet
+  // de nuevo manualmente, el mic no arranca solo (eso solo pasa cuando
+  // entran por el shortcut de voz).
+  useEffect(() => {
+    if (!open) setVoiceAuto(false);
+  }, [open]);
 
   // Hidratación: la primera vez que el user abre el sheet, traemos los
   // últimos N mensajes de chat_messages (mismos que ve /chat). Si vuelve
@@ -409,6 +434,7 @@ export function FloatingSalu() {
             />
             <SpeechToTextButton
               disabled={pending}
+              autoStart={voiceAuto}
               onTranscript={(text) => {
                 // Append al draft con un espacio. Si el usuario ya tenía
                 // texto, no lo pisa.

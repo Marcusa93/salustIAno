@@ -17,10 +17,11 @@ export { proposalSchema, summarizeProposal } from './proposals';
 
 const AGENT_NAME = 'salustia';
 const MODEL = 'anthropic/claude-haiku-4-5';
-// v4: agregamos search_chat_history para que el agente busque en su
-// propia conversación pasada cuando la familia pregunta "¿qué te dije
-// sobre…?". v3 ya inyectaba perfil del bebé + memorias persistentes.
-const PROMPT_VERSION = 'salustia-v4';
+// v5: sumamos sección "Dumps multi-evento" para que parsee re-envíos de
+// WhatsApp tipo "[1:09, 9/5/2026] Abril: Despierta 1:09 / Se duerme 2 am
+// post mamadera 60ml / Despierta 04:30..." y proponga una card por evento.
+// v4 agregó search_chat_history. v3 inyectaba perfil del bebé + memorias.
+const PROMPT_VERSION = 'salustia-v5';
 const MAX_ITERATIONS = 5;
 // Cota de inyección: si la familia acumula 200 memorias, no las metemos
 // todas en cada turno. Cortamos por cantidad y por chars.

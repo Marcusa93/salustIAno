@@ -122,6 +122,36 @@ export function groupEventsByDay<T extends { occurred_at: string }>(
     }));
 }
 
+/**
+ * Bucketiza una lista de timestamps ISO en 7 enteros — uno por día,
+ * cronológico — terminando en hoy (índice 6). Hora de Argentina, así
+ * que un evento a las 23:30 AR cae al día correcto y no al UTC siguiente.
+ *
+ * Útil para sparklines: querés saber cuántos eventos hubo el lunes,
+ * el martes, ..., hoy. Eventos fuera de la ventana de 7 días se ignoran.
+ */
+export function bucketByDayLast7(
+  timestamps: ReadonlyArray<string>,
+  now: Date = new Date(),
+): number[] {
+  const counts = [0, 0, 0, 0, 0, 0, 0];
+  const todayKey = arDateKey(now);
+  // Mapeamos cada uno de los últimos 7 días a su índice (0..6).
+  const dayKeyToIndex = new Map<string, number>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
+    dayKeyToIndex.set(arDateKey(d), i);
+  }
+  // Sanity: todayKey debe quedar en el índice 6.
+  void todayKey;
+  for (const ts of timestamps) {
+    const k = arDayKeyFor(ts);
+    const idx = dayKeyToIndex.get(k);
+    if (idx !== undefined) counts[idx] = (counts[idx] ?? 0) + 1;
+  }
+  return counts;
+}
+
 function dayHeaderLabel(dayKey: string, todayKey: string, yesterdayKey: string): string {
   if (dayKey === todayKey) return 'Hoy';
   if (dayKey === yesterdayKey) return 'Ayer';

@@ -4,7 +4,7 @@ import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timel
 import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { groupEventsByDay } from '@/lib/event-grouping';
+import { bucketByDayLast7, groupEventsByDay } from '@/lib/event-grouping';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
 import {
@@ -42,6 +42,7 @@ import { CloseSleepSheet } from '../home/_components/close-sleep-sheet';
 import { DiaperQuickAdd } from '../home/_components/diaper-quick-add';
 import { FeedingQuickAdd } from '../home/_components/feeding-quick-add';
 import { SleepQuickAdd } from '../home/_components/sleep-quick-add';
+import { WeeklyStatsCard } from './_components/weekly-stats-card';
 
 export const metadata: Metadata = {
   title: 'Registro',
@@ -134,15 +135,71 @@ export default async function TimelinePage({ searchParams }: PageProps) {
     );
   }
 
-  const { data, error } = await supabase.rpc('get_timeline', {
-    p_child_id: child.id,
-    p_event_types: filter ? [filter] : ['feeding', 'sleep', 'diaper', 'measurement', 'note'],
-    p_limit: 200,
-    p_offset: 0,
-  });
+  // Ventana de 7 días terminando hoy — usada por el WeeklyStatsCard.
+  // Tomamos la medianoche de hace 6 días (≈ 7 días incluido hoy) para
+  // que `bucketByDayLast7` ubique cada evento en su día AR.
+  const since7d = new Date();
+  since7d.setDate(since7d.getDate() - 6);
+  since7d.setHours(0, 0, 0, 0);
+
+  const [{ data, error }, feedings7, diapers7, sleeps7] = await Promise.all([
+    supabase.rpc('get_timeline', {
+      p_child_id: child.id,
+      p_event_types: filter ? [filter] : ['feeding', 'sleep', 'diaper', 'measurement', 'note'],
+      p_limit: 200,
+      p_offset: 0,
+    }),
+    supabase
+      .from('feeding_events')
+      .select('occurred_at')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .gte('occurred_at', since7d.toISOString()),
+    supabase
+      .from('diaper_events')
+      .select('occurred_at')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .gte('occurred_at', since7d.toISOString()),
+    supabase
+      .from('sleep_sessions')
+      .select('started_at')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .gte('started_at', since7d.toISOString()),
+  ]);
 
   const rows = (data ?? []) as TimelineRow[];
   const dayGroups = groupEventsByDay(rows);
+
+  // Series para el sparkline. Mapeamos las filas a sus timestamps y
+  // bucketizamos en hora AR.
+  const feedings7Iso = (feedings7.data ?? []).map(
+    (e) => (e as { occurred_at: string }).occurred_at,
+  );
+  const diapers7Iso = (diapers7.data ?? []).map((e) => (e as { occurred_at: string }).occurred_at);
+  const sleeps7Iso = (sleeps7.data ?? []).map((e) => (e as { started_at: string }).started_at);
+
+  const weeklyStats = [
+    {
+      label: 'Tomas',
+      Icon: Milk,
+      daily: bucketByDayLast7(feedings7Iso),
+      unit: 'tomas',
+    },
+    {
+      label: 'Pañales',
+      Icon: Baby,
+      daily: bucketByDayLast7(diapers7Iso),
+      unit: 'pañales',
+    },
+    {
+      label: 'Sueño',
+      Icon: Moon,
+      daily: bucketByDayLast7(sleeps7Iso),
+      unit: 'sesiones',
+    },
+  ] as const;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -228,6 +285,10 @@ export default async function TimelinePage({ searchParams }: PageProps) {
           </Link>
         </div>
       </section>
+
+      <div className="animate-stagger-up" style={{ animationDelay: '90ms' }}>
+        <WeeklyStatsCard series={weeklyStats} />
+      </div>
 
       <nav aria-label="Filtrar registro" className="flex flex-wrap gap-2">
         {FILTER_OPTIONS.map((opt) => {

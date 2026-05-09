@@ -8,7 +8,7 @@ import { greetingFor, isLateNightAr } from '@/lib/greeting';
 import { averagePerDay, predictNextDiaper, predictNextFeeding } from '@/lib/predictions';
 import { createClient } from '@/lib/supabase/server';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
-import { Baby, BookHeart, Milk, Moon, Plus, Sparkles } from 'lucide-react';
+import { Baby, BookHeart, Mic, Milk, Moon, Plus, Sparkles } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { CloseSleepSheet } from './_components/close-sleep-sheet';
@@ -278,38 +278,54 @@ export default async function HomePage() {
         }
       />
 
-      {/* SalustIA */}
-      <Link
-        href="/chat"
-        className="animate-stagger-up rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        style={{ animationDelay: '90ms' }}
-      >
-        <Card className="relative flex items-center gap-4 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-accent/30 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/10">
-          <div className="relative flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/10">
-            <Sparkles className="size-5 animate-breathe" aria-hidden />
-            <span
-              aria-hidden
-              className="absolute inset-0 origin-center"
-              style={{ animation: 'salu-orbit 9s linear infinite' }}
-            >
-              <span className="-translate-x-1/2 -translate-y-1 absolute top-0 left-1/2 size-1 rounded-full bg-primary/60" />
-            </span>
-            <span
-              aria-hidden
-              className="absolute inset-0 origin-center"
-              style={{ animation: 'salu-orbit 7s linear infinite reverse', animationDelay: '-2s' }}
-            >
-              <span className="-translate-x-1 -translate-y-1/2 absolute top-1/2 left-0 size-1 rounded-full bg-accent-foreground/40" />
-            </span>
+      {/* SalustIA — el card es 100% link a /chat (con un overlay
+          absoluto), pero el botón de mic queda por encima y abre el
+          FloatingSalu con el dictado ya activo via ?voz=1. */}
+      <div className="animate-stagger-up" style={{ animationDelay: '90ms' }}>
+        <Card className="relative flex items-center gap-3 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-accent/30 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/10">
+          <Link
+            href="/chat"
+            aria-label="Abrir chat con SalustIA"
+            className="absolute inset-0 z-0 rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          />
+          <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 items-center gap-4">
+            <div className="relative flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/10">
+              <Sparkles className="size-5 animate-breathe" aria-hidden />
+              <span
+                aria-hidden
+                className="absolute inset-0 origin-center"
+                style={{ animation: 'salu-orbit 9s linear infinite' }}
+              >
+                <span className="-translate-x-1/2 -translate-y-1 absolute top-0 left-1/2 size-1 rounded-full bg-primary/60" />
+              </span>
+              <span
+                aria-hidden
+                className="absolute inset-0 origin-center"
+                style={{
+                  animation: 'salu-orbit 7s linear infinite reverse',
+                  animationDelay: '-2s',
+                }}
+              >
+                <span className="-translate-x-1 -translate-y-1/2 absolute top-1/2 left-0 size-1 rounded-full bg-accent-foreground/40" />
+              </span>
+            </div>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="font-medium text-foreground">Preguntale a SalustIA</span>
+              <span className="text-muted-foreground text-sm">
+                Anotá una toma, un pañal o un sueño con tu voz, o preguntale cómo viene el día.
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="font-medium text-foreground">Preguntale a SalustIA</span>
-            <span className="text-muted-foreground text-sm">
-              Anotá una toma, un pañal o un sueño con tu voz, o preguntale cómo viene el día.
-            </span>
-          </div>
+          <Link
+            href="/home?voz=1"
+            aria-label="Anotar por voz, abrir el dictado"
+            title="Anotar por voz"
+            className="relative z-[2] flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20 transition-transform duration-200 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <Mic className="size-5" aria-hidden />
+          </Link>
         </Card>
-      </Link>
+      </div>
 
       {/* Resumen del día con IA */}
       <div className="animate-stagger-up" style={{ animationDelay: '120ms' }}>
