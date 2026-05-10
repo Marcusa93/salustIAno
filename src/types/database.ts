@@ -233,6 +233,7 @@ export type Database = {
           notes: string | null;
           pediatrician_name: string | null;
           pediatrician_phone: string | null;
+          sex: string | null;
           updated_at: string;
         };
         Insert: {
@@ -255,6 +256,7 @@ export type Database = {
           notes?: string | null;
           pediatrician_name?: string | null;
           pediatrician_phone?: string | null;
+          sex?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -277,6 +279,7 @@ export type Database = {
           notes?: string | null;
           pediatrician_name?: string | null;
           pediatrician_phone?: string | null;
+          sex?: string | null;
           updated_at?: string;
         };
         Relationships: [

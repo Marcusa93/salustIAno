@@ -59,12 +59,9 @@ function pickLatest(
 
 export default async function MeasurementsListPage() {
   const supabase = await createClient();
-  // Una vez aplicada la migration 026 (`alter table child_profiles add
-  // column sex`), agregar `sex` a este select y leerlo desde la fila.
-  // Mientras tanto, hardcodeamos 'male' (Salustiano) — Marco lo confirmó.
   const { data: child } = await supabase
     .from('child_profiles')
-    .select('id, name, birth_date')
+    .select('id, name, birth_date, sex')
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -101,11 +98,9 @@ export default async function MeasurementsListPage() {
 
   // Datos del bebé que necesitamos para los percentiles OMS.
   const birthDate = (child.birth_date as string | null | undefined) ?? null;
-  // TODO: leer de child.sex una vez aplicada la migration 026. Por ahora
-  // hardcoded 'male' (Salustiano confirmado). Cuando la migration corra
-  // y haya UI para editarlo, esta línea pasa a:
-  //   const childSex = (child.sex ?? null) as Sex | 'other' | null;
-  const childSex: Sex | 'other' | null = 'male';
+  const rawSex = (child.sex as string | null | undefined) ?? null;
+  const childSex: Sex | 'other' | null =
+    rawSex === 'male' || rawSex === 'female' || rawSex === 'other' ? rawSex : null;
 
   // Helper para calcular percentil de la última medición (si tenemos
   // birthDate + sex válidos). Devuelve null cuando no se puede.
