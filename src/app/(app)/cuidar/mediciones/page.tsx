@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
+import { cn } from '@/lib/utils';
+import { type Sex, percentileForMeasurement } from '@/lib/who-growth';
 import { ChevronLeft, Plus, Ruler } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
@@ -57,9 +59,12 @@ function pickLatest(
 
 export default async function MeasurementsListPage() {
   const supabase = await createClient();
+  // Una vez aplicada la migration 026 (`alter table child_profiles add
+  // column sex`), agregar `sex` a este select y leerlo desde la fila.
+  // Mientras tanto, hardcodeamos 'male' (Salustiano) — Marco lo confirmó.
   const { data: child } = await supabase
     .from('child_profiles')
-    .select('id, name')
+    .select('id, name, birth_date')
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -79,10 +84,12 @@ export default async function MeasurementsListPage() {
     );
   }
 
+  const childId = child.id as string;
+  const childName = (child.name as string | undefined) ?? 'el bebé';
   const { data: rowsData, error } = await supabase
     .from('child_measurements')
     .select('id, measured_at, weight_grams, height_cm, head_circumference_cm, notes')
-    .eq('child_id', child.id)
+    .eq('child_id', childId)
     .is('deleted_at', null)
     .order('measured_at', { ascending: false });
 
@@ -91,6 +98,46 @@ export default async function MeasurementsListPage() {
   const weight = pickLatest(rows, 'weight_grams');
   const height = pickLatest(rows, 'height_cm');
   const head = pickLatest(rows, 'head_circumference_cm');
+
+  // Datos del bebé que necesitamos para los percentiles OMS.
+  const birthDate = (child.birth_date as string | null | undefined) ?? null;
+  // TODO: leer de child.sex una vez aplicada la migration 026. Por ahora
+  // hardcoded 'male' (Salustiano confirmado). Cuando la migration corra
+  // y haya UI para editarlo, esta línea pasa a:
+  //   const childSex = (child.sex ?? null) as Sex | 'other' | null;
+  const childSex: Sex | 'other' | null = 'male';
+
+  // Helper para calcular percentil de la última medición (si tenemos
+  // birthDate + sex válidos). Devuelve null cuando no se puede.
+  function pctFor(
+    kind: 'weight' | 'length' | 'head_circumference',
+    value: number | null,
+    measuredAt: string | null,
+  ): number | null {
+    if (!birthDate || !childSex || value === null || !measuredAt) return null;
+    const ageDays = Math.floor(
+      (new Date(measuredAt).getTime() - new Date(birthDate).getTime()) / (1000 * 60 * 60 * 24),
+    );
+    // weight viene en gramos en BD, OMS lo espera en kg.
+    const v = kind === 'weight' ? value / 1000 : value;
+    return percentileForMeasurement({ sex: childSex, kind, value: v, ageDays });
+  }
+
+  const weightPct = pctFor(
+    'weight',
+    weight.latest?.weight_grams ?? null,
+    weight.latest?.measured_at ?? null,
+  );
+  const heightPct = pctFor(
+    'length',
+    height.latest?.height_cm ?? null,
+    height.latest?.measured_at ?? null,
+  );
+  const headPct = pctFor(
+    'head_circumference',
+    head.latest?.head_circumference_cm ?? null,
+    head.latest?.measured_at ?? null,
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
@@ -107,7 +154,7 @@ export default async function MeasurementsListPage() {
       <PageHeader
         eyebrow="Cuidar"
         title="Cómo va creciendo."
-        description={`Lo que te entregan en cada control. Vas a ver cómo crece ${child.name} con el tiempo.`}
+        description={`Lo que te entregan en cada control. Vas a ver cómo crece ${childName} con el tiempo.`}
         action={
           <Button render={<Link href="/cuidar/mediciones/nueva" />} size="sm">
             <Plus className="size-4" aria-hidden />
@@ -129,7 +176,8 @@ export default async function MeasurementsListPage() {
         />
       ) : (
         <>
-          {/* Gráfico de evolución */}
+          {/* Gráfico de evolución con bandas OMS de fondo cuando hay
+              birth_date + sex. */}
           <MeasurementsChart
             points={rows.map((m) => ({
               measuredAt: m.measured_at,
@@ -137,9 +185,11 @@ export default async function MeasurementsListPage() {
               heightCm: m.height_cm ?? null,
               headCm: m.head_circumference_cm ?? null,
             }))}
+            birthDate={birthDate}
+            sex={childSex === 'male' || childSex === 'female' ? childSex : null}
           />
 
-          {/* Resumen de últimos valores */}
+          {/* Resumen de últimos valores con percentil OMS al lado. */}
           <div className="grid gap-3 sm:grid-cols-3">
             <SummaryCard
               label="Peso"
@@ -147,6 +197,7 @@ export default async function MeasurementsListPage() {
               previous={weight.previous?.weight_grams ?? null}
               format={fmtWeight}
               latestAt={weight.latest?.measured_at ?? null}
+              percentile={weightPct}
             />
             <SummaryCard
               label="Talla"
@@ -154,6 +205,7 @@ export default async function MeasurementsListPage() {
               previous={height.previous?.height_cm ?? null}
               format={fmtCm}
               latestAt={height.latest?.measured_at ?? null}
+              percentile={heightPct}
             />
             <SummaryCard
               label="Cabeza"
@@ -161,8 +213,18 @@ export default async function MeasurementsListPage() {
               previous={head.previous?.head_circumference_cm ?? null}
               format={fmtCm}
               latestAt={head.latest?.measured_at ?? null}
+              percentile={headPct}
             />
           </div>
+
+          {/* Disclaimer OMS — siempre visible cuando hay percentiles. */}
+          {(weightPct !== null || heightPct !== null || headPct !== null) && (
+            <p className="text-muted-foreground/80 text-xs leading-relaxed">
+              Percentiles según las curvas oficiales de la OMS para{' '}
+              {childSex === 'male' ? 'varones' : 'nenas'} 0-24 meses. Son una referencia
+              orientativa, no un diagnóstico — la pediatra es la que interpreta el contexto.
+            </p>
+          )}
 
           {/* Lista completa */}
           <section className="flex flex-col gap-3">
@@ -210,12 +272,14 @@ function SummaryCard({
   previous,
   format,
   latestAt,
+  percentile,
 }: {
   label: string;
   latest: number | null;
   previous: number | null;
   format: (v: number | null) => string;
   latestAt: string | null;
+  percentile: number | null;
 }) {
   const delta = latest !== null && previous !== null ? latest - previous : null;
   return (
@@ -223,7 +287,22 @@ function SummaryCard({
       <span className="font-medium text-[10.5px] text-muted-foreground uppercase tracking-[0.18em]">
         {label}
       </span>
-      <span className="font-display text-2xl text-foreground tracking-tight">{format(latest)}</span>
+      <div className="flex items-baseline gap-2">
+        <span className="font-display text-2xl text-foreground tracking-tight">
+          {format(latest)}
+        </span>
+        {percentile !== null && (
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full px-2 py-0.5 font-mono font-medium text-[10px] tracking-wider',
+              percentileTone(percentile),
+            )}
+            title={percentileExplain(percentile)}
+          >
+            p{Math.round(percentile)}
+          </span>
+        )}
+      </div>
       {delta !== null && (
         <span className={`font-medium text-xs ${delta >= 0 ? 'text-primary' : 'text-destructive'}`}>
           {delta > 0 ? '+' : ''}
@@ -233,4 +312,25 @@ function SummaryCard({
       {latestAt && <span className="text-muted-foreground text-xs">{formatDate(latestAt)}</span>}
     </Card>
   );
+}
+
+/**
+ * Color-codea el chip del percentil. La idea es comunicar visualmente
+ * "está en el medio" (verde-azul, neutro/positivo) vs "extremo" (ámbar
+ * para llamar la atención, sin alarmismo) — los pediatras hablan de
+ * "fuera del rango p3-p97" como bandera.
+ */
+function percentileTone(p: number): string {
+  if (p < 3 || p > 97) return 'bg-amber-500/15 text-amber-700 ring-1 ring-amber-500/25';
+  if (p < 15 || p > 85) return 'bg-secondary text-secondary-foreground';
+  return 'bg-primary/12 text-primary ring-1 ring-primary/15';
+}
+
+function percentileExplain(p: number): string {
+  const r = Math.round(p);
+  if (r < 3) return 'Más chico que el 97% de los bebés de su edad. Conversalo con la pediatra.';
+  if (r > 97) return 'Más grande que el 97% de los bebés de su edad. Conversalo con la pediatra.';
+  if (r >= 25 && r <= 75) return `Está en el medio sano (p${r}). Mismo porte que la mayoría.`;
+  if (r < 25) return `Más chico que el promedio (p${r}). Dentro del rango normal.`;
+  return `Más grande que el promedio (p${r}). Dentro del rango normal.`;
 }
