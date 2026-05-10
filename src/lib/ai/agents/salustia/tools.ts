@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { ToolDefinition } from '@/lib/ai/types';
+import { startOfTodayAr } from '@/lib/format-ar';
 import type { createClient } from '@/lib/supabase/server';
 import { type Proposal, proposalSchema, summarizeProposal } from './proposals';
 
@@ -353,8 +354,7 @@ const getTodaySummary: ToolHandler = async (_args, ctx) => {
   if (!ctx.childId) {
     return jsonError('Todavía no hay perfil de bebé.');
   }
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const todayStart = startOfTodayAr();
 
   const { data, error } = await ctx.supabase.rpc('get_timeline', {
     p_child_id: ctx.childId,
@@ -371,7 +371,14 @@ const getTodaySummary: ToolHandler = async (_args, ctx) => {
     sleep: rows.filter((r) => r.event_type === 'sleep').length,
     diaper: rows.filter((r) => r.event_type === 'diaper').length,
   };
-  return jsonOk({ date: todayStart.toISOString().slice(0, 10), counts });
+  // Fecha local AR (no UTC).
+  const dateAr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(todayStart);
+  return jsonOk({ date: dateAr, counts });
 };
 
 const getChildInfo: ToolHandler = async (_args, ctx) => {

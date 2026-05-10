@@ -1,4 +1,10 @@
-import { formatDateAr, formatTimeAr } from '@/lib/format-ar';
+import {
+  endOfTodayAr,
+  formatDateAr,
+  formatTimeAr,
+  startOfDayArDaysAgo,
+  startOfTodayAr,
+} from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import {
   BREAST_SIDE_LABELS,
@@ -31,7 +37,8 @@ interface TimelineRow {
 
 function parseDateOrFallback(input: string | undefined, fallback: Date): Date {
   if (!input || !/^\d{4}-\d{2}-\d{2}$/.test(input)) return fallback;
-  const d = new Date(`${input}T00:00:00`);
+  // Interpretamos YYYY-MM-DD como medianoche en hora AR, no UTC.
+  const d = new Date(`${input}T00:00:00-03:00`);
   return Number.isNaN(d.getTime()) ? fallback : d;
 }
 
@@ -120,19 +127,14 @@ function describeEvent(row: TimelineRow): string {
 export default async function TimelinePrintPage({ searchParams }: PageProps) {
   const { desde, hasta } = await searchParams;
 
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  weekAgo.setHours(0, 0, 0, 0);
+  const today = endOfTodayAr();
+  const weekAgo = startOfDayArDaysAgo(7);
 
   const fromDate = parseDateOrFallback(desde, weekAgo);
   const toDate = parseDateOrFallback(hasta, today);
   // El usuario puede pasar `hasta` < `desde` por error — swap si pasa.
   const start = fromDate <= toDate ? fromDate : toDate;
   const end = fromDate <= toDate ? toDate : fromDate;
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
 
   const supabase = await createClient();
   const { data: child } = await supabase

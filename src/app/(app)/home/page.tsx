@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { babyAgeFromBirth } from '@/lib/baby-age';
 import { expectationsFor } from '@/lib/baby-expectations';
+import { startOfDayArDaysAgo, startOfTodayAr } from '@/lib/format-ar';
 import { greetingFor, isLateNightAr } from '@/lib/greeting';
 import { averagePerDay } from '@/lib/predictions';
 import { createClient } from '@/lib/supabase/server';
@@ -91,15 +92,16 @@ export default async function HomePage() {
     );
   }
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  // 'Hoy' en hora Argentina — sin esto, en Vercel UTC los counts del
+  // día aparecen desincronizados (la medianoche UTC son las 21h AR del
+  // día anterior).
+  const todayStart = startOfTodayAr();
 
   const upcomingHorizon = new Date();
   upcomingHorizon.setDate(upcomingHorizon.getDate() + 14);
 
   // Ventana de 7 días para tendencia semanal y predicciones rule-based.
-  const since7d = new Date();
-  since7d.setDate(since7d.getDate() - 7);
+  const since7d = startOfDayArDaysAgo(7);
 
   const [
     { data: recentEvents },

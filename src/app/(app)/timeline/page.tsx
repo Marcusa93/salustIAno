@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { bucketByDayLast7, groupEventsByDay } from '@/lib/event-grouping';
-import { formatTimeAr } from '@/lib/format-ar';
+import { formatTimeAr, startOfDayArDaysAgo } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
 import {
@@ -134,11 +134,9 @@ export default async function TimelinePage({ searchParams }: PageProps) {
   }
 
   // Ventana de 7 días terminando hoy — usada por el WeeklyStatsCard.
-  // Tomamos la medianoche de hace 6 días (≈ 7 días incluido hoy) para
-  // que `bucketByDayLast7` ubique cada evento en su día AR.
-  const since7d = new Date();
-  since7d.setDate(since7d.getDate() - 6);
-  since7d.setHours(0, 0, 0, 0);
+  // Medianoche AR de hace 6 días (≈ 7 días incluido hoy) para que
+  // `bucketByDayLast7` ubique cada evento en su día AR.
+  const since7d = startOfDayArDaysAgo(6);
 
   const [{ data, error }, feedings7, diapers7, sleeps7] = await Promise.all([
     supabase.rpc('get_timeline', {

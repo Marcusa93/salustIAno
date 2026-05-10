@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/salu/page-header';
 import { Card } from '@/components/ui/card';
 import { durationLabel } from '@/lib/baby-age';
+import { startOfDayArDaysAgo, startOfTodayAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
 import {
@@ -122,10 +123,10 @@ export default async function CuidarPage() {
     .limit(1)
     .maybeSingle();
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const since30d = new Date();
-  since30d.setDate(since30d.getDate() - 30);
+  // Medianoche en hora AR — no del runtime (en Vercel UTC arrancaría a
+  // las 21h AR del día anterior).
+  const todayStart = startOfTodayAr();
+  const since30d = startOfDayArDaysAgo(30);
 
   // Fan-out de queries en paralelo. Cada una alimenta la micro-info de
   // su card; si una falla, esa card cae en el copy default y las demás

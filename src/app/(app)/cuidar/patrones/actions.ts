@@ -1,6 +1,7 @@
 'use server';
 
 import { findPatterns } from '@/lib/ai/agents/pattern-finder';
+import { startOfDayArDaysAgo } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import { chronologicalAgeDays } from '@/lib/validators/child-profile';
 
@@ -37,9 +38,8 @@ export async function getPatternsAction(): Promise<PatternsResult> {
 
   if (!child) return { ok: false, error: 'Todavía no hay perfil del bebé.' };
 
-  const since = new Date();
-  since.setDate(since.getDate() - (WINDOW_DAYS - 1));
-  since.setHours(0, 0, 0, 0);
+  // Medianoche AR de hace WINDOW_DAYS-1 días (incluye hoy completo).
+  const since = startOfDayArDaysAgo(WINDOW_DAYS - 1);
   const sinceIso = since.toISOString();
 
   const [{ data: sleepRows }, { data: feedingRows }, { data: diaperRows }] = await Promise.all([

@@ -1,6 +1,7 @@
 'use server';
 
 import { summarizeDay } from '@/lib/ai/agents/daily-summary';
+import { endOfTodayAr, startOfTodayAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import { chronologicalAgeDays } from '@/lib/validators/child-profile';
 
@@ -35,13 +36,20 @@ export async function generateDailySummaryAction(): Promise<DailySummaryResult> 
     return { ok: false, error: 'Todavía no hay perfil del bebé.' };
   }
 
-  // Eventos de hoy (zona horaria local del server — Tucumán/Argentina).
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+  // Eventos de hoy en hora Argentina (forzado, no del runtime — en
+  // Vercel UTC la medianoche son las 21h AR del día anterior).
+  const todayStart = startOfTodayAr();
+  const todayEnd = endOfTodayAr();
 
-  const isoToday = `${todayStart.getFullYear()}-${String(todayStart.getMonth() + 1).padStart(2, '0')}-${String(todayStart.getDate()).padStart(2, '0')}`;
+  // YYYY-MM-DD en hora AR para mostrar al modelo.
+  const arParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const get = (t: string) => arParts.find((p) => p.type === t)?.value ?? '';
+  const isoToday = `${get('year')}-${get('month')}-${get('day')}`;
 
   const [{ data: sleepRows }, { data: feedingRows }, { data: diaperRows }, { data: noteRows }] =
     await Promise.all([

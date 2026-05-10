@@ -1,5 +1,6 @@
 'use server';
 
+import { startOfTodayAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 
 export interface MemberActivity {
@@ -36,8 +37,8 @@ export async function getTodayActivityByMemberAction(): Promise<MemberActivity[]
 
   if (!child) return [];
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  // Medianoche en hora AR (no UTC del runtime).
+  const todayStart = startOfTodayAr();
   const todayIso = todayStart.toISOString();
 
   const [

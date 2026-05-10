@@ -1,6 +1,6 @@
 'use server';
 
-import { formatDateAr, formatTimeAr } from '@/lib/format-ar';
+import { formatDateAr, formatTimeAr, startOfTodayAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 
 export interface DayShareSnapshot {
@@ -40,8 +40,8 @@ export async function getDayShareSnapshotAction(): Promise<DayShareSnapshot | nu
     .maybeSingle();
   if (!child) return null;
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  // Medianoche en hora AR (no UTC del runtime).
+  const todayStart = startOfTodayAr();
   const todayIso = todayStart.toISOString();
 
   const [{ data: feedings }, { data: diapers }, { data: sleeps }, { data: latestPhoto }] =

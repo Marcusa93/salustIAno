@@ -22,6 +22,48 @@
 const AR_TZ = 'America/Argentina/Buenos_Aires';
 
 /**
+ * Devuelve el instante UTC que corresponde a las 00:00 de HOY en hora
+ * de Argentina. Esencial para queries de "eventos del día": en Vercel
+ * (server UTC) `new Date(); setHours(0,0,0,0)` da las 00:00 UTC, que
+ * en AR son las 21:00 del día anterior — los counts del día salen
+ * mal y "Cómo va el día" queda desincronizado.
+ *
+ * El truco: extraer YYYY-MM-DD en TZ AR vía Intl, y construir un
+ * Date desde el ISO con offset explícito -03:00. ECMA garantiza que
+ * `new Date('YYYY-MM-DDTHH:mm:ss-03:00')` da el instant UTC correcto
+ * sin importar el TZ del runtime.
+ */
+export function startOfTodayAr(now: Date = new Date()): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: AR_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+  return new Date(`${get('year')}-${get('month')}-${get('day')}T00:00:00-03:00`);
+}
+
+/**
+ * Como `startOfTodayAr` pero N días atrás. `daysAgo=0` → hoy 00:00 AR,
+ * `daysAgo=7` → hace 7 días 00:00 AR.
+ */
+export function startOfDayArDaysAgo(daysAgo: number, now: Date = new Date()): Date {
+  const today = startOfTodayAr(now);
+  return new Date(today.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Final del día (23:59:59.999) en hora AR. Usado en queries con
+ * `lte('occurred_at', endOfTodayAr().toISOString())` para incluir
+ * eventos cargados hasta la medianoche AR.
+ */
+export function endOfTodayAr(now: Date = new Date()): Date {
+  const start = startOfTodayAr(now);
+  return new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+}
+
+/**
  * Hora corta en formato 24h ("14:30"). Para mostrar al lado de eventos
  * ("Empezó a las 14:30").
  */
