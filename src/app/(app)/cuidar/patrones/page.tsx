@@ -4,7 +4,9 @@ import { Card } from '@/components/ui/card';
 import { ChevronLeft, Sparkles } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { HourlyHeatmap } from './_components/hourly-heatmap';
 import { getPatternsAction } from './actions';
+import { getHourlyHeatmapAction } from './heatmap-actions';
 import { PatternsView } from './patterns-view';
 
 export const metadata: Metadata = {
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
 export default async function PatronesPage() {
   // Pre-cargamos las observaciones del server para que el primer paint ya
   // las muestre. La UI puede regenerar a demanda.
-  const initial = await getPatternsAction();
+  const [initial, heatmap] = await Promise.all([getPatternsAction(), getHourlyHeatmapAction()]);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -53,6 +55,10 @@ export default async function PatronesPage() {
         </div>
 
         <PatternsView initial={initial} />
+      </Card>
+
+      <Card className="animate-stagger-up flex flex-col gap-4 border-border/60 p-5">
+        <HourlyHeatmap data={heatmap} />
       </Card>
     </div>
   );
