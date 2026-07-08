@@ -12,6 +12,8 @@ export interface NotificationPrefs {
   feeding_predicted: boolean;
   /** Próximo pañal estimado (predicción rule-based). Default OFF. */
   diaper_predicted: boolean;
+  /** Próxima dosis de medicamento (20 min antes). Default ON. */
+  medication_due: boolean;
 }
 
 const DEFAULT_PREFS: NotificationPrefs = {
@@ -19,6 +21,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   feeding_overdue: true,
   feeding_predicted: false,
   diaper_predicted: false,
+  medication_due: true,
 };
 
 const VALID_KEYS = new Set<keyof NotificationPrefs>([
@@ -26,6 +29,7 @@ const VALID_KEYS = new Set<keyof NotificationPrefs>([
   'feeding_overdue',
   'feeding_predicted',
   'diaper_predicted',
+  'medication_due',
 ]);
 
 /**

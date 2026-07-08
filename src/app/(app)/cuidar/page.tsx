@@ -10,6 +10,7 @@ import {
   Camera,
   ClipboardCheck,
   Moon,
+  Pill,
   Ruler,
   Sparkles,
 } from 'lucide-react';
@@ -138,6 +139,7 @@ export default async function CuidarPage() {
     lastDiaperPhoto,
     lastSummary,
     careGuidesCount,
+    nextMedDose,
   ] = await Promise.all([
     child
       ? supabase
@@ -192,6 +194,19 @@ export default async function CuidarPage() {
       .from('care_guides')
       .select('id', { count: 'exact', head: true })
       .is('deleted_at', null),
+    child
+      ? // biome-ignore lint/suspicious/noExplicitAny: medication_doses falta en types/database.ts (regenerar Supabase types resolvería).
+        (supabase as any)
+          .from('medication_doses')
+          .select('medication_name, next_dose_at')
+          .eq('child_id', child.id)
+          .is('deleted_at', null)
+          .not('next_dose_at', 'is', null)
+          .gte('given_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+          .order('next_dose_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   // Sueño — total minutos y siestas hoy.
@@ -259,6 +274,23 @@ export default async function CuidarPage() {
       ? 'Sin entradas todavía'
       : `${guidesCount} entrada${guidesCount === 1 ? '' : 's'}`;
 
+  // Medicamentos — próxima dosis.
+  const nextMed = nextMedDose.data as { medication_name: string; next_dose_at: string } | null;
+  let medicamentosMicro = 'Sin medicamentos activos';
+  if (nextMed?.next_dose_at) {
+    const diffMin = Math.round(
+      (new Date(nextMed.next_dose_at).getTime() - Date.now()) / 60_000,
+    );
+    if (diffMin > 0) {
+      const h = Math.floor(diffMin / 60);
+      const m = diffMin % 60;
+      const timeStr = h === 0 ? `${m}m` : m === 0 ? `${h}h` : `${h}h ${m}m`;
+      medicamentosMicro = `${nextMed.medication_name} · en ${timeStr}`;
+    } else {
+      medicamentosMicro = `${nextMed.medication_name} · dar ahora`;
+    }
+  }
+
   // Cards con su sección asignada — el orden de OPTIONS no importa
   // visualmente porque el render las agrupa por sección abajo.
   const OPTIONS: CuidarOption[] = [
@@ -277,6 +309,14 @@ export default async function CuidarPage() {
       description: 'Peso, talla, perímetro cefálico — cómo va creciendo.',
       Icon: Ruler,
       microInfo: measurementMicro,
+      section: 'salud',
+    },
+    {
+      href: '/cuidar/medicamentos' as Route,
+      title: 'Medicamentos',
+      description: 'Registrá cada dosis y el sistema te avisa cuándo toca la siguiente.',
+      Icon: Pill,
+      microInfo: medicamentosMicro,
       section: 'salud',
     },
     {

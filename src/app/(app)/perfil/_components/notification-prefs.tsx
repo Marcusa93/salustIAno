@@ -2,7 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Baby, BellRing, CalendarClock, Loader2, Milk, Sparkles } from 'lucide-react';
+import { Baby, BellRing, CalendarClock, Loader2, Milk, Pill, Sparkles } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -46,6 +46,12 @@ const ROWS: ReadonlyArray<PrefRow> = [
     label: 'Próximo pañal estimado',
     description: 'Lo mismo para pañales. Más laxo — los pañales son menos predictivos.',
     badge: 'IA',
+  },
+  {
+    key: 'medication_due',
+    Icon: Pill,
+    label: 'Dosis de medicamento',
+    description: 'Avisamos 20 min antes de que toque dar una dosis programada.',
   },
 ];
 

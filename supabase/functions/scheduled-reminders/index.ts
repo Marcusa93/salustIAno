@@ -72,6 +72,7 @@ interface NotificationPrefs {
   feeding_overdue?: boolean;
   feeding_predicted?: boolean;
   diaper_predicted?: boolean;
+  medication_due?: boolean;
 }
 
 type PrefKey = keyof NotificationPrefs;
@@ -81,6 +82,7 @@ const DEFAULT_PREFS: Required<NotificationPrefs> = {
   feeding_overdue: true,
   feeding_predicted: false,
   diaper_predicted: false,
+  medication_due: true,
 };
 
 const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC_KEY');
@@ -525,6 +527,64 @@ async function processDiaperPredictions(): Promise<{ checked: number; notified: 
   return { checked: children.length, notified };
 }
 
+interface MedicationDoseRow {
+  id: string;
+  medication_name: string;
+  next_dose_at: string;
+  child_profiles: { name: string; family_group_id: string } | null;
+}
+
+/**
+ * Notifica dosis de medicamentos que vencen en los próximos 20 min.
+ * Usa next_dose_notified_at para idempotencia — si ya se notificó, no
+ * vuelve a mandar push aunque el cron corra de nuevo.
+ */
+async function processMedicationReminders(): Promise<{ checked: number; notified: number }> {
+  const now = new Date();
+  const lookahead = new Date(now.getTime() + 20 * 60 * 1000);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: doses } = await (supabase as any)
+    .from('medication_doses')
+    .select('id, medication_name, next_dose_at, child_profiles(name, family_group_id)')
+    .is('deleted_at', null)
+    .is('next_dose_notified_at', null)
+    .gte('next_dose_at', now.toISOString())
+    .lte('next_dose_at', lookahead.toISOString());
+
+  if (!doses || doses.length === 0) return { checked: 0, notified: 0 };
+
+  let notified = 0;
+  for (const dose of doses as MedicationDoseRow[]) {
+    const child = dose.child_profiles;
+    if (!child) continue;
+
+    const minutesUntil = Math.round(
+      (new Date(dose.next_dose_at).getTime() - now.getTime()) / 60_000,
+    );
+
+    const result = await sendToFamily(
+      child.family_group_id,
+      {
+        title: '💊 Próxima dosis',
+        body: `${dose.medication_name} para ${child.name} en ${minutesUntil} min.`,
+        url: '/cuidar/medicamentos',
+        tag: `medication-reminder-${dose.id}`,
+      },
+      'medication_due',
+    );
+
+    // Marcar notificado aunque no haya llegado a nadie — evita reintento spam.
+    await (supabase as any)
+      .from('medication_doses')
+      .update({ next_dose_notified_at: now.toISOString() })
+      .eq('id', dose.id);
+
+    if (result.sent > 0) notified += 1;
+  }
+  return { checked: doses.length, notified };
+}
+
 Deno.serve(async (_req: Request) => {
   const startedAt = Date.now();
   try {
@@ -532,6 +592,7 @@ Deno.serve(async (_req: Request) => {
     const feedings = await processFeedingReminders();
     const feedingPredictions = await processFeedingPredictions();
     const diaperPredictions = await processDiaperPredictions();
+    const medications = await processMedicationReminders();
     const elapsed = Date.now() - startedAt;
     return new Response(
       JSON.stringify({
@@ -540,6 +601,7 @@ Deno.serve(async (_req: Request) => {
         feedings,
         feedingPredictions,
         diaperPredictions,
+        medications,
         elapsedMs: elapsed,
       }),
       { headers: { 'Content-Type': 'application/json' } },

@@ -47,6 +47,7 @@ test-results/
 # Supabase
 supabase/.branches
 supabase/.temp
+.supabase/
 
 # Vercel
 .vercel
