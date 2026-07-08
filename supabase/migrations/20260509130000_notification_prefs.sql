@@ -55,7 +55,7 @@ alter table public.child_profiles
 -- 15 min nos da margen para no perderla.
 do $$
 declare
-  v_project_ref text := 'cwzngscywmgnjuudsgva';
+  v_project_ref text := 'nszwkhwqfezcrvvqskdb';
   v_existing int;
 begin
   select count(*) into v_existing from cron.job where jobname = 'salu-scheduled-reminders';

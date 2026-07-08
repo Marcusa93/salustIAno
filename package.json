@@ -19,7 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "db:link": "supabase link --project-ref cwzngscywmgnjuudsgva",
+    "db:link": "supabase link --project-ref nszwkhwqfezcrvvqskdb",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
     "db:diff": "supabase db diff --linked",

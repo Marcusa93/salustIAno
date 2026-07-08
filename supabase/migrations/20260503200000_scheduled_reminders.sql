@@ -30,7 +30,7 @@ create extension if not exists pg_net;
 -- 3. Schedule del cron job
 -- IMPORTANTE: reemplazar <PROJECT_REF> por el ref del proyecto Supabase
 -- antes de aplicar (o setearlo como secret y reescribirlo después).
--- Por defecto: cwzngscywmgnjuudsgva.
+-- Por defecto: nszwkhwqfezcrvvqskdb.
 --
 -- Cómo funciona: cada hora a los :05, hacemos POST a la edge function.
 -- El header Authorization usa el SUPABASE_SERVICE_ROLE_KEY del proyecto
@@ -39,7 +39,7 @@ create extension if not exists pg_net;
 
 do $$
 declare
-  v_project_ref text := 'cwzngscywmgnjuudsgva';
+  v_project_ref text := 'nszwkhwqfezcrvvqskdb';
   v_existing int;
 begin
   -- Borramos cualquier schedule previo con el mismo nombre para re-crear
@@ -88,5 +88,5 @@ end $$;
 --    curl -X POST \
 --      -H "Authorization: Bearer <service_role_key>" \
 --      -H "Content-Type: application/json" \
---      https://cwzngscywmgnjuudsgva.supabase.co/functions/v1/scheduled-reminders
+--      https://nszwkhwqfezcrvvqskdb.supabase.co/functions/v1/scheduled-reminders
 -- ============================================================================
