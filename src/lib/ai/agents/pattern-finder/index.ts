@@ -11,7 +11,7 @@ import { logStore } from '@/lib/ai/logger';
 
 const AGENT_NAME = 'pattern-finder';
 const MODEL = 'anthropic/claude-haiku-4-5';
-const PROMPT_VERSION = 'pattern-finder-v1';
+const PROMPT_VERSION = 'pattern-finder-v2';
 
 const SYSTEM_PROMPT = readFileSync(
   join(process.cwd(), 'src/lib/ai/agents/pattern-finder/prompt.md'),
@@ -24,6 +24,13 @@ export const patternsSchema = z.object({
 });
 
 export type Patterns = z.infer<typeof patternsSchema>;
+
+export interface WeekSummaryInput {
+  feedingCountPerDay: number;
+  feedingMlPerDay: number | null;
+  sleepHoursPerDay: number;
+  diaperCountPerDay: number;
+}
 
 export interface PatternFinderInput {
   childName: string;
@@ -39,8 +46,14 @@ export interface PatternFinderInput {
     diaperCount: number;
     sleepMinutesAvg: number | null;
     sleepMinutesMax: number | null;
+    sleepMinutesTotal: number | null;
     feedingTotalMl: number | null;
   }>;
+  /** Resumen comparativo semana actual vs semana anterior. Presente cuando hay ≥7 días de datos. */
+  weekComparison?: {
+    current: WeekSummaryInput;
+    previous: WeekSummaryInput | null;
+  };
 }
 
 export interface PatternFinderOutput {

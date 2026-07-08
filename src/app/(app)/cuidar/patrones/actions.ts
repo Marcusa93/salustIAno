@@ -5,16 +5,53 @@ import { startOfDayArDaysAgo } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
 import { chronologicalAgeDays } from '@/lib/validators/child-profile';
 
+export interface WeekSummary {
+  feedingCountPerDay: number;
+  feedingMlPerDay: number | null;
+  sleepHoursPerDay: number;
+  diaperCountPerDay: number;
+}
+
 export type PatternsResult =
   | {
       ok: true;
       observations: string[];
       tone: string;
       daysWithData: number;
+      weeklyStats: { current: WeekSummary; previous: WeekSummary | null } | null;
     }
   | { ok: false; error: string };
 
 const WINDOW_DAYS = 14;
+
+function computeWeekSummary(
+  daySlice: Array<{
+    feedingCount: number;
+    diaperCount: number;
+    sleepMinutesTotal: number | null;
+    feedingTotalMl: number | null;
+  }>,
+): WeekSummary {
+  const n = daySlice.length;
+  if (n === 0) {
+    return { feedingCountPerDay: 0, feedingMlPerDay: null, sleepHoursPerDay: 0, diaperCountPerDay: 0 };
+  }
+
+  const feedingCountPerDay =
+    Math.round((daySlice.reduce((s, d) => s + d.feedingCount, 0) / n) * 10) / 10;
+  const diaperCountPerDay =
+    Math.round((daySlice.reduce((s, d) => s + d.diaperCount, 0) / n) * 10) / 10;
+  const sleepHoursPerDay =
+    Math.round((daySlice.reduce((s, d) => s + (d.sleepMinutesTotal ?? 0), 0) / n / 60) * 10) / 10;
+
+  const mlDays = daySlice.filter((d) => d.feedingTotalMl !== null && d.feedingTotalMl > 0);
+  const feedingMlPerDay =
+    mlDays.length > 0
+      ? Math.round(mlDays.reduce((s, d) => s + (d.feedingTotalMl ?? 0), 0) / mlDays.length)
+      : null;
+
+  return { feedingCountPerDay, feedingMlPerDay, sleepHoursPerDay, diaperCountPerDay };
+}
 
 /**
  * Genera 2-4 observaciones descriptivas sobre los últimos 14 días con el
@@ -136,6 +173,10 @@ export async function getPatternsAction(): Promise<PatternsResult> {
           ? Math.round(b.sleepDurationsMin.reduce((s, x) => s + x, 0) / b.sleepDurationsMin.length)
           : null,
       sleepMinutesMax: b.sleepDurationsMin.length > 0 ? Math.max(...b.sleepDurationsMin) : null,
+      sleepMinutesTotal:
+        b.sleepDurationsMin.length > 0
+          ? b.sleepDurationsMin.reduce((s, x) => s + x, 0)
+          : null,
       feedingTotalMl: b.feedingMl > 0 ? b.feedingMl : null,
     }));
 
@@ -147,8 +188,17 @@ export async function getPatternsAction(): Promise<PatternsResult> {
       ],
       tone: 'pocos datos',
       daysWithData: days.length,
+      weeklyStats: null,
     };
   }
+
+  // Semana actual (últimos 7 días) vs semana anterior (7 días previos).
+  const currentDays = days.slice(-7);
+  const previousDays = days.slice(-14, -7);
+  const weeklyStats: { current: WeekSummary; previous: WeekSummary | null } = {
+    current: computeWeekSummary(currentDays),
+    previous: previousDays.length >= 3 ? computeWeekSummary(previousDays) : null,
+  };
 
   try {
     const result = await findPatterns(
@@ -156,6 +206,10 @@ export async function getPatternsAction(): Promise<PatternsResult> {
         childName: (child.name as string) ?? 'el bebé',
         ageDays: chronologicalAgeDays((child.birth_date as string | null) ?? null),
         days,
+        weekComparison: {
+          current: weeklyStats.current,
+          previous: weeklyStats.previous,
+        },
       },
       {
         familyGroupId: (child.family_group_id as string) ?? undefined,
@@ -168,6 +222,7 @@ export async function getPatternsAction(): Promise<PatternsResult> {
       observations: result.observations,
       tone: result.tone,
       daysWithData: days.length,
+      weeklyStats,
     };
   } catch {
     return { ok: false, error: 'No pudimos generar las observaciones. Probá en un rato.' };

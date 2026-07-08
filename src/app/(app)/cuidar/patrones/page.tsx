@@ -5,6 +5,7 @@ import { ChevronLeft, Sparkles } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { HourlyHeatmap } from './_components/hourly-heatmap';
+import { WeeklyStats } from './_components/weekly-stats';
 import { getPatternsAction } from './actions';
 import { getHourlyHeatmapAction } from './heatmap-actions';
 import { PatternsView } from './patterns-view';
@@ -13,15 +14,10 @@ export const metadata: Metadata = {
   title: 'Patrones',
 };
 
-/**
- * Página /cuidar/patrones — observaciones descriptivas (no diagnósticas) de
- * los últimos 14 días con el bebé. Genera al primer load y cachea client-side
- * en localStorage por 6 horas para no repetir costos.
- */
 export default async function PatronesPage() {
-  // Pre-cargamos las observaciones del server para que el primer paint ya
-  // las muestre. La UI puede regenerar a demanda.
   const [initial, heatmap] = await Promise.all([getPatternsAction(), getHourlyHeatmapAction()]);
+
+  const weeklyStats = initial.ok ? initial.weeklyStats : null;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -38,8 +34,12 @@ export default async function PatronesPage() {
       <PageHeader
         eyebrow="Cuidar"
         title="Cómo viene la rutina."
-        description="Observaciones cariñosas sobre los últimos 14 días — promedios y ritmos visibles en los datos. Nada de diagnósticos ni recomendaciones."
+        description="Promedios y ritmos de los últimos 14 días. Nada de diagnósticos ni recomendaciones."
       />
+
+      {weeklyStats && (
+        <WeeklyStats current={weeklyStats.current} previous={weeklyStats.previous} />
+      )}
 
       <Card className="animate-stagger-up flex flex-col gap-4 border-primary/15 bg-gradient-to-br from-primary/[0.06] via-card to-accent/15 p-5">
         <div className="flex items-center gap-2">
