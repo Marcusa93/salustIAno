@@ -77,6 +77,13 @@ export interface SalustiaOutput {
 interface AgentContext {
   familyGroupId?: string;
   actorUserId?: string;
+  /**
+   * Contexto de auth inyectado para llamadas server-to-server SIN cookie de
+   * sesión (ej. el endpoint de Alexa, que actúa como la familia vía admin
+   * client). Si se pasa, `resolveContext` usa este cliente y userId en vez de
+   * resolver desde `auth.getUser()`. El flujo del browser lo deja sin setear.
+   */
+  auth?: { supabase: Awaited<ReturnType<typeof createClient>>; userId: string };
 }
 
 interface ResolvedContext {
@@ -102,11 +109,18 @@ interface ResolvedContext {
  * fetch falla silencioso y se omite la sección de memorias — el chat
  * sigue andando como antes.
  */
-async function resolveContext(): Promise<ResolvedContext> {
-  const supabase = await createClient();
-  const { data: userData, error } = await supabase.auth.getUser();
-  if (error || !userData.user) {
-    throw new AIError('config', 'Sesión no válida.');
+async function resolveContext(auth?: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+}): Promise<ResolvedContext> {
+  const supabase = auth?.supabase ?? (await createClient());
+  let userId = auth?.userId;
+  if (!userId) {
+    const { data: userData, error } = await supabase.auth.getUser();
+    if (error || !userData.user) {
+      throw new AIError('config', 'Sesión no válida.');
+    }
+    userId = userData.user.id;
   }
 
   const { data: child } = await supabase
@@ -123,7 +137,7 @@ async function resolveContext(): Promise<ResolvedContext> {
   const { data: membership } = await supabase
     .from('family_memberships')
     .select('family_group_id')
-    .eq('user_id', userData.user.id)
+    .eq('user_id', userId)
     .is('deleted_at', null)
     .limit(1)
     .maybeSingle();
@@ -150,7 +164,7 @@ async function resolveContext(): Promise<ResolvedContext> {
   return {
     toolCtx: {
       supabase,
-      userId: userData.user.id,
+      userId,
       childId: child?.id ?? null,
       proposals: [],
     },
@@ -247,7 +261,7 @@ export async function chat(
   let toolCtx: ToolContext;
   let ambientContext = '';
   try {
-    const resolved = await resolveContext();
+    const resolved = await resolveContext(context.auth);
     toolCtx = resolved.toolCtx;
     ambientContext = resolved.ambientContext;
   } catch (err) {
@@ -349,8 +363,25 @@ export async function chat(
           actorUserId: context.actorUserId ?? null,
         });
 
+        // Fallback de texto: si el modelo no devolvió contenido (caso
+        // típico — emitió tool calls de propose_* en una iteración
+        // intermedia y la última iteración terminó sin texto), damos un
+        // mensaje útil. Sin esto la burbuja queda vacía, el assistant se
+        // persiste con content="" y la próxima llamada arrastra una
+        // entrada huérfana en el historial.
+        const rawReply = (response.content ?? '').trim();
+        const reply = rawReply
+          ? rawReply
+          : toolCtx.proposals.length > 0
+            ? voice === 'baby'
+              ? 'Te dejo abajo lo que entendí. Tocá "Confirmar todo" o decidí una por una.'
+              : 'Te dejo abajo las cards con lo que entendí. Confirmá cada una o tocá "Confirmar todo".'
+            : voice === 'baby'
+              ? 'Estoy acá, contame.'
+              : 'Listo. ¿Algo más?';
+
         return {
-          reply: response.content || '',
+          reply,
           proposals: toolCtx.proposals,
           meta: {
             model: lastModel,

@@ -1,3 +1,4 @@
+import { type Proposal, chat, summarizeProposal } from '@/lib/ai/agents/salustia';
 import { env } from '@/lib/env';
 import { startOfTodayAr } from '@/lib/format-ar';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -257,6 +258,100 @@ async function registerDiaper(
   return `Anotado, un pañal ${label} para ${target.childName}.`;
 }
 
+// ---- Texto libre → Salustia (consultar o cargar CUALQUIER cosa) -----------
+/** Si el ISO no trae zona horaria, lo tratamos como hora de Argentina (UTC-3). */
+function toTimestamptz(iso: string): string {
+  return /[zZ]$|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}-03:00`;
+}
+
+/** Ejecuta una propuesta de Salustia con el admin client. Devuelve true si la
+ *  cargó. milestone/memory no se cargan por voz (se avisan). */
+async function executeProposal(admin: AdminClient, target: Target, p: Proposal): Promise<boolean> {
+  const base = { child_id: target.childId, created_by: target.createdBy };
+  if (p.kind === 'feeding') {
+    const { error } = await admin.from('feeding_events').insert({
+      ...base,
+      occurred_at: toTimestamptz(p.occurred_at),
+      type: p.type,
+      side: p.side ?? null,
+      duration_minutes: p.duration_minutes ?? null,
+      amount_ml: p.amount_ml ?? null,
+      reaction: p.reaction,
+    });
+    return !error;
+  }
+  if (p.kind === 'diaper') {
+    const { error } = await admin.from('diaper_events').insert({
+      ...base,
+      occurred_at: toTimestamptz(p.occurred_at),
+      type: p.type,
+      notes: p.notes ?? null,
+    });
+    return !error;
+  }
+  if (p.kind === 'sleep') {
+    const { error } = await admin.from('sleep_sessions').insert({
+      ...base,
+      started_at: toTimestamptz(p.started_at),
+      ended_at: p.ended_at ? toTimestamptz(p.ended_at) : null,
+      quality: p.quality,
+      is_nap: p.is_nap,
+      notes: p.notes ?? null,
+    });
+    return !error;
+  }
+  if (p.kind === 'note') {
+    const { error } = await admin.from('notes').insert({
+      ...base,
+      occurred_at: toTimestamptz(p.occurred_at ?? new Date().toISOString()),
+      category: p.category,
+      content: p.content,
+    });
+    return !error;
+  }
+  return false; // milestone / memory → por ahora no por voz
+}
+
+async function handleFreeText(admin: AdminClient, target: Target, text: string): Promise<Response> {
+  if (!text.trim()) {
+    return speak('Contame qué querés saber o anotar.', false);
+  }
+  if (!target.createdBy) {
+    return speak('No pude identificar tu usuario. Entrá una vez a la app y reintentá.', true);
+  }
+  let out: Awaited<ReturnType<typeof chat>>;
+  try {
+    out = await chat(
+      { messages: [{ role: 'user', content: text }], voice: 'baby' },
+      {
+        auth: { supabase: admin, userId: target.createdBy },
+        familyGroupId: target.familyGroupId,
+        actorUserId: target.createdBy,
+      },
+    );
+  } catch {
+    return speak('Uh, no pude procesar eso ahora. Probá de nuevo en un ratito.', true);
+  }
+
+  const proposals = out.proposals ?? [];
+  if (proposals.length === 0) {
+    // Consulta pura → leemos la respuesta de Salustia.
+    return speak(out.reply || 'Listo.', true);
+  }
+  // Hay cosas para cargar; por voz no hay cards de confirmación, así que las
+  // ejecutamos y confirmamos hablando.
+  const done: string[] = [];
+  const skipped: string[] = [];
+  for (const p of proposals) {
+    const ok = await executeProposal(admin, target, p);
+    (ok ? done : skipped).push(summarizeProposal(p));
+  }
+  let msg = '';
+  if (done.length > 0) msg += `Anoté: ${done.join('; ')}.`;
+  if (skipped.length > 0) msg += ` Esto cargalo desde la app: ${skipped.join('; ')}.`;
+  return speak(msg.trim() || out.reply || 'Listo.', true);
+}
+
 // ---- Handler principal ----------------------------------------------------
 export async function POST(req: Request): Promise<Response> {
   let body: AlexaRequestEnvelope;
@@ -338,6 +433,8 @@ export async function POST(req: Request): Promise<Response> {
       return speak(await registerFeeding(admin, target, slots), true);
     case 'RegistrarPanalIntent':
       return speak(await registerDiaper(admin, target, slots), true);
+    case 'SaluLibreIntent':
+      return await handleFreeText(admin, target, slots?.texto?.value ?? '');
     default:
       return speak('Esa todavía no la sé hacer. Decí "ayuda" para escuchar las opciones.', false);
   }

@@ -60,6 +60,20 @@
             "cuándo comió",
             "última toma"
           ]
+        },
+        {
+          "name": "SaluLibreIntent",
+          "slots": [{ "name": "texto", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "que {texto}",
+            "pregunta {texto}",
+            "preguntale {texto}",
+            "decile que {texto}",
+            "anota que {texto}",
+            "quiero saber {texto}",
+            "fijate {texto}",
+            "necesito que {texto}"
+          ]
         }
       ],
       "types": [
