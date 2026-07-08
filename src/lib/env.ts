@@ -18,6 +18,9 @@ const envSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().min(1).optional(),
   VAPID_EMAIL: z.string().email().default('marco.rossi@derecho.unt.edu.ar'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  // Alexa Skill: applicationId de la Skill de Salu (Developer Console). Si está
+  // seteada, el endpoint /api/alexa rechaza requests de otras skills.
+  ALEXA_SKILL_ID: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

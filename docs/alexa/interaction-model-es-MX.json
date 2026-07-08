@@ -1,0 +1,88 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "salu bebe",
+      "intents": [
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        {
+          "name": "RegistrarTomaIntent",
+          "slots": [
+            { "name": "metodo", "type": "MetodoToma" },
+            { "name": "duracion", "type": "AMAZON.NUMBER" },
+            { "name": "cantidad", "type": "AMAZON.NUMBER" }
+          ],
+          "samples": [
+            "tomó {metodo}",
+            "que tomó {metodo}",
+            "anotá que tomó {metodo}",
+            "anota que tomó {metodo}",
+            "registra una toma de {metodo}",
+            "tomó {metodo} {duracion} minutos",
+            "que tomó {metodo} {duracion} minutos",
+            "tomó pecho {duracion} minutos",
+            "tomó {cantidad} mililitros de mamadera",
+            "tomó mamadera de {cantidad} mililitros"
+          ]
+        },
+        {
+          "name": "RegistrarPanalIntent",
+          "slots": [{ "name": "tipo", "type": "TipoPanal" }],
+          "samples": [
+            "hizo {tipo}",
+            "que hizo {tipo}",
+            "cambié un pañal de {tipo}",
+            "registra un pañal de {tipo}",
+            "anotá un pañal {tipo}",
+            "pañal de {tipo}"
+          ]
+        },
+        {
+          "name": "ResumenHoyIntent",
+          "slots": [],
+          "samples": [
+            "cómo va el día",
+            "resumen de hoy",
+            "qué pasó hoy",
+            "cómo viene el día",
+            "cómo estuvo el día"
+          ]
+        },
+        {
+          "name": "UltimaTomaIntent",
+          "slots": [],
+          "samples": [
+            "cuándo fue la última toma",
+            "cuál fue la última toma",
+            "hace cuánto que no come",
+            "cuándo comió",
+            "última toma"
+          ]
+        }
+      ],
+      "types": [
+        {
+          "name": "MetodoToma",
+          "values": [
+            { "name": { "value": "pecho", "synonyms": ["teta", "lactancia", "pecho materno"] } },
+            {
+              "name": { "value": "mamadera", "synonyms": ["biberón", "bibe", "fórmula", "leche"] }
+            },
+            { "name": { "value": "sólido", "synonyms": ["comida", "papilla", "puré", "sólidos"] } }
+          ]
+        },
+        {
+          "name": "TipoPanal",
+          "values": [
+            { "name": { "value": "pis", "synonyms": ["pichí", "pipí", "mojado", "orina"] } },
+            { "name": { "value": "caca", "synonyms": ["popó", "sucio", "materia"] } },
+            { "name": { "value": "ambos", "synonyms": ["los dos", "pis y caca", "completo"] } },
+            { "name": { "value": "seco", "synonyms": ["limpio", "nada"] } }
+          ]
+        }
+      ]
+    }
+  }
+}

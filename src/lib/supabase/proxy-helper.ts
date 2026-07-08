@@ -11,6 +11,10 @@ const PUBLIC_ROUTES = new Set<string>([
   '/restablecer',
   '/auth/callback',
   '/auth/confirm',
+  // Endpoint de la Alexa Skill: lo llama Amazon (máquina-a-máquina, sin cookie
+  // de sesión). Su seguridad la maneja el propio route handler (applicationId +
+  // firma de Alexa), no el proxy — por eso va como público.
+  '/api/alexa',
 ]);
 
 const AUTH_ROUTES = new Set<string>(['/login', '/signup']);
