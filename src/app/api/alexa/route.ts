@@ -46,14 +46,36 @@ interface AlexaRequestEnvelope {
   };
 }
 
+// ---- Modo noche: 20:00–09:00 AR → Alexa susurra (para no despertar al bebé) --
+function isNightAr(): boolean {
+  const h = Number(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).format(new Date()),
+  );
+  return h >= 20 || h < 9;
+}
+
+function escapeSsml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ---- Helpers de respuesta -------------------------------------------------
+// De noche (modo susurro) envolvemos el texto en SSML `whispered` para que
+// Alexa hable bajito. De día, texto plano. El acortar el texto lo hace cada
+// handler con `isNightAr()`.
 function speak(text: string, endSession = true): Response {
+  const outputSpeech = isNightAr()
+    ? {
+        type: 'SSML',
+        ssml: `<speak><amazon:effect name="whispered">${escapeSsml(text)}</amazon:effect></speak>`,
+      }
+    : { type: 'PlainText', text };
   return Response.json({
     version: '1.0',
-    response: {
-      outputSpeech: { type: 'PlainText', text },
-      shouldEndSession: endSession,
-    },
+    response: { outputSpeech, shouldEndSession: endSession },
   });
 }
 
@@ -224,7 +246,7 @@ async function registerFeeding(
           ? ` de mamadera de ${amount} mililitros`
           : ' de mamadera'
         : ' de sólido';
-  return `Listo, anoté una toma${detalle} para ${target.childName}.`;
+  return isNightAr() ? 'Anotado.' : `Listo, anoté una toma${detalle} para ${target.childName}.`;
 }
 
 async function registerDiaper(
@@ -255,7 +277,7 @@ async function registerDiaper(
         : type === 'both'
           ? 'de pis y caca'
           : 'seco';
-  return `Anotado, un pañal ${label} para ${target.childName}.`;
+  return isNightAr() ? 'Anotado.' : `Anotado, un pañal ${label} para ${target.childName}.`;
 }
 
 // ---- Texto libre → Salustia (consultar o cargar CUALQUIER cosa) -----------
@@ -319,10 +341,13 @@ async function handleFreeText(admin: AdminClient, target: Target, text: string):
   if (!target.createdBy) {
     return speak('No pude identificar tu usuario. Entrá una vez a la app y reintentá.', true);
   }
+  const userText = isNightAr()
+    ? `${text} (es de noche y el bebé duerme: respondé en una sola frase muy corta)`
+    : text;
   let out: Awaited<ReturnType<typeof chat>>;
   try {
     out = await chat(
-      { messages: [{ role: 'user', content: text }], voice: 'baby' },
+      { messages: [{ role: 'user', content: userText }], voice: 'baby' },
       {
         auth: { supabase: admin, userId: target.createdBy },
         familyGroupId: target.familyGroupId,
@@ -345,6 +370,9 @@ async function handleFreeText(admin: AdminClient, target: Target, text: string):
   for (const p of proposals) {
     const ok = await executeProposal(admin, target, p);
     (ok ? done : skipped).push(summarizeProposal(p));
+  }
+  if (isNightAr()) {
+    return speak(done.length > 0 ? 'Anotado.' : out.reply || 'Listo.', true);
   }
   let msg = '';
   if (done.length > 0) msg += `Anoté: ${done.join('; ')}.`;
@@ -395,6 +423,7 @@ export async function POST(req: Request): Promise<Response> {
         true,
       );
     }
+    if (isNightAr()) return speak('Hola, decime.', false);
     const resumen = await todaySummary(admin, target.childId);
     return speak(`Hola. ${resumen} ¿Qué querés hacer?`, false);
   }
