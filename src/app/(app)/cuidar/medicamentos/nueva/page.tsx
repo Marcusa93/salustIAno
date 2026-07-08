@@ -4,8 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { ChevronLeft } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
-import { createMedicationDoseAction } from '../actions';
 import { MedicationForm } from '../_components/medication-form';
+import { createMedicationDoseAction } from '../actions';
 
 export const metadata: Metadata = {
   title: 'Registrar dosis',
@@ -23,9 +23,8 @@ export default async function NewMedicationDosePage() {
     .maybeSingle();
 
   // Últimos 5 medicamentos distintos para el datalist.
-  // biome-ignore lint/suspicious/noExplicitAny: medication_doses falta en types/database.ts (regenerar Supabase types resolvería).
   const { data: recent } = child
-    ? await (supabase as any)
+    ? await supabase
         .from('medication_doses')
         .select('medication_name')
         .eq('child_id', child.id)
@@ -56,10 +55,7 @@ export default async function NewMedicationDosePage() {
         description="Anotá qué medicamento diste, cuándo y cada cuántas horas — el sistema calcula la próxima."
       />
 
-      <MedicationForm
-        suggestions={suggestions}
-        onSubmitAction={createMedicationDoseAction}
-      />
+      <MedicationForm suggestions={suggestions} onSubmitAction={createMedicationDoseAction} />
     </div>
   );
 }

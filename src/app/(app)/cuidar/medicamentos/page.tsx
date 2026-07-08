@@ -1,8 +1,8 @@
 import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/server';
+import { cn } from '@/lib/utils';
 import { Clock, Pill, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
@@ -63,7 +63,9 @@ function formatDayLabel(iso: string, now: Date): string {
   if (dStr === todayStr) return 'Hoy';
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = yesterday.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const yStr = yesterday.toLocaleDateString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
   if (dStr === yStr) return 'Ayer';
   return d.toLocaleDateString('es-AR', {
     weekday: 'long',
@@ -93,9 +95,8 @@ export default async function MedicamentosPage() {
 
   const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  // biome-ignore lint/suspicious/noExplicitAny: medication_doses falta en types/database.ts (regenerar Supabase types resolvería).
   const { data: rawDoses } = child
-    ? await (supabase as any)
+    ? await supabase
         .from('medication_doses')
         .select('id, medication_name, dose_amount, given_at, interval_hours, next_dose_at, notes')
         .eq('child_id', child.id)
@@ -125,7 +126,7 @@ export default async function MedicamentosPage() {
       timeZone: 'America/Argentina/Buenos_Aires',
     });
     if (!grouped.has(dayKey)) grouped.set(dayKey, []);
-    grouped.get(dayKey)!.push(dose);
+    grouped.get(dayKey)?.push(dose);
   }
   const historyDays = Array.from(grouped.entries());
 
@@ -150,9 +151,7 @@ export default async function MedicamentosPage() {
       {doses.length === 0 && (
         <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">
           <Pill className="size-8 text-muted-foreground/50" aria-hidden />
-          <p className="text-muted-foreground text-sm">
-            No hay dosis registradas todavía.
-          </p>
+          <p className="text-muted-foreground text-sm">No hay dosis registradas todavía.</p>
           <Button
             render={<Link href={'/cuidar/medicamentos/nueva' as Route} />}
             variant="outline"
@@ -182,7 +181,7 @@ export default async function MedicamentosPage() {
                     <Pill className="size-4" aria-hidden />
                   </span>
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate font-medium text-sm text-foreground">
+                    <span className="truncate font-medium text-foreground text-sm">
                       {dose.medication_name}
                       {dose.dose_amount && (
                         <span className="ml-1.5 font-normal text-muted-foreground">
@@ -220,16 +219,13 @@ export default async function MedicamentosPage() {
           <div className="flex flex-col gap-5">
             {historyDays.map(([dayKey, dayDoses]) => (
               <div key={dayKey} className="flex flex-col gap-2">
-                <span className="text-muted-foreground text-xs font-medium">
-                  {formatDayLabel(dayDoses[0].given_at, now)}
+                <span className="font-medium text-muted-foreground text-xs">
+                  {dayDoses[0] ? formatDayLabel(dayDoses[0].given_at, now) : null}
                 </span>
                 {dayDoses.map((dose) => (
-                  <Card
-                    key={dose.id}
-                    className="flex items-start gap-3 px-4 py-3"
-                  >
+                  <Card key={dose.id} className="flex items-start gap-3 px-4 py-3">
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="font-medium text-sm text-foreground">
+                      <span className="font-medium text-foreground text-sm">
                         {dose.medication_name}
                         {dose.dose_amount && (
                           <span className="ml-1.5 font-normal text-muted-foreground">
@@ -240,9 +236,7 @@ export default async function MedicamentosPage() {
                       <span className="text-muted-foreground text-xs">
                         {formatTime(dose.given_at)}
                         {dose.interval_hours && (
-                          <span className="ml-2 opacity-70">
-                            · cada {dose.interval_hours}h
-                          </span>
+                          <span className="ml-2 opacity-70">· cada {dose.interval_hours}h</span>
                         )}
                       </span>
                       {dose.notes && (

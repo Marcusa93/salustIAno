@@ -63,8 +63,7 @@ export async function createMedicationDoseAction(
       ? new Date(givenAt.getTime() + parsed.data.interval_hours * 60 * 60 * 1000)
       : null;
 
-  // biome-ignore lint/suspicious/noExplicitAny: medication_doses falta en types/database.ts (regenerar Supabase types resolvería).
-  const { error: insertError } = await (ctx.supabase as any).from('medication_doses').insert({
+  const { error: insertError } = await ctx.supabase.from('medication_doses').insert({
     child_id: ctx.childId,
     medication_name: parsed.data.medication_name.trim(),
     dose_amount: emptyToNull(parsed.data.dose_amount),
@@ -89,8 +88,7 @@ export async function deleteMedicationDoseAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
 
-  // biome-ignore lint/suspicious/noExplicitAny: medication_doses falta en types/database.ts (regenerar Supabase types resolvería).
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('medication_doses')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);

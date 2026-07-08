@@ -71,6 +71,69 @@ export type Database = {
           },
         ];
       };
+      albums: {
+        Row: {
+          child_id: string | null;
+          cover_path: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          family_group_id: string;
+          id: string;
+          kind: Database['public']['Enums']['album_kind'];
+          month_key: string | null;
+          name: string;
+          share_token: string | null;
+          shared_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          child_id?: string | null;
+          cover_path?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id: string;
+          id?: string;
+          kind?: Database['public']['Enums']['album_kind'];
+          month_key?: string | null;
+          name: string;
+          share_token?: string | null;
+          shared_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          child_id?: string | null;
+          cover_path?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          id?: string;
+          kind?: Database['public']['Enums']['album_kind'];
+          month_key?: string | null;
+          name?: string;
+          share_token?: string | null;
+          shared_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'albums_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'albums_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       audit_logs: {
         Row: {
           action: Database['public']['Enums']['audit_action'];
@@ -162,6 +225,44 @@ export type Database = {
           },
         ];
       };
+      chat_messages: {
+        Row: {
+          content: string;
+          created_at: string;
+          deleted_at: string | null;
+          family_group_id: string;
+          id: string;
+          role: Database['public']['Enums']['chat_role'];
+          user_id: string;
+        };
+        Insert: {
+          content: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          family_group_id: string;
+          id?: string;
+          role: Database['public']['Enums']['chat_role'];
+          user_id: string;
+        };
+        Update: {
+          content?: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          id?: string;
+          role?: Database['public']['Enums']['chat_role'];
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'chat_messages_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       child_measurements: {
         Row: {
           child_id: string;
@@ -229,6 +330,9 @@ export type Database = {
           health_insurance: string | null;
           id: string;
           is_preterm: boolean | null;
+          last_feeding_reminder_at: string | null;
+          last_predicted_diaper_reminder_at: string | null;
+          last_predicted_feeding_reminder_at: string | null;
           name: string;
           notes: string | null;
           pediatrician_name: string | null;
@@ -252,6 +356,9 @@ export type Database = {
           health_insurance?: string | null;
           id?: string;
           is_preterm?: boolean | null;
+          last_feeding_reminder_at?: string | null;
+          last_predicted_diaper_reminder_at?: string | null;
+          last_predicted_feeding_reminder_at?: string | null;
           name: string;
           notes?: string | null;
           pediatrician_name?: string | null;
@@ -275,6 +382,9 @@ export type Database = {
           health_insurance?: string | null;
           id?: string;
           is_preterm?: boolean | null;
+          last_feeding_reminder_at?: string | null;
+          last_predicted_diaper_reminder_at?: string | null;
+          last_predicted_feeding_reminder_at?: string | null;
           name?: string;
           notes?: string | null;
           pediatrician_name?: string | null;
@@ -301,6 +411,8 @@ export type Database = {
           id: string;
           notes: string | null;
           occurred_at: string;
+          photo_analysis: Json | null;
+          photo_path: string | null;
           type: Database['public']['Enums']['diaper_type'];
           updated_at: string;
         };
@@ -312,6 +424,8 @@ export type Database = {
           id?: string;
           notes?: string | null;
           occurred_at: string;
+          photo_analysis?: Json | null;
+          photo_path?: string | null;
           type: Database['public']['Enums']['diaper_type'];
           updated_at?: string;
         };
@@ -323,6 +437,8 @@ export type Database = {
           id?: string;
           notes?: string | null;
           occurred_at?: string;
+          photo_analysis?: Json | null;
+          photo_path?: string | null;
           type?: Database['public']['Enums']['diaper_type'];
           updated_at?: string;
         };
@@ -332,6 +448,50 @@ export type Database = {
             columns: ['child_id'];
             isOneToOne: false;
             referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      event_comments: {
+        Row: {
+          content: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          family_group_id: string;
+          id: string;
+          target_id: string;
+          target_type: Database['public']['Enums']['comment_target'];
+          updated_at: string;
+        };
+        Insert: {
+          content: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id: string;
+          id?: string;
+          target_id: string;
+          target_type: Database['public']['Enums']['comment_target'];
+          updated_at?: string;
+        };
+        Update: {
+          content?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          id?: string;
+          target_id?: string;
+          target_type?: Database['public']['Enums']['comment_target'];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'event_comments_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
             referencedColumns: ['id'];
           },
         ];
@@ -360,43 +520,46 @@ export type Database = {
         };
         Relationships: [];
       };
-      family_memories: {
+      family_invitations: {
         Row: {
-          content: string;
+          code: string;
           created_at: string;
-          created_by: string | null;
-          deleted_at: string | null;
+          created_by: string;
+          expires_at: string;
           family_group_id: string;
           id: string;
-          kind: string | null;
-          private_to_user: string | null;
-          updated_at: string;
+          redeemed_at: string | null;
+          redeemed_by: string | null;
+          revoked_at: string | null;
+          role: Database['public']['Enums']['family_role'];
         };
         Insert: {
-          content: string;
+          code: string;
           created_at?: string;
-          created_by?: string | null;
-          deleted_at?: string | null;
+          created_by: string;
+          expires_at: string;
           family_group_id: string;
           id?: string;
-          kind?: string | null;
-          private_to_user?: string | null;
-          updated_at?: string;
+          redeemed_at?: string | null;
+          redeemed_by?: string | null;
+          revoked_at?: string | null;
+          role?: Database['public']['Enums']['family_role'];
         };
         Update: {
-          content?: string;
+          code?: string;
           created_at?: string;
-          created_by?: string | null;
-          deleted_at?: string | null;
+          created_by?: string;
+          expires_at?: string;
           family_group_id?: string;
           id?: string;
-          kind?: string | null;
-          private_to_user?: string | null;
-          updated_at?: string;
+          redeemed_at?: string | null;
+          redeemed_by?: string | null;
+          revoked_at?: string | null;
+          role?: Database['public']['Enums']['family_role'];
         };
         Relationships: [
           {
-            foreignKeyName: 'family_memories_family_group_id_fkey';
+            foreignKeyName: 'family_invitations_family_group_id_fkey';
             columns: ['family_group_id'];
             isOneToOne: false;
             referencedRelation: 'family_groups';
@@ -444,6 +607,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'family_memberships_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      family_memories: {
+        Row: {
+          content: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          family_group_id: string;
+          id: string;
+          kind: string | null;
+          private_to_user: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          content: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id: string;
+          id?: string;
+          kind?: string | null;
+          private_to_user?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          content?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          id?: string;
+          kind?: string | null;
+          private_to_user?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'family_memories_family_group_id_fkey';
             columns: ['family_group_id'];
             isOneToOne: false;
             referencedRelation: 'family_groups';
@@ -554,11 +761,86 @@ export type Database = {
           },
         ];
       };
+      lullabies: {
+        Row: {
+          audio_path: string | null;
+          child_id: string;
+          chorus: string;
+          closing: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          family_group_id: string;
+          generation_meta: Json;
+          id: string;
+          intro: string;
+          mood: Database['public']['Enums']['lullaby_mood'];
+          share_token: string | null;
+          shared_at: string | null;
+          title: string;
+          updated_at: string;
+          verses: Json;
+        };
+        Insert: {
+          audio_path?: string | null;
+          child_id: string;
+          chorus?: string;
+          closing?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id: string;
+          generation_meta?: Json;
+          id?: string;
+          intro: string;
+          mood: Database['public']['Enums']['lullaby_mood'];
+          share_token?: string | null;
+          shared_at?: string | null;
+          title: string;
+          updated_at?: string;
+          verses: Json;
+        };
+        Update: {
+          audio_path?: string | null;
+          child_id?: string;
+          chorus?: string;
+          closing?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          generation_meta?: Json;
+          id?: string;
+          intro?: string;
+          mood?: Database['public']['Enums']['lullaby_mood'];
+          share_token?: string | null;
+          shared_at?: string | null;
+          title?: string;
+          updated_at?: string;
+          verses?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'lullabies_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'lullabies_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       media_items: {
         Row: {
           album_id: string | null;
           caption: string | null;
-          child_id: string | null;
+          child_id: string;
           created_at: string;
           created_by: string | null;
           deleted_at: string | null;
@@ -577,7 +859,7 @@ export type Database = {
         Insert: {
           album_id?: string | null;
           caption?: string | null;
-          child_id?: string | null;
+          child_id: string;
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
@@ -596,7 +878,7 @@ export type Database = {
         Update: {
           album_id?: string | null;
           caption?: string | null;
-          child_id?: string | null;
+          child_id?: string;
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
@@ -614,13 +896,6 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: 'media_items_child_id_fkey';
-            columns: ['child_id'];
-            isOneToOne: false;
-            referencedRelation: 'child_profiles';
-            referencedColumns: ['id'];
-          },
-          {
             foreignKeyName: 'media_items_album_id_fkey';
             columns: ['album_id'];
             isOneToOne: false;
@@ -628,107 +903,24 @@ export type Database = {
             referencedColumns: ['id'];
           },
           {
+            foreignKeyName: 'media_items_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'media_items_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+          {
             foreignKeyName: 'media_items_note_id_fkey';
             columns: ['note_id'];
             isOneToOne: false;
             referencedRelation: 'notes';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
-      albums: {
-        Row: {
-          child_id: string | null;
-          cover_path: string | null;
-          created_at: string;
-          created_by: string | null;
-          deleted_at: string | null;
-          family_group_id: string;
-          id: string;
-          kind: 'manual' | 'monthly' | 'milestone';
-          month_key: string | null;
-          name: string;
-          shared_at: string | null;
-          share_token: string | null;
-          updated_at: string;
-        };
-        Insert: {
-          child_id?: string | null;
-          cover_path?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          deleted_at?: string | null;
-          family_group_id: string;
-          id?: string;
-          kind?: 'manual' | 'monthly' | 'milestone';
-          month_key?: string | null;
-          name: string;
-          shared_at?: string | null;
-          share_token?: string | null;
-          updated_at?: string;
-        };
-        Update: {
-          child_id?: string | null;
-          cover_path?: string | null;
-          created_at?: string;
-          created_by?: string | null;
-          deleted_at?: string | null;
-          family_group_id?: string;
-          id?: string;
-          kind?: 'manual' | 'monthly' | 'milestone';
-          month_key?: string | null;
-          name?: string;
-          shared_at?: string | null;
-          share_token?: string | null;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'albums_family_group_id_fkey';
-            columns: ['family_group_id'];
-            isOneToOne: false;
-            referencedRelation: 'family_groups';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
-      push_subscriptions: {
-        Row: {
-          created_at: string;
-          endpoint: string;
-          family_group_id: string;
-          id: string;
-          invalidated_at: string | null;
-          keys: { p256dh: string; auth: string };
-          user_agent: string | null;
-          user_id: string;
-        };
-        Insert: {
-          created_at?: string;
-          endpoint: string;
-          family_group_id: string;
-          id?: string;
-          invalidated_at?: string | null;
-          keys: { p256dh: string; auth: string };
-          user_agent?: string | null;
-          user_id: string;
-        };
-        Update: {
-          created_at?: string;
-          endpoint?: string;
-          family_group_id?: string;
-          id?: string;
-          invalidated_at?: string | null;
-          keys?: { p256dh: string; auth: string };
-          user_agent?: string | null;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'push_subscriptions_family_group_id_fkey';
-            columns: ['family_group_id'];
-            isOneToOne: false;
-            referencedRelation: 'family_groups';
             referencedColumns: ['id'];
           },
         ];
@@ -744,6 +936,7 @@ export type Database = {
           due_at: string | null;
           family_group_id: string;
           id: string;
+          last_reminded_at: string | null;
           notes: string | null;
           title: string;
           updated_at: string;
@@ -758,6 +951,7 @@ export type Database = {
           due_at?: string | null;
           family_group_id: string;
           id?: string;
+          last_reminded_at?: string | null;
           notes?: string | null;
           title: string;
           updated_at?: string;
@@ -772,6 +966,7 @@ export type Database = {
           due_at?: string | null;
           family_group_id?: string;
           id?: string;
+          last_reminded_at?: string | null;
           notes?: string | null;
           title?: string;
           updated_at?: string;
@@ -782,6 +977,62 @@ export type Database = {
             columns: ['family_group_id'];
             isOneToOne: false;
             referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      medication_doses: {
+        Row: {
+          child_id: string;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          dose_amount: string | null;
+          given_at: string;
+          id: string;
+          interval_hours: number | null;
+          medication_name: string;
+          next_dose_at: string | null;
+          next_dose_notified_at: string | null;
+          notes: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          child_id: string;
+          created_at?: string;
+          created_by: string;
+          deleted_at?: string | null;
+          dose_amount?: string | null;
+          given_at?: string;
+          id?: string;
+          interval_hours?: number | null;
+          medication_name: string;
+          next_dose_at?: string | null;
+          next_dose_notified_at?: string | null;
+          notes?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          child_id?: string;
+          created_at?: string;
+          created_by?: string;
+          deleted_at?: string | null;
+          dose_amount?: string | null;
+          given_at?: string;
+          id?: string;
+          interval_hours?: number | null;
+          medication_name?: string;
+          next_dose_at?: string | null;
+          next_dose_notified_at?: string | null;
+          notes?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'medication_doses_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
             referencedColumns: ['id'];
           },
         ];
@@ -826,6 +1077,134 @@ export type Database = {
             columns: ['child_id'];
             isOneToOne: false;
             referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      notification_prefs: {
+        Row: {
+          created_at: string;
+          prefs: Json;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          prefs?: Json;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          prefs?: Json;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      pediatric_summaries: {
+        Row: {
+          child_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          days_back: number;
+          deleted_at: string | null;
+          family_group_id: string;
+          generation_meta: Json;
+          headline: string;
+          id: string;
+          metrics: Json;
+          observations: Json;
+          pending_milestones: Json;
+          period_label: string;
+          questions: Json;
+        };
+        Insert: {
+          child_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          days_back: number;
+          deleted_at?: string | null;
+          family_group_id: string;
+          generation_meta?: Json;
+          headline: string;
+          id?: string;
+          metrics: Json;
+          observations?: Json;
+          pending_milestones?: Json;
+          period_label: string;
+          questions?: Json;
+        };
+        Update: {
+          child_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          days_back?: number;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          generation_meta?: Json;
+          headline?: string;
+          id?: string;
+          metrics?: Json;
+          observations?: Json;
+          pending_milestones?: Json;
+          period_label?: string;
+          questions?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'pediatric_summaries_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'pediatric_summaries_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      push_subscriptions: {
+        Row: {
+          created_at: string;
+          endpoint: string;
+          family_group_id: string;
+          id: string;
+          invalidated_at: string | null;
+          keys: Json;
+          user_agent: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          endpoint: string;
+          family_group_id: string;
+          id?: string;
+          invalidated_at?: string | null;
+          keys: Json;
+          user_agent?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          endpoint?: string;
+          family_group_id?: string;
+          id?: string;
+          invalidated_at?: string | null;
+          keys?: Json;
+          user_agent?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'push_subscriptions_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
             referencedColumns: ['id'];
           },
         ];
@@ -876,6 +1255,75 @@ export type Database = {
             columns: ['child_id'];
             isOneToOne: false;
             referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      stories: {
+        Row: {
+          characters_used: Json;
+          child_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          family_group_id: string;
+          generation_meta: Json;
+          id: string;
+          input_meta: Json;
+          moral_or_theme: string;
+          share_token: string | null;
+          shared_at: string | null;
+          story: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          characters_used?: Json;
+          child_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id: string;
+          generation_meta?: Json;
+          id?: string;
+          input_meta?: Json;
+          moral_or_theme: string;
+          share_token?: string | null;
+          shared_at?: string | null;
+          story: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          characters_used?: Json;
+          child_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          family_group_id?: string;
+          generation_meta?: Json;
+          id?: string;
+          input_meta?: Json;
+          moral_or_theme?: string;
+          share_token?: string | null;
+          shared_at?: string | null;
+          story?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'stories_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'stories_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
             referencedColumns: ['id'];
           },
         ];
@@ -936,6 +1384,7 @@ export type Database = {
       user_family_group_ids: { Args: never; Returns: string[] };
     };
     Enums: {
+      album_kind: 'manual' | 'monthly' | 'milestone';
       audit_action: 'insert' | 'update' | 'soft_delete' | 'restore' | 'hard_delete';
       breast_side: 'left' | 'right' | 'both';
       care_guide_category:
@@ -945,10 +1394,13 @@ export type Database = {
         | 'control'
         | 'emergencia'
         | 'otros';
+      chat_role: 'user' | 'assistant';
+      comment_target: 'note' | 'feeding' | 'sleep' | 'diaper' | 'milestone' | 'media';
       diaper_type: 'wet' | 'dirty' | 'both' | 'dry';
       family_role: 'admin' | 'caregiver' | 'family' | 'viewer';
       feeding_reaction: 'none' | 'mild' | 'strong';
       feeding_type: 'breastfeeding' | 'bottle' | 'solid';
+      lullaby_mood: 'dulce' | 'jugueton' | 'calmo' | 'valiente';
       milestone_category: 'control_pediatrico' | 'pesquisa' | 'estudio' | 'vacuna' | 'otro';
       note_category: 'memory' | 'observation' | 'milestone' | 'other';
       sleep_quality: 'good' | 'regular' | 'bad' | 'unknown';
@@ -1077,13 +1529,17 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      album_kind: ['manual', 'monthly', 'milestone'],
       audit_action: ['insert', 'update', 'soft_delete', 'restore', 'hard_delete'],
       breast_side: ['left', 'right', 'both'],
       care_guide_category: ['dormir', 'higiene', 'alimentacion', 'control', 'emergencia', 'otros'],
+      chat_role: ['user', 'assistant'],
+      comment_target: ['note', 'feeding', 'sleep', 'diaper', 'milestone', 'media'],
       diaper_type: ['wet', 'dirty', 'both', 'dry'],
       family_role: ['admin', 'caregiver', 'family', 'viewer'],
       feeding_reaction: ['none', 'mild', 'strong'],
       feeding_type: ['breastfeeding', 'bottle', 'solid'],
+      lullaby_mood: ['dulce', 'jugueton', 'calmo', 'valiente'],
       milestone_category: ['control_pediatrico', 'pesquisa', 'estudio', 'vacuna', 'otro'],
       note_category: ['memory', 'observation', 'milestone', 'other'],
       sleep_quality: ['good', 'regular', 'bad', 'unknown'],
