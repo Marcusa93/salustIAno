@@ -543,7 +543,7 @@ async function processMedicationReminders(): Promise<{ checked: number; notified
   const now = new Date();
   const lookahead = new Date(now.getTime() + 20 * 60 * 1000);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
   const { data: doses } = await (supabase as any)
     .from('medication_doses')
     .select('id, medication_name, next_dose_at, child_profiles(name, family_group_id)')
@@ -575,6 +575,7 @@ async function processMedicationReminders(): Promise<{ checked: number; notified
     );
 
     // Marcar notificado aunque no haya llegado a nadie — evita reintento spam.
+    // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
     await (supabase as any)
       .from('medication_doses')
       .update({ next_dose_notified_at: now.toISOString() })

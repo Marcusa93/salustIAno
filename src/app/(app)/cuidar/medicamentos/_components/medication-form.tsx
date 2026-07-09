@@ -53,7 +53,8 @@ export function MedicationForm({
       given_at: new Date(values.given_at).toISOString(),
     });
     if (!result.ok) {
-      const message = result.errors?.root ?? result.errors?.medication_name ?? 'No pudimos guardar la dosis.';
+      const message =
+        result.errors?.root ?? result.errors?.medication_name ?? 'No pudimos guardar la dosis.';
       toast.error(message);
     }
   }
@@ -126,9 +127,7 @@ export function MedicationForm({
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="med-at">Cuándo se dio</Label>
           <Input id="med-at" type="datetime-local" {...register('given_at')} />
-          {errors.given_at && (
-            <p className="text-destructive text-sm">{errors.given_at.message}</p>
-          )}
+          {errors.given_at && <p className="text-destructive text-sm">{errors.given_at.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -139,9 +138,7 @@ export function MedicationForm({
             placeholder="Reacción, temperatura antes de dar, observaciones…"
             {...register('notes')}
           />
-          {errors.notes && (
-            <p className="text-destructive text-sm">{errors.notes.message}</p>
-          )}
+          {errors.notes && <p className="text-destructive text-sm">{errors.notes.message}</p>}
         </div>
       </fieldset>
 

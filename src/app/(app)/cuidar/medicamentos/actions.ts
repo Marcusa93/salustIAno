@@ -83,6 +83,47 @@ export async function createMedicationDoseAction(
   redirect('/cuidar/medicamentos' as Route);
 }
 
+export async function repeatDoseAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await getActorContext();
+  if ('error' in ctx) return { ok: false, error: ctx.error ?? 'Error inesperado.' };
+
+  // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
+  const { data: original } = await (ctx.supabase as any)
+    .from('medication_doses')
+    .select('medication_name, dose_amount, interval_hours')
+    .eq('id', id)
+    .eq('child_id', ctx.childId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (!original) return { ok: false, error: 'No encontramos la dosis original.' };
+
+  const now = new Date();
+  const nextDoseAt =
+    original.interval_hours != null
+      ? new Date(now.getTime() + original.interval_hours * 60 * 60 * 1000)
+      : null;
+
+  // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
+  const { error: insertError } = await (ctx.supabase as any).from('medication_doses').insert({
+    child_id: ctx.childId,
+    medication_name: original.medication_name,
+    dose_amount: original.dose_amount ?? null,
+    interval_hours: original.interval_hours ?? null,
+    given_at: now.toISOString(),
+    next_dose_at: nextDoseAt?.toISOString() ?? null,
+    created_by: ctx.userId,
+  });
+
+  if (insertError) return { ok: false, error: 'No pudimos registrar la dosis.' };
+
+  revalidatePath('/cuidar/medicamentos');
+  revalidatePath('/cuidar');
+  redirect('/cuidar/medicamentos' as Route);
+}
+
 export async function deleteMedicationDoseAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {

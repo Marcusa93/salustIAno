@@ -37,9 +37,7 @@ export default async function PatronesPage() {
         description="Promedios y ritmos de los últimos 14 días. Nada de diagnósticos ni recomendaciones."
       />
 
-      {weeklyStats && (
-        <WeeklyStats current={weeklyStats.current} previous={weeklyStats.previous} />
-      )}
+      {weeklyStats && <WeeklyStats current={weeklyStats.current} previous={weeklyStats.previous} />}
 
       <Card className="animate-stagger-up flex flex-col gap-4 border-primary/15 bg-gradient-to-br from-primary/[0.06] via-card to-accent/15 p-5">
         <div className="flex items-center gap-2">

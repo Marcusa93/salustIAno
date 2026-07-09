@@ -138,8 +138,7 @@ export function SpeechToTextButton({
   // autoStart: una vez detectado el soporte, intentamos iniciar. Pequeño
   // retraso de 250ms para que la animación del Sheet asiente y el
   // permiso del browser no se confunda con el render del backdrop.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: solo queremos
-  // disparar en el primer mount con autoStart, no en cada cambio de start.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo dispara en primer mount con autoStart
   useEffect(() => {
     if (!autoStart || !supported || disabled || listening) return;
     const t = setTimeout(() => {
@@ -150,7 +149,6 @@ export function SpeechToTextButton({
       }
     }, 250);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart, supported]);
 
   function start() {

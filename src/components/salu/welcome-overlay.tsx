@@ -49,7 +49,6 @@ export function WelcomeOverlay({ userId, childName, displayName }: WelcomeOverla
   const [open, setOpen] = useState(false);
   const [slide, setSlide] = useState(0);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: solo corre al montar por user.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {

@@ -19,6 +19,7 @@ function isNightInTucuman(): boolean {
 export function useAutoNightMode() {
   const { setTheme, resolvedTheme } = useTheme();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intencional, solo al montar
   useEffect(() => {
     const override = localStorage.getItem(OVERRIDE_KEY);
     if (override) return;
@@ -26,8 +27,6 @@ export function useAutoNightMode() {
     if (isNightInTucuman()) {
       setTheme('night');
     }
-    // Solo al montar — no queremos re-aplicar en cada render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { resolvedTheme };

@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
-import { Clock, Pill, Plus } from 'lucide-react';
+import { Clock, Pencil, Pill, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { DeleteDoseButton } from './_components/delete-dose-button';
+import { RepeatDoseButton } from './_components/repeat-dose-button';
 
 export const metadata: Metadata = {
   title: 'Medicamentos',
@@ -171,39 +172,54 @@ export default async function MedicamentosPage() {
             {activeDoses.map((dose) => {
               const status = getNextDoseStatus(dose.next_dose_at, now);
               return (
-                <Card key={dose.id} className="flex items-center gap-3 px-4 py-3">
-                  <span
-                    className={cn(
-                      'flex size-9 shrink-0 items-center justify-center rounded-full',
-                      STATUS_STYLES[status],
-                    )}
-                  >
-                    <Pill className="size-4" aria-hidden />
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate font-medium text-foreground text-sm">
-                      {dose.medication_name}
-                      {dose.dose_amount && (
-                        <span className="ml-1.5 font-normal text-muted-foreground">
-                          {dose.dose_amount}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-muted-foreground text-xs">
-                      Última: {formatTime(dose.given_at)}
-                    </span>
-                  </div>
-                  {dose.next_dose_at && (
+                <Card key={dose.id} className="flex flex-col gap-3 px-4 py-3">
+                  <div className="flex items-center gap-3">
                     <span
                       className={cn(
-                        'shrink-0 rounded-full px-2.5 py-0.5 font-medium text-xs',
+                        'flex size-9 shrink-0 items-center justify-center rounded-full',
                         STATUS_STYLES[status],
                       )}
                     >
-                      <Clock className="mr-1 inline size-3" aria-hidden />
-                      {formatCountdown(dose.next_dose_at, now)}
+                      <Pill className="size-4" aria-hidden />
                     </span>
-                  )}
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate font-medium text-foreground text-sm">
+                        {dose.medication_name}
+                        {dose.dose_amount && (
+                          <span className="ml-1.5 font-normal text-muted-foreground">
+                            {dose.dose_amount}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        Última: {formatTime(dose.given_at)}
+                      </span>
+                    </div>
+                    {dose.next_dose_at && (
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full px-2.5 py-0.5 font-medium text-xs',
+                          STATUS_STYLES[status],
+                        )}
+                      >
+                        <Clock className="mr-1 inline size-3" aria-hidden />
+                        {formatCountdown(dose.next_dose_at, now)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2 border-t border-border/50 pt-2">
+                    <RepeatDoseButton doseId={dose.id} medicationName={dose.medication_name} />
+                    <Button
+                      render={<Link href={`/cuidar/medicamentos/nueva?from=${dose.id}` as Route} />}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 px-3 text-xs"
+                      aria-label={`Ajustar hora de dosis de ${dose.medication_name}`}
+                    >
+                      <Pencil className="size-3" aria-hidden />
+                      Ajustar hora
+                    </Button>
+                  </div>
                 </Card>
               );
             })}

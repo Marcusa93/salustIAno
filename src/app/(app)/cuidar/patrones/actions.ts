@@ -34,7 +34,12 @@ function computeWeekSummary(
 ): WeekSummary {
   const n = daySlice.length;
   if (n === 0) {
-    return { feedingCountPerDay: 0, feedingMlPerDay: null, sleepHoursPerDay: 0, diaperCountPerDay: 0 };
+    return {
+      feedingCountPerDay: 0,
+      feedingMlPerDay: null,
+      sleepHoursPerDay: 0,
+      diaperCountPerDay: 0,
+    };
   }
 
   const feedingCountPerDay =
@@ -174,9 +179,7 @@ export async function getPatternsAction(): Promise<PatternsResult> {
           : null,
       sleepMinutesMax: b.sleepDurationsMin.length > 0 ? Math.max(...b.sleepDurationsMin) : null,
       sleepMinutesTotal:
-        b.sleepDurationsMin.length > 0
-          ? b.sleepDurationsMin.reduce((s, x) => s + x, 0)
-          : null,
+        b.sleepDurationsMin.length > 0 ? b.sleepDurationsMin.reduce((s, x) => s + x, 0) : null,
       feedingTotalMl: b.feedingMl > 0 ? b.feedingMl : null,
     }));
 
