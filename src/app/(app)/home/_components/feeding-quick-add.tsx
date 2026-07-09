@@ -60,7 +60,7 @@ export function FeedingQuickAdd({ trigger }: FeedingQuickAddProps) {
     resolver: zodResolver(feedingEventSchema),
     defaultValues: {
       occurred_at: nowLocalISO(),
-      type: 'breastfeeding',
+      type: 'bottle',
       reaction: 'none',
       notes: '',
     },
@@ -120,7 +120,7 @@ export function FeedingQuickAdd({ trigger }: FeedingQuickAddProps) {
     toast.success('Toma anotada.');
     reset({
       occurred_at: nowLocalISO(),
-      type: 'breastfeeding',
+      type: 'bottle',
       reaction: 'none',
       notes: '',
     });

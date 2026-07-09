@@ -8,7 +8,7 @@ import { babyAgeFromBirth } from '@/lib/baby-age';
 import { expectationsFor } from '@/lib/baby-expectations';
 import { startOfDayArDaysAgo, startOfTodayAr } from '@/lib/format-ar';
 import { greetingFor, isLateNightAr } from '@/lib/greeting';
-import { averagePerDay } from '@/lib/predictions';
+import { averagePerDay, formatPredictionTime, predictNextFeeding } from '@/lib/predictions';
 import { createClient } from '@/lib/supabase/server';
 import { DIAPER_TYPE_LABELS } from '@/lib/validators/events';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
@@ -247,6 +247,11 @@ export default async function HomePage() {
   const feedings7Iso = (feedingsLast7 ?? []).map((e) => (e as { occurred_at: string }).occurred_at);
   const diapers7Iso = (diapersLast7 ?? []).map((e) => (e as { occurred_at: string }).occurred_at);
 
+  const feedingPrediction = lastFeedingAt ? predictNextFeeding(feedings7Iso, lastFeedingAt) : null;
+  const predictedNextFeedingLabel = feedingPrediction
+    ? formatPredictionTime(feedingPrediction.expectedAt)
+    : null;
+
   // Tendencia semanal: promedio de eventos por día en los últimos 7 días
   // (incluyendo hoy). Para sueño usamos el conteo de sesiones, no horas.
   const weeklyAvg = {
@@ -293,13 +298,16 @@ export default async function HomePage() {
         lastDiaperAt={lastDiaperAt}
         todayCounts={todaySummary}
         lateNight={lateNight}
+        predictedNextFeedingLabel={predictedNextFeedingLabel}
       />
 
       {/* Acciones rápidas: repite la última toma o el último pañal sin abrir
-          ningún formulario — un solo tap registra el evento al instante. */}
+          ningún formulario — un solo tap registra el evento al instante.
+          Cuando hay sueño activo muestra además "Se despertó". */}
       <QuickRepeatBar
         lastFeedingAmountMl={lastFeedingAmountMl}
         lastDiaperTypeLabel={lastDiaperTypeLabel}
+        activeSleep={activeSleep}
       />
 
       {/* Coach pediátrico de sueño — solo en modo madrugada (22-06 AR).

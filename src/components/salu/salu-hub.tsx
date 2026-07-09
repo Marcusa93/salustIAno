@@ -25,6 +25,7 @@ interface Salu360HubProps {
   lastDiaperAt: string | null;
   todayCounts: { feeding: number; sleep: number; diaper: number };
   lateNight: boolean;
+  predictedNextFeedingLabel: string | null;
 }
 
 /**
@@ -54,6 +55,7 @@ export function Salu360Hub({
   lastDiaperAt,
   todayCounts,
   lateNight,
+  predictedNextFeedingLabel,
 }: Salu360HubProps) {
   // Estado del sueño para el badge sobre el avatar.
   const isSleeping = !!active;
@@ -85,7 +87,9 @@ export function Salu360Hub({
       label: 'Toma',
       meta:
         lastFeedingAt != null
-          ? `${formatTimeAr(lastFeedingAt)} · ${todayCounts.feeding} hoy`
+          ? predictedNextFeedingLabel != null
+            ? `últ. ${formatTimeAr(lastFeedingAt)} · prox. ~${predictedNextFeedingLabel}`
+            : `${formatTimeAr(lastFeedingAt)} · ${todayCounts.feeding} hoy`
           : 'sin registros',
       codeLabel: `> tomas:${todayCounts.feeding}`,
       kind: 'sheet',

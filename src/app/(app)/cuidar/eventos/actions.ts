@@ -591,6 +591,61 @@ export async function updateSleepAction(
 }
 
 // ============================================================================
+// Quick close sleep — cierra el sueño activo sin abrir el sheet
+// ============================================================================
+
+export async function quickCloseSleepAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+
+  const { data: existing } = await supabase
+    .from('sleep_sessions')
+    .select('started_at, child_id, is_nap')
+    .eq('id', id)
+    .is('ended_at', null)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, error: 'Ese sueño ya estaba cerrado.' };
+
+  const now = new Date();
+
+  const { data, error } = await supabase
+    .from('sleep_sessions')
+    .update({ ended_at: now.toISOString() })
+    .eq('id', id)
+    .is('ended_at', null)
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error || !data) return { ok: false, error: 'No pudimos cerrar el sueño.' };
+
+  if (userData?.user) {
+    const startMs = new Date(existing.started_at as string).getTime();
+    const minutes = Math.max(0, Math.round((now.getTime() - startMs) / 60_000));
+    const dur =
+      minutes < 60
+        ? `${minutes} min`
+        : `${Math.floor(minutes / 60)} h${minutes % 60 > 0 ? ` ${minutes % 60} min` : ''}`;
+    const isNap = (existing.is_nap as boolean) ?? false;
+    const author = await getActorDisplayName(supabase, userData.user.id);
+    await notifyFamily(supabase, userData.user.id, existing.child_id as string, {
+      title: `${author}: Salu se despertó`,
+      body: `Cerró ${isNap ? 'la siesta' : 'el sueño'} de ${dur}.`,
+      url: '/home',
+      tag: `sleep-close-${id}`,
+    });
+  }
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true };
+}
+
+// ============================================================================
 // Repeat — registra al instante con los mismos datos que el último evento
 // ============================================================================
 
