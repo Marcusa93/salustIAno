@@ -1,5 +1,6 @@
 'use server';
 
+import { sendPushToFamily } from '@/app/(app)/perfil/push-actions';
 import { tagPhoto } from '@/lib/ai/agents/photo-tagger';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
@@ -66,7 +67,7 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
 
   const { data: membership } = await supabase
     .from('family_memberships')
-    .select('family_group_id')
+    .select('family_group_id, display_name')
     .eq('user_id', userData.user.id)
     .is('deleted_at', null)
     .limit(1)
@@ -176,7 +177,25 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
     uploaded += 1;
   }
 
-  if (uploaded > 0) revalidatePath('/album');
+  if (uploaded > 0) {
+    revalidatePath('/album');
+    try {
+      const name = (membership.display_name as string | null) ?? 'Alguien';
+      const photoText = uploaded === 1 ? 'una foto nueva' : `${uploaded} fotos nuevas`;
+      await sendPushToFamily(
+        familyGroupId,
+        {
+          title: `📸 ${name} subió ${photoText}`,
+          body: 'Nuevo recuerdo en el álbum de Salu.',
+          url: '/album',
+          tag: 'photo-upload',
+        },
+        userData.user.id,
+      );
+    } catch {
+      // best-effort: si el push falla, el upload ya fue exitoso
+    }
+  }
   return { ok: true, uploaded, failed };
 }
 

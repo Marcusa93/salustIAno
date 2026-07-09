@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { getTodayActivityByMemberAction } from '../home/family-activity-actions';
 import { InvitationsSection } from './_components/invitations-section';
 import { MembersSection } from './_components/members-section';
+import { ShareLinkCard } from './_components/share-link-card';
 import { listMembersAction } from './miembros/actions';
 import { listInvitationsAction } from './miembros/invitations-actions';
 
@@ -172,11 +173,22 @@ export default async function FamiliaPage() {
         )}
       </section>
 
-      <div className="animate-stagger-up" style={{ animationDelay: '180ms' }}>
+      {/* Link mágico para abuelos y familia extensa. */}
+      <section
+        className="animate-stagger-up flex flex-col gap-3"
+        style={{ animationDelay: '180ms' }}
+      >
+        <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+          Para la familia extensa
+        </h2>
+        <ShareLinkCard />
+      </section>
+
+      <div className="animate-stagger-up" style={{ animationDelay: '240ms' }}>
         <MembersSection initialMembers={members} isAdmin={isAdmin} />
       </div>
 
-      <div className="animate-stagger-up" style={{ animationDelay: '240ms' }}>
+      <div className="animate-stagger-up" style={{ animationDelay: '300ms' }}>
         <InvitationsSection initialInvitations={invitations} isAdmin={isAdmin} />
       </div>
     </div>

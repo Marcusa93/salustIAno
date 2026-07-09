@@ -65,6 +65,7 @@ interface ChildRow {
   last_feeding_reminder_at: string | null;
   last_predicted_feeding_reminder_at: string | null;
   last_predicted_diaper_reminder_at: string | null;
+  last_daily_summary_at?: string | null;
 }
 
 interface NotificationPrefs {
@@ -73,6 +74,7 @@ interface NotificationPrefs {
   feeding_predicted?: boolean;
   diaper_predicted?: boolean;
   medication_due?: boolean;
+  daily_summary?: boolean;
 }
 
 type PrefKey = keyof NotificationPrefs;
@@ -83,6 +85,7 @@ const DEFAULT_PREFS: Required<NotificationPrefs> = {
   feeding_predicted: false,
   diaper_predicted: false,
   medication_due: true,
+  daily_summary: true,
 };
 
 const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC_KEY');
@@ -586,6 +589,97 @@ async function processMedicationReminders(): Promise<{ checked: number; notified
   return { checked: doses.length, notified };
 }
 
+/**
+ * Manda el resumen diario a las 20:00 ART (= 23:00 UTC).
+ *
+ * Idempotencia: si `last_daily_summary_at` del bebé ya es de hoy
+ * (>= 03:00 UTC del día actual, que es midnight ART), no manda de nuevo.
+ */
+async function processDailySummary(): Promise<{ checked: number; sent: number }> {
+  const now = new Date();
+
+  // Solo correr a las 23:xx UTC (= 20:xx ART)
+  if (now.getUTCHours() !== 23) return { checked: 0, sent: 0 };
+
+  // Midnight ART de hoy = 03:00 UTC del día actual
+  const dayStart = new Date(now);
+  dayStart.setUTCHours(3, 0, 0, 0);
+
+  const { data: children } = await supabase
+    .from('child_profiles')
+    .select('id, name, family_group_id, birth_date, last_daily_summary_at')
+    .is('deleted_at', null)
+    .lte('birth_date', now.toISOString());
+
+  if (!children || children.length === 0) return { checked: 0, sent: 0 };
+
+  let sent = 0;
+  for (const c of children as ChildRow[]) {
+    // Ya enviamos el resumen de hoy
+    if (c.last_daily_summary_at && new Date(c.last_daily_summary_at) >= dayStart) {
+      continue;
+    }
+
+    const since = dayStart.toISOString();
+
+    const [{ count: feedingCount }, { count: diaperCount }, { data: sleepRows }] =
+      await Promise.all([
+        supabase
+          .from('feeding_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('child_id', c.id)
+          .is('deleted_at', null)
+          .gte('occurred_at', since),
+        supabase
+          .from('diaper_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('child_id', c.id)
+          .is('deleted_at', null)
+          .gte('occurred_at', since),
+        supabase
+          .from('sleep_sessions')
+          .select('started_at, ended_at')
+          .eq('child_id', c.id)
+          .is('deleted_at', null)
+          .gte('started_at', since),
+      ]);
+
+    const sleeps = (sleepRows ?? []) as Array<{ started_at: string; ended_at: string | null }>;
+    const totalSleepMin = sleeps.reduce((acc, s) => {
+      const end = s.ended_at ? new Date(s.ended_at) : now;
+      const start = new Date(s.started_at);
+      return acc + Math.max(0, (end.getTime() - start.getTime()) / 60_000);
+    }, 0);
+    const sleepHours = Math.round((totalSleepMin / 60) * 10) / 10;
+
+    const parts: string[] = [];
+    if ((feedingCount ?? 0) > 0) parts.push(`${feedingCount} toma${feedingCount === 1 ? '' : 's'}`);
+    if ((diaperCount ?? 0) > 0) parts.push(`${diaperCount} pañal${diaperCount === 1 ? '' : 'es'}`);
+    if (sleepHours > 0) parts.push(`${sleepHours}h de sueño`);
+
+    const body = parts.length > 0 ? parts.join(' · ') : 'Un día tranquilo sin eventos registrados.';
+
+    const result = await sendToFamily(
+      c.family_group_id,
+      {
+        title: `🌙 Resumen del día de ${c.name}`,
+        body,
+        url: '/home',
+        tag: `daily-summary-${c.id}`,
+      },
+      'daily_summary',
+    );
+
+    await supabase
+      .from('child_profiles')
+      .update({ last_daily_summary_at: now.toISOString() })
+      .eq('id', c.id);
+
+    if (result.sent > 0) sent += 1;
+  }
+  return { checked: children.length, sent };
+}
+
 Deno.serve(async (_req: Request) => {
   const startedAt = Date.now();
   try {
@@ -594,6 +688,7 @@ Deno.serve(async (_req: Request) => {
     const feedingPredictions = await processFeedingPredictions();
     const diaperPredictions = await processDiaperPredictions();
     const medications = await processMedicationReminders();
+    const dailySummary = await processDailySummary();
     const elapsed = Date.now() - startedAt;
     return new Response(
       JSON.stringify({
@@ -603,6 +698,7 @@ Deno.serve(async (_req: Request) => {
         feedingPredictions,
         diaperPredictions,
         medications,
+        dailySummary,
         elapsedMs: elapsed,
       }),
       { headers: { 'Content-Type': 'application/json' } },
