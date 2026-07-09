@@ -1,3 +1,7 @@
+'use client';
+
+import { AnimatedBar } from '@/components/salu/animated-bar';
+import { AnimatedNumber } from '@/components/salu/animated-number';
 import { cn } from '@/lib/utils';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { WeekSummary } from '../actions';
@@ -10,9 +14,14 @@ interface Props {
 interface StatCell {
   key: string;
   label: string;
-  currentValue: string;
+  value: number;
+  decimals: number;
+  suffix: string;
+  barValue: number;
+  barMax: number;
   delta: string | null;
   deltaDir: 'up' | 'down' | null;
+  displayNull?: boolean;
 }
 
 function pct(a: number, b: number): number {
@@ -50,28 +59,45 @@ function buildCells(current: WeekSummary, previous: WeekSummary | null): StatCel
     {
       key: 'feedings',
       label: 'Tomas/día',
-      currentValue: current.feedingCountPerDay.toFixed(1),
+      value: current.feedingCountPerDay,
+      decimals: 1,
+      suffix: '',
+      barValue: current.feedingCountPerDay,
+      barMax: 12,
       delta: feedDiff !== null ? `${feedDiff > 0 ? '+' : ''}${feedDiff.toFixed(1)}` : null,
       deltaDir: feedDiff !== null ? (feedDiff > 0 ? 'up' : 'down') : null,
     },
     {
       key: 'sleep',
       label: 'Sueño/día',
-      currentValue: `${current.sleepHoursPerDay.toFixed(1)}h`,
+      value: current.sleepHoursPerDay,
+      decimals: 1,
+      suffix: 'h',
+      barValue: current.sleepHoursPerDay,
+      barMax: 20,
       delta: sleepDiff !== null ? `${sleepDiff > 0 ? '+' : ''}${sleepDiff.toFixed(1)}h` : null,
       deltaDir: sleepDiff !== null ? (sleepDiff > 0 ? 'up' : 'down') : null,
     },
     {
       key: 'formula',
       label: 'Fórmula/día',
-      currentValue: mlCurrent !== null ? `${mlCurrent}ml` : '—',
+      value: mlCurrent ?? 0,
+      decimals: 0,
+      suffix: 'ml',
+      barValue: mlCurrent ?? 0,
+      barMax: 900,
       delta: mlDiff !== null ? `${mlDiff > 0 ? '+' : ''}${Math.round(mlDiff)}ml` : null,
       deltaDir: mlDiff !== null ? (mlDiff > 0 ? 'up' : 'down') : null,
+      displayNull: mlCurrent === null,
     },
     {
       key: 'diapers',
       label: 'Pañales/día',
-      currentValue: current.diaperCountPerDay.toFixed(1),
+      value: current.diaperCountPerDay,
+      decimals: 1,
+      suffix: '',
+      barValue: current.diaperCountPerDay,
+      barMax: 12,
       delta: diaperDiff !== null ? `${diaperDiff > 0 ? '+' : ''}${diaperDiff.toFixed(1)}` : null,
       deltaDir: diaperDiff !== null ? (diaperDiff > 0 ? 'up' : 'down') : null,
     },
@@ -92,30 +118,49 @@ export function WeeklyStats({ current, previous }: Props) {
         )}
       </div>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        {cells.map((cell) => (
-          <StatCard key={cell.key} cell={cell} hasPrevious={previous !== null} />
+        {cells.map((cell, i) => (
+          <StatCard key={cell.key} cell={cell} delay={i * 0.08} hasPrevious={previous !== null} />
         ))}
       </div>
     </div>
   );
 }
 
-function StatCard({ cell, hasPrevious }: { cell: StatCell; hasPrevious: boolean }) {
+function StatCard({
+  cell,
+  delay,
+  hasPrevious,
+}: {
+  cell: StatCell;
+  delay: number;
+  hasPrevious: boolean;
+}) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-xl border border-border/50 bg-card/80 px-3 py-2.5">
+    <div className="flex flex-col gap-1.5 rounded-xl border border-border/50 bg-card/80 px-3 py-2.5">
       <span className="text-[10px] text-muted-foreground/80 uppercase tracking-wider">
         {cell.label}
       </span>
+
       <span className="font-semibold tabular-nums text-xl text-foreground">
-        {cell.currentValue}
+        {cell.displayNull ? (
+          '—'
+        ) : (
+          <AnimatedNumber
+            value={cell.value}
+            decimals={cell.decimals}
+            suffix={cell.suffix}
+            duration={0.9}
+          />
+        )}
       </span>
+
+      {!cell.displayNull && <AnimatedBar value={cell.barValue} max={cell.barMax} delay={delay} />}
+
       {cell.delta ? (
         <span
           className={cn(
             'flex items-center gap-0.5 text-[11px]',
-            cell.deltaDir === 'up'
-              ? 'text-green-600 dark:text-green-400'
-              : 'text-muted-foreground',
+            cell.deltaDir === 'up' ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground',
           )}
         >
           {cell.deltaDir === 'up' ? (

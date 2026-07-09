@@ -17,6 +17,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { SleepTimeline } from './_components/sleep-timeline';
 
 export const metadata: Metadata = {
   title: 'Cuidar',
@@ -278,9 +279,7 @@ export default async function CuidarPage() {
   const nextMed = nextMedDose.data as { medication_name: string; next_dose_at: string } | null;
   let medicamentosMicro = 'Sin medicamentos activos';
   if (nextMed?.next_dose_at) {
-    const diffMin = Math.round(
-      (new Date(nextMed.next_dose_at).getTime() - Date.now()) / 60_000,
-    );
+    const diffMin = Math.round((new Date(nextMed.next_dose_at).getTime() - Date.now()) / 60_000);
     if (diffMin > 0) {
       const h = Math.floor(diffMin / 60);
       const m = diffMin % 60;
@@ -380,6 +379,14 @@ export default async function CuidarPage() {
         description="Tres áreas: Salud, Patrones y Aprender. Tocá una herramienta para entrar."
       />
 
+      {sleeps.length > 0 && (
+        <SleepTimeline
+          sessions={sleeps}
+          totalMinutes={totalSleepMin}
+          className="animate-stagger-up"
+        />
+      )}
+
       {grouped.map(({ section, options }, sectionIdx) => (
         <section
           key={section.id}
@@ -409,7 +416,7 @@ function CuidarCard({ option, index }: { option: CuidarOption; index: number }) 
   return (
     <Link
       href={option.href}
-      className="animate-stagger-up rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      className="animate-stagger-up rounded-2xl outline-none transition-transform duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       style={{ animationDelay: delay }}
     >
       <Card

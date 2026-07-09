@@ -2,6 +2,7 @@ import { BottomNav } from '@/components/salu/bottom-nav';
 import { CommandPalette, CommandPaletteTrigger } from '@/components/salu/command-palette';
 import { DesktopSidebar } from '@/components/salu/desktop-sidebar';
 import { InstallHint } from '@/components/salu/install-hint';
+import { MainContent } from '@/components/salu/main-content';
 import { MobileMenu } from '@/components/salu/mobile-menu';
 import { SaluLogo } from '@/components/salu/salu-logo';
 import { SoftBackdrop } from '@/components/salu/soft-backdrop';
@@ -41,9 +42,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="print:hidden">
           <DesktopSidebar />
         </div>
-        <main id="main" className="min-w-0 flex-1 py-8 pb-20 md:pb-8 print:py-0 print:pb-0">
-          {children}
-        </main>
+        <MainContent>{children}</MainContent>
       </div>
 
       <Separator className="print:hidden" />
