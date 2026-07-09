@@ -5,9 +5,11 @@ import {
   logDiaperAction,
   quickCloseSleepAction,
 } from '@/app/(app)/cuidar/eventos/actions';
+import { DiaperQuickAdd } from '@/app/(app)/home/_components/diaper-quick-add';
 import { FeedingQuickAdd } from '@/app/(app)/home/_components/feeding-quick-add';
 import { durationLabel } from '@/lib/baby-age';
 import { Baby, Loader2, Milk, Moon, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -29,12 +31,16 @@ interface Props {
 
 function FeedingPresetBtn({ amountMl }: { amountMl: number }) {
   const [pending, start] = useTransition();
+  const router = useRouter();
 
   function handle() {
     start(async () => {
       const r = await logBottleFeedingAction(amountMl);
       if (!r.ok) toast.error(r.error);
-      else toast.success(`${amountMl} ml anotados.`);
+      else {
+        toast.success(`${amountMl} ml anotados.`);
+        router.refresh();
+      }
     });
   }
 
@@ -53,13 +59,17 @@ function FeedingPresetBtn({ amountMl }: { amountMl: number }) {
 
 function DiaperTypeBtn({ type }: { type: DiaperType }) {
   const [pending, start] = useTransition();
+  const router = useRouter();
   const label = QUICK_DIAPER_LABELS[type];
 
   function handle() {
     start(async () => {
       const r = await logDiaperAction(type);
       if (!r.ok) toast.error(r.error);
-      else toast.success(`Pañal (${label}) anotado.`);
+      else {
+        toast.success(`Pañal (${label}) anotado.`);
+        router.refresh();
+      }
     });
   }
 
@@ -82,12 +92,16 @@ function SleepCloseBtn({
   activeSleep: { id: string; started_at: string; is_nap: boolean };
 }) {
   const [pending, start] = useTransition();
+  const router = useRouter();
 
   function handle() {
     start(async () => {
       const r = await quickCloseSleepAction(activeSleep.id);
       if (!r.ok) toast.error(r.error);
-      else toast.success('Se despertó. Sueño cerrado.');
+      else {
+        toast.success('Se despertó. Sueño cerrado.');
+        router.refresh();
+      }
     });
   }
 
@@ -164,6 +178,18 @@ export function QuickRepeatBar({ feedingPresets, activeSleep }: Props) {
             {DIAPER_TYPES.map((type) => (
               <DiaperTypeBtn key={type} type={type} />
             ))}
+            <DiaperQuickAdd
+              trigger={
+                <button
+                  type="button"
+                  aria-label="Anotar pañal con opciones"
+                  className="flex h-9 items-center justify-center gap-0.5 rounded-lg border border-border border-dashed px-2.5 text-muted-foreground text-xs transition-all hover:border-primary/40 hover:text-primary"
+                >
+                  <Plus className="size-3" aria-hidden />
+                  ajustar
+                </button>
+              }
+            />
           </div>
         </div>
       </div>
