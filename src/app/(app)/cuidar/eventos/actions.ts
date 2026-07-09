@@ -726,6 +726,69 @@ export async function repeatDiaperAction(): Promise<{ ok: true } | { ok: false; 
 }
 
 // ============================================================================
+// Quick log — registra al instante con tipo/cantidad especificada
+// ============================================================================
+
+/**
+ * Registra una toma de mamadera con la cantidad indicada y occurred_at = ahora.
+ * Usado por los botones de preset en el QuickLogBar.
+ */
+export async function logBottleFeedingAction(
+  amountMl: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!Number.isFinite(amountMl) || amountMl < 5 || amountMl > 500) {
+    return { ok: false, error: 'Cantidad inválida.' };
+  }
+
+  const ctx = await getActorContext();
+  if ('error' in ctx) return { ok: false, error: ctx.error ?? 'Error inesperado.' };
+
+  const { error } = await ctx.supabase.from('feeding_events').insert({
+    child_id: ctx.childId,
+    occurred_at: new Date().toISOString(),
+    type: 'bottle',
+    amount_ml: Math.round(amountMl),
+    reaction: 'none',
+    created_by: ctx.userId,
+  });
+
+  if (error) return { ok: false, error: 'No pudimos guardar la toma.' };
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true };
+}
+
+/**
+ * Registra un pañal con el tipo indicado y occurred_at = ahora.
+ * Usado por los botones de tipo en el QuickLogBar.
+ */
+export async function logDiaperAction(
+  type: 'wet' | 'dirty' | 'both' | 'dry',
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const VALID_TYPES = new Set(['wet', 'dirty', 'both', 'dry']);
+  if (!VALID_TYPES.has(type)) return { ok: false, error: 'Tipo de pañal inválido.' };
+
+  const ctx = await getActorContext();
+  if ('error' in ctx) return { ok: false, error: ctx.error ?? 'Error inesperado.' };
+
+  const payload = {
+    child_id: ctx.childId,
+    occurred_at: new Date().toISOString(),
+    type,
+    created_by: ctx.userId,
+  };
+  // biome-ignore lint/suspicious/noExplicitAny: types stale (photo_analysis/photo_path en diaper_events)
+  const { error } = await ctx.supabase.from('diaper_events').insert(payload as any);
+
+  if (error) return { ok: false, error: 'No pudimos guardar el pañal.' };
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true };
+}
+
+// ============================================================================
 // Delete (genérico — recibe table name + id, RLS controla quién puede)
 // ============================================================================
 

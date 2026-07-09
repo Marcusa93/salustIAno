@@ -10,7 +10,6 @@ import { startOfDayArDaysAgo, startOfTodayAr } from '@/lib/format-ar';
 import { greetingFor, isLateNightAr } from '@/lib/greeting';
 import { averagePerDay, formatPredictionTime, predictNextFeeding } from '@/lib/predictions';
 import { createClient } from '@/lib/supabase/server';
-import { DIAPER_TYPE_LABELS } from '@/lib/validators/events';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
 import { Baby, BookHeart, Milk, Moon, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
@@ -118,6 +117,7 @@ export default async function HomePage() {
     todayActivity,
     shareSnapshot,
     { data: upcomingMilestones },
+    { data: recentBottleAmounts },
   ] = await Promise.all([
     supabase.rpc('get_timeline', {
       p_child_id: child.id,
@@ -151,7 +151,7 @@ export default async function HomePage() {
       .maybeSingle(),
     supabase
       .from('feeding_events')
-      .select('occurred_at, amount_ml')
+      .select('occurred_at')
       .eq('child_id', child.id)
       .is('deleted_at', null)
       .order('occurred_at', { ascending: false })
@@ -159,7 +159,7 @@ export default async function HomePage() {
       .maybeSingle(),
     supabase
       .from('diaper_events')
-      .select('occurred_at, type')
+      .select('occurred_at')
       .eq('child_id', child.id)
       .is('deleted_at', null)
       .order('occurred_at', { ascending: false })
@@ -196,6 +196,16 @@ export default async function HomePage() {
       .lte('due_at', upcomingHorizon.toISOString())
       .order('due_at', { ascending: true, nullsFirst: false })
       .limit(3),
+    // Últimas 15 tomas de mamadera con cantidad — para calcular presets.
+    supabase
+      .from('feeding_events')
+      .select('amount_ml')
+      .eq('child_id', child.id)
+      .is('deleted_at', null)
+      .eq('type', 'bottle')
+      .not('amount_ml', 'is', null)
+      .order('occurred_at', { ascending: false })
+      .limit(15),
   ]);
 
   const recents = (recentEvents ?? []) as RecentTimelineRow[];
@@ -207,12 +217,28 @@ export default async function HomePage() {
   } | null;
   const lastClosedSleepAt = (lastClosedSleep?.ended_at as string | null | undefined) ?? null;
   const lastFeedingAt = (lastFeeding?.occurred_at as string | null | undefined) ?? null;
-  const lastFeedingAmountMl = (lastFeeding?.amount_ml as number | null | undefined) ?? null;
   const lastDiaperAt = (lastDiaper?.occurred_at as string | null | undefined) ?? null;
-  const lastDiaperType = (lastDiaper?.type as string | null | undefined) ?? null;
-  const lastDiaperTypeLabel = lastDiaperType
-    ? (DIAPER_TYPE_LABELS[lastDiaperType as keyof typeof DIAPER_TYPE_LABELS] ?? lastDiaperType)
-    : null;
+
+  // Presets de cantidad para el QuickLogBar: top 3 por frecuencia en las
+  // últimas 15 tomas de mamadera, relleno con defaults si hay menos de 3.
+  const recentAmounts = ((recentBottleAmounts ?? []) as { amount_ml: number }[]).map(
+    (e) => e.amount_ml,
+  );
+  const amountFreq = new Map<number, number>();
+  for (const ml of recentAmounts) {
+    amountFreq.set(ml, (amountFreq.get(ml) ?? 0) + 1);
+  }
+  const DEFAULT_ML_PRESETS = [60, 90, 120];
+  const topByFreq = Array.from(amountFreq.entries())
+    .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+    .slice(0, 3)
+    .map(([ml]) => ml);
+  const feedingPresets: number[] = [...topByFreq];
+  for (const d of DEFAULT_ML_PRESETS) {
+    if (feedingPresets.length >= 3) break;
+    if (!feedingPresets.includes(d)) feedingPresets.push(d);
+  }
+  feedingPresets.sort((a, b) => a - b);
 
   const todaySummary = {
     feeding: today.filter((e) => e.event_type === 'feeding').length,
@@ -304,11 +330,7 @@ export default async function HomePage() {
       {/* Acciones rápidas: repite la última toma o el último pañal sin abrir
           ningún formulario — un solo tap registra el evento al instante.
           Cuando hay sueño activo muestra además "Se despertó". */}
-      <QuickRepeatBar
-        lastFeedingAmountMl={lastFeedingAmountMl}
-        lastDiaperTypeLabel={lastDiaperTypeLabel}
-        activeSleep={activeSleep}
-      />
+      <QuickRepeatBar feedingPresets={feedingPresets} activeSleep={activeSleep} />
 
       {/* Coach pediátrico de sueño — solo en modo madrugada (22-06 AR).
           Lee la situación del bebé y devuelve diagnóstico + sugerencia.
@@ -391,7 +413,7 @@ export default async function HomePage() {
 
       {/* ZONA 3 — HISTORIA: recientes agrupados. */}
       <section
-        className="animate-stagger-up flex flex-col gap-4"
+        className="flex animate-stagger-up flex-col gap-4"
         style={{ animationDelay: '285ms' }}
       >
         <div className="flex items-baseline justify-between gap-2">

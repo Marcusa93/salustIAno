@@ -1,43 +1,40 @@
 'use client';
 
 import {
+  logBottleFeedingAction,
+  logDiaperAction,
   quickCloseSleepAction,
-  repeatDiaperAction,
-  repeatFeedingAction,
 } from '@/app/(app)/cuidar/eventos/actions';
+import { FeedingQuickAdd } from '@/app/(app)/home/_components/feeding-quick-add';
 import { durationLabel } from '@/lib/baby-age';
-import { Baby, CheckCircle2, Loader2, Milk, Moon } from 'lucide-react';
+import { Baby, Loader2, Milk, Moon, Plus } from 'lucide-react';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 
+type DiaperType = 'wet' | 'dirty' | 'both' | 'dry';
+
+const QUICK_DIAPER_LABELS: Record<DiaperType, string> = {
+  wet: 'Pis',
+  dirty: 'Caca',
+  both: 'Ambos',
+  dry: 'Seco',
+};
+
+const DIAPER_TYPES: DiaperType[] = ['wet', 'dirty', 'both', 'dry'];
+
 interface Props {
-  lastFeedingAmountMl: number | null;
-  lastDiaperTypeLabel: string | null;
+  feedingPresets: number[];
   activeSleep: { id: string; started_at: string; is_nap: boolean } | null;
 }
 
-function QuickButton({
-  icon: Icon,
-  label,
-  sublabel,
-  onAction,
-  ariaLabel,
-  variant = 'default',
-}: {
-  icon: typeof Milk;
-  label: string;
-  sublabel: string | null;
-  onAction: () => Promise<{ ok: true } | { ok: false; error: string }>;
-  ariaLabel: string;
-  variant?: 'default' | 'sleep';
-}) {
-  const [pending, startTransition] = useTransition();
+function FeedingPresetBtn({ amountMl }: { amountMl: number }) {
+  const [pending, start] = useTransition();
 
   function handle() {
-    startTransition(async () => {
-      const result = await onAction();
-      if (!result.ok) toast.error(result.error);
-      else toast.success(`${label} registrado.`);
+    start(async () => {
+      const r = await logBottleFeedingAction(amountMl);
+      if (!r.ok) toast.error(r.error);
+      else toast.success(`${amountMl} ml anotados.`);
     });
   }
 
@@ -46,76 +43,130 @@ function QuickButton({
       type="button"
       onClick={handle}
       disabled={pending}
-      aria-label={ariaLabel}
-      className={`flex flex-1 items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left transition-all active:scale-[0.97] disabled:opacity-60 hover:bg-muted/40 ${
-        variant === 'sleep' ? 'border-primary/20 bg-primary/5' : 'border-border bg-card'
-      }`}
+      aria-label={`Registrar toma de ${amountMl} ml ahora`}
+      className="flex h-9 flex-1 items-center justify-center rounded-lg border border-border bg-card font-medium text-foreground text-sm transition-all hover:bg-muted/40 active:scale-95 disabled:opacity-60"
     >
-      <span
-        className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-          variant === 'sleep' ? 'bg-primary/15 text-primary' : 'bg-primary/10 text-primary'
-        }`}
-      >
-        {pending ? (
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-        ) : (
-          <Icon className="size-3.5" aria-hidden />
-        )}
-      </span>
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate font-medium text-foreground text-xs">{label}</span>
-        {sublabel && (
-          <span className="truncate text-[10.5px] text-muted-foreground">{sublabel}</span>
-        )}
-      </span>
-      <CheckCircle2 className="ml-auto size-3.5 shrink-0 text-muted-foreground/40" aria-hidden />
+      {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : `${amountMl} ml`}
     </button>
   );
 }
 
-export function QuickRepeatBar({ lastFeedingAmountMl, lastDiaperTypeLabel, activeSleep }: Props) {
-  const hasSleep = !!activeSleep;
-  const hasFeeding = lastFeedingAmountMl !== null;
-  const hasDiaper = lastDiaperTypeLabel !== null;
+function DiaperTypeBtn({ type }: { type: DiaperType }) {
+  const [pending, start] = useTransition();
+  const label = QUICK_DIAPER_LABELS[type];
 
-  if (!hasSleep && !hasFeeding && !hasDiaper) return null;
+  function handle() {
+    start(async () => {
+      const r = await logDiaperAction(type);
+      if (!r.ok) toast.error(r.error);
+      else toast.success(`Pañal (${label}) anotado.`);
+    });
+  }
 
   return (
+    <button
+      type="button"
+      onClick={handle}
+      disabled={pending}
+      aria-label={`Registrar pañal ${label}`}
+      className="flex h-9 flex-1 items-center justify-center rounded-lg border border-border bg-card font-medium text-foreground text-xs transition-all hover:bg-muted/40 active:scale-95 disabled:opacity-60"
+    >
+      {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : label}
+    </button>
+  );
+}
+
+function SleepCloseBtn({
+  activeSleep,
+}: {
+  activeSleep: { id: string; started_at: string; is_nap: boolean };
+}) {
+  const [pending, start] = useTransition();
+
+  function handle() {
+    start(async () => {
+      const r = await quickCloseSleepAction(activeSleep.id);
+      if (!r.ok) toast.error(r.error);
+      else toast.success('Se despertó. Sueño cerrado.');
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      disabled={pending}
+      aria-label="Registrar que Salu se despertó ahora"
+      className="flex w-full items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-2.5 text-left transition-all hover:bg-primary/10 active:scale-[0.97] disabled:opacity-60"
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+        {pending ? (
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        ) : (
+          <Moon className="size-3.5" aria-hidden />
+        )}
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-medium text-foreground text-xs">Se despertó</span>
+        <span className="truncate text-[10.5px] text-muted-foreground">
+          lleva {durationLabel(activeSleep.started_at)}{' '}
+          {activeSleep.is_nap ? 'de siesta' : 'durmiendo'}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+export function QuickRepeatBar({ feedingPresets, activeSleep }: Props) {
+  return (
     <div className="flex flex-col gap-2">
-      {hasSleep && activeSleep && (
-        <div className="flex">
-          <QuickButton
-            icon={Moon}
-            label="Se despertó"
-            sublabel={`lleva ${durationLabel(activeSleep.started_at)} ${activeSleep.is_nap ? 'de siesta' : 'durmiendo'}`}
-            onAction={() => quickCloseSleepAction(activeSleep.id)}
-            ariaLabel="Registrar que Salu se despertó ahora"
-            variant="sleep"
-          />
-        </div>
-      )}
-      {(hasFeeding || hasDiaper) && (
-        <div className="flex gap-2.5">
-          {hasFeeding && (
-            <QuickButton
-              icon={Milk}
-              label="Repetir toma"
-              sublabel={`${lastFeedingAmountMl} ml como la última`}
-              onAction={repeatFeedingAction}
-              ariaLabel={`Registrar toma de ${lastFeedingAmountMl} ml ahora`}
+      {activeSleep && <SleepCloseBtn activeSleep={activeSleep} />}
+
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Fila toma */}
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          <span
+            className="flex size-6 shrink-0 items-center justify-center text-primary/70"
+            aria-hidden
+          >
+            <Milk className="size-4" />
+          </span>
+          <div className="flex flex-1 gap-1.5">
+            {feedingPresets.map((ml) => (
+              <FeedingPresetBtn key={ml} amountMl={ml} />
+            ))}
+            <FeedingQuickAdd
+              trigger={
+                <button
+                  type="button"
+                  aria-label="Anotar toma con opciones"
+                  className="flex h-9 items-center justify-center gap-0.5 rounded-lg border border-border border-dashed px-2.5 text-muted-foreground text-xs transition-all hover:border-primary/40 hover:text-primary"
+                >
+                  <Plus className="size-3" aria-hidden />
+                  otro
+                </button>
+              }
             />
-          )}
-          {hasDiaper && (
-            <QuickButton
-              icon={Baby}
-              label="Repetir pañal"
-              sublabel={lastDiaperTypeLabel}
-              onAction={repeatDiaperAction}
-              ariaLabel={`Registrar pañal (${lastDiaperTypeLabel}) ahora`}
-            />
-          )}
+          </div>
         </div>
-      )}
+
+        <div className="border-border/50 border-t" aria-hidden />
+
+        {/* Fila pañal */}
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          <span
+            className="flex size-6 shrink-0 items-center justify-center text-primary/70"
+            aria-hidden
+          >
+            <Baby className="size-4" />
+          </span>
+          <div className="flex flex-1 gap-1.5">
+            {DIAPER_TYPES.map((type) => (
+              <DiaperTypeBtn key={type} type={type} />
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
