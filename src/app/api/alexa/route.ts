@@ -280,6 +280,65 @@ async function registerDiaper(
   return isNightAr() ? 'Anotado.' : `Anotado, un pañal ${label} para ${target.childName}.`;
 }
 
+// ---- Registro de sueño -------------------------------------------------------
+async function registerSleepStart(admin: AdminClient, target: Target): Promise<string> {
+  // Si ya hay un sueño abierto, no abrir otro.
+  const { data: open } = await admin
+    .from('sleep_sessions')
+    .select('id, started_at')
+    .eq('child_id', target.childId)
+    .is('ended_at', null)
+    .is('deleted_at', null)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (open) {
+    const mins = Math.round((Date.now() - new Date(open.started_at as string).getTime()) / 60000);
+    return isNightAr()
+      ? 'Ya estaba durmiendo.'
+      : `Ya está durmiendo, arrancó hace ${mins} minutos.`;
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await admin.from('sleep_sessions').insert({
+    child_id: target.childId,
+    created_by: target.createdBy,
+    started_at: now,
+    is_nap: true,
+  });
+
+  if (error) return 'No pude anotar el sueño. Probá de nuevo.';
+  return isNightAr() ? 'Anotado.' : `Listo, anoté que ${target.childName} se durmió ahora.`;
+}
+
+async function registerSleepEnd(admin: AdminClient, target: Target): Promise<string> {
+  const { data: open } = await admin
+    .from('sleep_sessions')
+    .select('id, started_at')
+    .eq('child_id', target.childId)
+    .is('ended_at', null)
+    .is('deleted_at', null)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!open) {
+    return isNightAr() ? 'No había sueño abierto.' : 'No había ningún sueño abierto para cerrar.';
+  }
+
+  const now = new Date().toISOString();
+  const mins = Math.round((Date.now() - new Date(open.started_at as string).getTime()) / 60000);
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  const durLabel = hours > 0 ? `${hours}h ${rest > 0 ? `${rest}min` : ''}`.trim() : `${mins} min`;
+
+  const { error } = await admin.from('sleep_sessions').update({ ended_at: now }).eq('id', open.id);
+
+  if (error) return 'No pude cerrar el sueño. Probá de nuevo.';
+  return isNightAr() ? 'Anotado.' : `Listo, ${target.childName} durmió ${durLabel}.`;
+}
+
 // ---- Texto libre → Salustia (consultar o cargar CUALQUIER cosa) -----------
 /** Si el ISO no trae zona horaria, lo tratamos como hora de Argentina (UTC-3). */
 function toTimestamptz(iso: string): string {
@@ -462,6 +521,10 @@ export async function POST(req: Request): Promise<Response> {
       return speak(await registerFeeding(admin, target, slots), true);
     case 'RegistrarPanalIntent':
       return speak(await registerDiaper(admin, target, slots), true);
+    case 'RegistrarSuenoIntent':
+      return speak(await registerSleepStart(admin, target), true);
+    case 'RegistrarDespertarIntent':
+      return speak(await registerSleepEnd(admin, target), true);
     case 'SaluLibreIntent':
       return await handleFreeText(admin, target, slots?.texto?.value ?? '');
     default:

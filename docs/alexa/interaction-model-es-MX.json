@@ -20,11 +20,20 @@
             "anotá que tomó {metodo}",
             "anota que tomó {metodo}",
             "registra una toma de {metodo}",
+            "registrá una toma de {metodo}",
             "tomó {metodo} {duracion} minutos",
             "que tomó {metodo} {duracion} minutos",
             "tomó pecho {duracion} minutos",
             "tomó {cantidad} mililitros de mamadera",
-            "tomó mamadera de {cantidad} mililitros"
+            "tomó mamadera de {cantidad} mililitros",
+            "tomó {cantidad} ml de mamadera",
+            "le di {cantidad} mililitros",
+            "le di {cantidad} mililitros de mamadera",
+            "le di mamadera de {cantidad} mililitros",
+            "le diste {cantidad} mililitros",
+            "tomó {cantidad}",
+            "anotá toma de {metodo}",
+            "toma de {metodo}"
           ]
         },
         {
@@ -34,9 +43,50 @@
             "hizo {tipo}",
             "que hizo {tipo}",
             "cambié un pañal de {tipo}",
+            "cambié pañal de {tipo}",
             "registra un pañal de {tipo}",
+            "registrá un pañal de {tipo}",
             "anotá un pañal {tipo}",
-            "pañal de {tipo}"
+            "anotá pañal {tipo}",
+            "pañal de {tipo}",
+            "pañal {tipo}",
+            "tenía {tipo}",
+            "que tenía {tipo}",
+            "le cambié el pañal tenía {tipo}"
+          ]
+        },
+        {
+          "name": "RegistrarSuenoIntent",
+          "slots": [],
+          "samples": [
+            "se durmió",
+            "empezó a dormir",
+            "se quedó dormido",
+            "se quedó dormida",
+            "que se durmió",
+            "anotá que se durmió",
+            "anota que se durmió",
+            "está durmiendo",
+            "lo dormí",
+            "la dormí",
+            "empezó la siesta",
+            "empezó el sueño"
+          ]
+        },
+        {
+          "name": "RegistrarDespertarIntent",
+          "slots": [],
+          "samples": [
+            "se despertó",
+            "que se despertó",
+            "anotá que se despertó",
+            "anota que se despertó",
+            "ya se despertó",
+            "se despertó el bebé",
+            "terminó la siesta",
+            "terminó el sueño",
+            "ya está despierto",
+            "ya está despierta"
           ]
         },
         {
@@ -47,7 +97,9 @@
             "resumen de hoy",
             "qué pasó hoy",
             "cómo viene el día",
-            "cómo estuvo el día"
+            "cómo estuvo el día",
+            "contame el resumen",
+            "cómo estamos hoy"
           ]
         },
         {
@@ -58,7 +110,9 @@
             "cuál fue la última toma",
             "hace cuánto que no come",
             "cuándo comió",
-            "última toma"
+            "última toma",
+            "hace cuánto comió",
+            "cuándo tomó por última vez"
           ]
         },
         {
@@ -69,7 +123,13 @@
             "pregunta {texto}",
             "preguntale {texto}",
             "decile que {texto}",
+            "decile {texto}",
             "anota que {texto}",
+            "anotá que {texto}",
+            "registrá que {texto}",
+            "registra que {texto}",
+            "cargá que {texto}",
+            "carga que {texto}",
             "quiero saber {texto}",
             "fijate {texto}",
             "necesito que {texto}"
@@ -92,7 +152,12 @@
           "values": [
             { "name": { "value": "pis", "synonyms": ["pichí", "pipí", "mojado", "orina"] } },
             { "name": { "value": "caca", "synonyms": ["popó", "sucio", "materia"] } },
-            { "name": { "value": "ambos", "synonyms": ["los dos", "pis y caca", "completo"] } },
+            {
+              "name": {
+                "value": "ambos",
+                "synonyms": ["los dos", "pis y caca", "completo", "todo"]
+              }
+            },
             { "name": { "value": "seco", "synonyms": ["limpio", "nada"] } }
           ]
         }
