@@ -10,6 +10,7 @@ import { startOfDayArDaysAgo, startOfTodayAr } from '@/lib/format-ar';
 import { greetingFor, isLateNightAr } from '@/lib/greeting';
 import { averagePerDay } from '@/lib/predictions';
 import { createClient } from '@/lib/supabase/server';
+import { DIAPER_TYPE_LABELS } from '@/lib/validators/events';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
 import { Baby, BookHeart, Milk, Moon, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
@@ -21,6 +22,7 @@ import { ExpectationsCard } from './_components/expectations-card';
 import { FamilyActivityCard } from './_components/family-activity-card';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
 import { NightCoachCard } from './_components/night-coach-card';
+import { QuickRepeatBar } from './_components/quick-repeat-bar';
 import { RealtimeRefresher } from './_components/realtime-refresher';
 import { RecentEventsGrouped, type RecentTimelineRow } from './_components/recent-events-grouped';
 import { ShareDayCard } from './_components/share-day-card';
@@ -149,7 +151,7 @@ export default async function HomePage() {
       .maybeSingle(),
     supabase
       .from('feeding_events')
-      .select('occurred_at')
+      .select('occurred_at, amount_ml')
       .eq('child_id', child.id)
       .is('deleted_at', null)
       .order('occurred_at', { ascending: false })
@@ -157,7 +159,7 @@ export default async function HomePage() {
       .maybeSingle(),
     supabase
       .from('diaper_events')
-      .select('occurred_at')
+      .select('occurred_at, type')
       .eq('child_id', child.id)
       .is('deleted_at', null)
       .order('occurred_at', { ascending: false })
@@ -205,7 +207,12 @@ export default async function HomePage() {
   } | null;
   const lastClosedSleepAt = (lastClosedSleep?.ended_at as string | null | undefined) ?? null;
   const lastFeedingAt = (lastFeeding?.occurred_at as string | null | undefined) ?? null;
+  const lastFeedingAmountMl = (lastFeeding?.amount_ml as number | null | undefined) ?? null;
   const lastDiaperAt = (lastDiaper?.occurred_at as string | null | undefined) ?? null;
+  const lastDiaperType = (lastDiaper?.type as string | null | undefined) ?? null;
+  const lastDiaperTypeLabel = lastDiaperType
+    ? (DIAPER_TYPE_LABELS[lastDiaperType as keyof typeof DIAPER_TYPE_LABELS] ?? lastDiaperType)
+    : null;
 
   const todaySummary = {
     feeding: today.filter((e) => e.event_type === 'feeding').length,
@@ -286,6 +293,13 @@ export default async function HomePage() {
         lastDiaperAt={lastDiaperAt}
         todayCounts={todaySummary}
         lateNight={lateNight}
+      />
+
+      {/* Acciones rápidas: repite la última toma o el último pañal sin abrir
+          ningún formulario — un solo tap registra el evento al instante. */}
+      <QuickRepeatBar
+        lastFeedingAmountMl={lastFeedingAmountMl}
+        lastDiaperTypeLabel={lastDiaperTypeLabel}
       />
 
       {/* Coach pediátrico de sueño — solo en modo madrugada (22-06 AR).

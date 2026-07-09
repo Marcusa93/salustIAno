@@ -591,6 +591,86 @@ export async function updateSleepAction(
 }
 
 // ============================================================================
+// Repeat — registra al instante con los mismos datos que el último evento
+// ============================================================================
+
+/**
+ * Registra una nueva toma con occurred_at = ahora y los mismos datos que
+ * la última toma registrada (tipo, cantidad, duración, reacción).
+ * No redirige — solo revalida para que la home refresque.
+ */
+export async function repeatFeedingAction(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await getActorContext();
+  if ('error' in ctx) return { ok: false, error: ctx.error ?? 'Error inesperado.' };
+
+  const { data: last, error: fetchError } = await ctx.supabase
+    .from('feeding_events')
+    .select('type, side, duration_minutes, amount_ml, reaction, notes')
+    .eq('child_id', ctx.childId)
+    .is('deleted_at', null)
+    .order('occurred_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fetchError) return { ok: false, error: 'No pudimos leer la última toma.' };
+  if (!last) return { ok: false, error: 'Todavía no hay tomas para repetir.' };
+
+  const { error: insertError } = await ctx.supabase.from('feeding_events').insert({
+    child_id: ctx.childId,
+    occurred_at: new Date().toISOString(),
+    type: last.type,
+    side: (last.side as 'left' | 'right' | 'both' | null) ?? null,
+    duration_minutes: (last.duration_minutes as number | null) ?? null,
+    amount_ml: (last.amount_ml as number | null) ?? null,
+    reaction: last.reaction,
+    notes: (last.notes as string | null) ?? null,
+    created_by: ctx.userId,
+  });
+
+  if (insertError) return { ok: false, error: 'No pudimos guardar la toma.' };
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true };
+}
+
+/**
+ * Registra un nuevo pañal con occurred_at = ahora y el mismo tipo que
+ * el último pañal registrado.
+ */
+export async function repeatDiaperAction(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await getActorContext();
+  if ('error' in ctx) return { ok: false, error: ctx.error ?? 'Error inesperado.' };
+
+  const { data: last, error: fetchError } = await ctx.supabase
+    .from('diaper_events')
+    .select('type')
+    .eq('child_id', ctx.childId)
+    .is('deleted_at', null)
+    .order('occurred_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fetchError) return { ok: false, error: 'No pudimos leer el último pañal.' };
+  if (!last) return { ok: false, error: 'Todavía no hay pañales para repetir.' };
+
+  const payload = {
+    child_id: ctx.childId,
+    occurred_at: new Date().toISOString(),
+    type: last.type,
+    created_by: ctx.userId,
+  };
+  // biome-ignore lint/suspicious/noExplicitAny: types stale (photo_analysis/photo_path en diaper_events)
+  const { error: insertError } = await ctx.supabase.from('diaper_events').insert(payload as any);
+
+  if (insertError) return { ok: false, error: 'No pudimos guardar el pañal.' };
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true };
+}
+
+// ============================================================================
 // Delete (genérico — recibe table name + id, RLS controla quién puede)
 // ============================================================================
 
