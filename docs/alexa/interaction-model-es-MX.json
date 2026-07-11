@@ -4,7 +4,10 @@
       "invocationName": "salu bebe",
       "intents": [
         { "name": "AMAZON.HelpIntent", "samples": [] },
-        { "name": "AMAZON.StopIntent", "samples": [] },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": ["pará", "detente", "salir", "chau", "terminar"]
+        },
         { "name": "AMAZON.CancelIntent", "samples": [] },
         { "name": "AMAZON.FallbackIntent", "samples": [] },
         {
@@ -12,18 +15,20 @@
           "slots": [
             { "name": "metodo", "type": "MetodoToma" },
             { "name": "duracion", "type": "AMAZON.NUMBER" },
-            { "name": "cantidad", "type": "AMAZON.NUMBER" }
+            { "name": "cantidad", "type": "AMAZON.NUMBER" },
+            { "name": "tiempo", "type": "AMAZON.NUMBER" }
           ],
           "samples": [
             "tomó {metodo}",
             "que tomó {metodo}",
             "anotá que tomó {metodo}",
             "anota que tomó {metodo}",
-            "registra una toma de {metodo}",
             "registrá una toma de {metodo}",
+            "registra una toma de {metodo}",
             "tomó {metodo} {duracion} minutos",
             "que tomó {metodo} {duracion} minutos",
             "tomó pecho {duracion} minutos",
+            "tomó pecho {duracion}",
             "tomó {cantidad} mililitros de mamadera",
             "tomó mamadera de {cantidad} mililitros",
             "tomó {cantidad} ml de mamadera",
@@ -33,26 +38,36 @@
             "le diste {cantidad} mililitros",
             "tomó {cantidad}",
             "anotá toma de {metodo}",
-            "toma de {metodo}"
+            "toma de {metodo}",
+            "tomó {metodo} hace {tiempo} minutos",
+            "le di {cantidad} mililitros hace {tiempo} minutos",
+            "tomó pecho hace {tiempo} minutos",
+            "tomó mamadera hace {tiempo} minutos",
+            "tomó {cantidad} ml hace {tiempo} minutos"
           ]
         },
         {
           "name": "RegistrarPanalIntent",
-          "slots": [{ "name": "tipo", "type": "TipoPanal" }],
+          "slots": [
+            { "name": "tipo", "type": "TipoPanal" },
+            { "name": "tiempo", "type": "AMAZON.NUMBER" }
+          ],
           "samples": [
             "hizo {tipo}",
             "que hizo {tipo}",
             "cambié un pañal de {tipo}",
             "cambié pañal de {tipo}",
-            "registra un pañal de {tipo}",
             "registrá un pañal de {tipo}",
+            "registra un pañal de {tipo}",
             "anotá un pañal {tipo}",
             "anotá pañal {tipo}",
             "pañal de {tipo}",
             "pañal {tipo}",
             "tenía {tipo}",
             "que tenía {tipo}",
-            "le cambié el pañal tenía {tipo}"
+            "le cambié el pañal tenía {tipo}",
+            "hizo {tipo} hace {tiempo} minutos",
+            "cambié el pañal hace {tiempo} minutos"
           ]
         },
         {
@@ -70,7 +85,9 @@
             "lo dormí",
             "la dormí",
             "empezó la siesta",
-            "empezó el sueño"
+            "empezó el sueño",
+            "se fue a dormir",
+            "se acostó"
           ]
         },
         {
@@ -86,7 +103,40 @@
             "terminó la siesta",
             "terminó el sueño",
             "ya está despierto",
-            "ya está despierta"
+            "ya está despierta",
+            "se levantó",
+            "cerrar sueño",
+            "cerrá el sueño"
+          ]
+        },
+        {
+          "name": "RepetirUltimoIntent",
+          "slots": [],
+          "samples": [
+            "repetí",
+            "otra vez",
+            "lo mismo",
+            "lo mismo de antes",
+            "anotá otra igual",
+            "otra igual",
+            "igual que antes",
+            "repetí lo mismo",
+            "anotá lo mismo",
+            "otra toma igual",
+            "otro pañal igual"
+          ]
+        },
+        {
+          "name": "EstadoActualIntent",
+          "slots": [],
+          "samples": [
+            "cómo está",
+            "cómo está el bebé",
+            "qué está haciendo",
+            "está durmiendo",
+            "qué hace ahora",
+            "cómo anda",
+            "qué onda"
           ]
         },
         {
@@ -99,7 +149,8 @@
             "cómo viene el día",
             "cómo estuvo el día",
             "contame el resumen",
-            "cómo estamos hoy"
+            "cómo estamos hoy",
+            "resumen"
           ]
         },
         {
@@ -112,7 +163,8 @@
             "cuándo comió",
             "última toma",
             "hace cuánto comió",
-            "cuándo tomó por última vez"
+            "cuándo tomó por última vez",
+            "cuándo fue la toma"
           ]
         },
         {
@@ -140,25 +192,40 @@
         {
           "name": "MetodoToma",
           "values": [
-            { "name": { "value": "pecho", "synonyms": ["teta", "lactancia", "pecho materno"] } },
             {
-              "name": { "value": "mamadera", "synonyms": ["biberón", "bibe", "fórmula", "leche"] }
+              "name": {
+                "value": "pecho",
+                "synonyms": ["teta", "lactancia", "pecho materno", "lactó"]
+              }
             },
-            { "name": { "value": "sólido", "synonyms": ["comida", "papilla", "puré", "sólidos"] } }
+            {
+              "name": {
+                "value": "mamadera",
+                "synonyms": ["biberón", "bibe", "fórmula", "leche", "tetero"]
+              }
+            },
+            {
+              "name": {
+                "value": "sólido",
+                "synonyms": ["comida", "papilla", "puré", "sólidos", "fruta", "verdura"]
+              }
+            }
           ]
         },
         {
           "name": "TipoPanal",
           "values": [
-            { "name": { "value": "pis", "synonyms": ["pichí", "pipí", "mojado", "orina"] } },
-            { "name": { "value": "caca", "synonyms": ["popó", "sucio", "materia"] } },
+            {
+              "name": { "value": "pis", "synonyms": ["pichí", "pipí", "mojado", "orina", "húmedo"] }
+            },
+            { "name": { "value": "caca", "synonyms": ["popó", "sucio", "materia", "deposición"] } },
             {
               "name": {
                 "value": "ambos",
-                "synonyms": ["los dos", "pis y caca", "completo", "todo"]
+                "synonyms": ["los dos", "pis y caca", "caca y pis", "completo", "todo", "mezclado"]
               }
             },
-            { "name": { "value": "seco", "synonyms": ["limpio", "nada"] } }
+            { "name": { "value": "seco", "synonyms": ["limpio", "nada", "vacío"] } }
           ]
         }
       ]
