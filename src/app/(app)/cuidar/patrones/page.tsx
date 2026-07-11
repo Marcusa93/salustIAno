@@ -5,6 +5,7 @@ import { ChevronLeft, Sparkles } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { HourlyHeatmap } from './_components/hourly-heatmap';
+import { TrendCharts } from './_components/trend-charts';
 import { WeeklyStats } from './_components/weekly-stats';
 import { getPatternsAction } from './actions';
 import { getHourlyHeatmapAction } from './heatmap-actions';
@@ -38,6 +39,10 @@ export default async function PatronesPage() {
       />
 
       {weeklyStats && <WeeklyStats current={weeklyStats.current} previous={weeklyStats.previous} />}
+
+      {initial.ok && initial.trendDays.length >= 3 && (
+        <TrendCharts days={initial.trendDays} avgIntervalHours={initial.avgFeedingIntervalHours} />
+      )}
 
       <Card className="animate-stagger-up flex flex-col gap-4 border-primary/15 bg-gradient-to-br from-primary/[0.06] via-card to-accent/15 p-5">
         <div className="flex items-center gap-2">

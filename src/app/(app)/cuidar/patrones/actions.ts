@@ -12,6 +12,14 @@ export interface WeekSummary {
   diaperCountPerDay: number;
 }
 
+export interface DayStat {
+  date: string;
+  feedingCount: number;
+  sleepHours: number | null;
+  diaperCount: number;
+  feedingTotalMl: number | null;
+}
+
 export type PatternsResult =
   | {
       ok: true;
@@ -19,6 +27,8 @@ export type PatternsResult =
       tone: string;
       daysWithData: number;
       weeklyStats: { current: WeekSummary; previous: WeekSummary | null } | null;
+      trendDays: DayStat[];
+      avgFeedingIntervalHours: number | null;
     }
   | { ok: false; error: string };
 
@@ -183,6 +193,35 @@ export async function getPatternsAction(): Promise<PatternsResult> {
       feedingTotalMl: b.feedingMl > 0 ? b.feedingMl : null,
     }));
 
+  const trendDays: DayStat[] = days.map((d) => ({
+    date: d.date,
+    feedingCount: d.feedingCount,
+    sleepHours:
+      d.sleepMinutesTotal != null ? Math.round((d.sleepMinutesTotal / 60) * 10) / 10 : null,
+    diaperCount: d.diaperCount,
+    feedingTotalMl: d.feedingTotalMl,
+  }));
+
+  // Intervalo promedio entre tomas: usando los timestamps crudos de feedingRows.
+  let avgFeedingIntervalHours: number | null = null;
+  const feedingTimestamps = ((feedingRows ?? []) as Array<{ occurred_at: string }>)
+    .map((f) => new Date(f.occurred_at).getTime())
+    .sort((a, b) => a - b);
+  if (feedingTimestamps.length >= 2) {
+    const gaps: number[] = [];
+    for (let i = 1; i < feedingTimestamps.length; i++) {
+      const curr = feedingTimestamps[i];
+      const prev = feedingTimestamps[i - 1];
+      if (curr === undefined || prev === undefined) continue;
+      const gapH = (curr - prev) / 3_600_000;
+      if (gapH > 0.25 && gapH < 12) gaps.push(gapH);
+    }
+    if (gaps.length > 0) {
+      avgFeedingIntervalHours =
+        Math.round((gaps.reduce((s, g) => s + g, 0) / gaps.length) * 10) / 10;
+    }
+  }
+
   if (days.length < 3) {
     return {
       ok: true,
@@ -192,6 +231,8 @@ export async function getPatternsAction(): Promise<PatternsResult> {
       tone: 'pocos datos',
       daysWithData: days.length,
       weeklyStats: null,
+      trendDays,
+      avgFeedingIntervalHours,
     };
   }
 
@@ -226,8 +267,13 @@ export async function getPatternsAction(): Promise<PatternsResult> {
       tone: result.tone,
       daysWithData: days.length,
       weeklyStats,
+      trendDays,
+      avgFeedingIntervalHours,
     };
   } catch {
-    return { ok: false, error: 'No pudimos generar las observaciones. Probá en un rato.' };
+    return {
+      ok: false,
+      error: 'No pudimos generar las observaciones. Probá en un rato.',
+    };
   }
 }
