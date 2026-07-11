@@ -424,8 +424,7 @@ export async function createDiaperAction(
   };
   const { data, error } = await ctx.supabase
     .from('diaper_events')
-    // biome-ignore lint/suspicious/noExplicitAny: ver comentario sobre types stale arriba.
-    .insert(insertPayload as any)
+    .insert(insertPayload)
     .select('id')
     .single();
 
@@ -481,8 +480,7 @@ export async function updateDiaperAction(
 
   const { data, error } = await supabase
     .from('diaper_events')
-    // biome-ignore lint/suspicious/noExplicitAny: types stale por photo_analysis (ver insert arriba).
-    .update(updatePayload as any)
+    .update(updatePayload)
     .eq('id', id)
     .is('deleted_at', null)
     .select('id')
@@ -715,8 +713,7 @@ export async function repeatDiaperAction(): Promise<{ ok: true } | { ok: false; 
     type: last.type,
     created_by: ctx.userId,
   };
-  // biome-ignore lint/suspicious/noExplicitAny: types stale (photo_analysis/photo_path en diaper_events)
-  const { error: insertError } = await ctx.supabase.from('diaper_events').insert(payload as any);
+  const { error: insertError } = await ctx.supabase.from('diaper_events').insert(payload);
 
   if (insertError) return { ok: false, error: 'No pudimos guardar el pañal.' };
 
@@ -778,8 +775,7 @@ export async function logDiaperAction(
     type,
     created_by: ctx.userId,
   };
-  // biome-ignore lint/suspicious/noExplicitAny: types stale (photo_analysis/photo_path en diaper_events)
-  const { error } = await ctx.supabase.from('diaper_events').insert(payload as any);
+  const { error } = await ctx.supabase.from('diaper_events').insert(payload);
 
   if (error) return { ok: false, error: 'No pudimos guardar el pañal.' };
 

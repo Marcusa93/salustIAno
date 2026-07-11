@@ -405,9 +405,7 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
       };
     }
 
-    // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar Supabase types con la migration 022.
-    const sb = supabase as any;
-    const { data: memoryData, error: memoryErr } = await sb
+    const { data: memoryData, error: memoryErr } = await supabase
       .from('family_memories')
       .insert({
         family_group_id: memMembership.family_group_id,
@@ -556,9 +554,7 @@ export async function persistMessages(
     role: m.role,
     content: m.content,
   }));
-  // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar Supabase types con la migration 20260501150000.
-  const sb = supabase as any;
-  const { error } = await sb.from('chat_messages').insert(rows);
+  const { error } = await supabase.from('chat_messages').insert(rows);
   if (error) {
     await logStore.record({
       agent: 'salustia-persist',
@@ -580,9 +576,7 @@ export async function loadChatHistoryAction(): Promise<ChatHistoryEntry[]> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return [];
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar.
-  const sb = supabase as any;
-  const { data, error } = await sb
+  const { data, error } = await supabase
     .from('chat_messages')
     .select('role, content, created_at')
     .eq('user_id', userData.user.id)
@@ -612,9 +606,7 @@ export async function loadChatHistoryMetaAction(): Promise<{
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return null;
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar.
-  const sb = supabase as any;
-  const { data, error } = await sb
+  const { data, error } = await supabase
     .from('chat_messages')
     .select('created_at')
     .eq('user_id', userData.user.id)
@@ -646,9 +638,7 @@ export async function clearChatHistoryAction(): Promise<
   if (!userData.user) {
     return { ok: false, error: 'Sesión expirada.' };
   }
-  // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('chat_messages')
     .update({ deleted_at: new Date().toISOString() })
     .eq('user_id', userData.user.id)
@@ -797,7 +787,11 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
-  const childId = (child?.id as string | undefined) ?? null;
+  const childId = child?.id ?? null;
+
+  if (!childId) {
+    return { ok: false, error: 'Todavía no tenés un perfil de bebé creado.' };
+  }
 
   // 1. Upload al Storage.
   const ext =
@@ -835,10 +829,8 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
   });
   const albumName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale para albums/media_items.
-  const sb = supabase as any;
   let albumId: string | null = null;
-  const { data: existingAlbum } = await sb
+  const { data: existingAlbum } = await supabase
     .from('albums')
     .select('id')
     .eq('family_group_id', familyGroupId)
@@ -846,9 +838,9 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
     .is('deleted_at', null)
     .maybeSingle();
   if (existingAlbum?.id) {
-    albumId = existingAlbum.id as string;
+    albumId = existingAlbum.id;
   } else {
-    const { data: createdAlbum } = await sb
+    const { data: createdAlbum } = await supabase
       .from('albums')
       .insert({
         family_group_id: familyGroupId,
@@ -860,7 +852,7 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
       })
       .select('id')
       .single();
-    albumId = (createdAlbum?.id as string | undefined) ?? null;
+    albumId = createdAlbum?.id ?? null;
   }
 
   // 3. Auto-tag (best-effort).
@@ -888,7 +880,7 @@ export async function sendPhotoToChatAction(formData: FormData): Promise<SendPho
   // 4. Insertar media_items. Si la familia escribió un caption, ese
   // gana sobre el de la IA — su voz va primero.
   const captionForAlbum = userCaption ?? aiCaption;
-  const { error: insertErr } = await sb.from('media_items').insert({
+  const { error: insertErr } = await supabase.from('media_items').insert({
     child_id: childId,
     family_group_id: familyGroupId,
     album_id: albumId,

@@ -181,8 +181,7 @@ export default async function CuidarPage() {
           .maybeSingle()
       : Promise.resolve({ data: null }),
     child?.family_group_id
-      ? // biome-ignore lint/suspicious/noExplicitAny: pediatric_summaries falta en types/database.ts (regenerar Supabase types resolvería).
-        (supabase as any)
+      ? supabase
           .from('pediatric_summaries')
           .select('created_at, period_label')
           .eq('family_group_id', child.family_group_id)
@@ -196,8 +195,7 @@ export default async function CuidarPage() {
       .select('id', { count: 'exact', head: true })
       .is('deleted_at', null),
     child
-      ? // biome-ignore lint/suspicious/noExplicitAny: medication_doses falta en types/database.ts (regenerar Supabase types resolvería).
-        (supabase as any)
+      ? supabase
           .from('medication_doses')
           .select('medication_name, next_dose_at')
           .eq('child_id', child.id)

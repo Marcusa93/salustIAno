@@ -211,10 +211,8 @@ export async function generateLullabyAudioAction(
       };
     }
 
-    // 4. Insertar fila en lullabies. Cast por types stale.
-    // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar.
-    const sb = supabase as any;
-    const { data: row, error: insertErr } = await sb
+    // 4. Insertar fila en lullabies.
+    const { data: row, error: insertErr } = await supabase
       .from('lullabies')
       .insert({
         child_id: child?.id,
@@ -259,7 +257,7 @@ export async function generateLullabyAudioAction(
     return {
       ok: true,
       audioUrl: signed?.signedUrl ?? audio.audioUrl,
-      lullabyId: row.id as string,
+      lullabyId: row.id,
       latencyMs: audio.meta.latencyMs,
     };
   } catch (err) {
@@ -311,9 +309,7 @@ export async function listLullabiesAction(): Promise<LullabyLibraryEntry[]> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return [];
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data, error } = await sb
+  const { data, error } = await supabase
     .from('lullabies')
     .select('id, title, intro, verses, chorus, closing, mood, audio_path, created_at')
     .is('deleted_at', null)
@@ -322,16 +318,16 @@ export async function listLullabiesAction(): Promise<LullabyLibraryEntry[]> {
 
   if (error || !data) return [];
 
-  return (data as Array<Record<string, unknown>>).map((r) => ({
-    id: r.id as string,
-    title: r.title as string,
-    intro: r.intro as string,
+  return data.map((r) => ({
+    id: r.id,
+    title: r.title,
+    intro: r.intro,
     verses: (r.verses as string[]) ?? [],
-    chorus: (r.chorus as string) ?? '',
-    closing: (r.closing as string) ?? '',
+    chorus: r.chorus ?? '',
+    closing: r.closing ?? '',
     mood: r.mood as LullabyLibraryEntry['mood'],
-    audioPath: (r.audio_path as string | null) ?? null,
-    createdAt: r.created_at as string,
+    audioPath: r.audio_path ?? null,
+    createdAt: r.created_at,
   }));
 }
 
@@ -359,9 +355,7 @@ export async function shareLullabyAction(
   }
   const supabase = await createClient();
   const token = generateShareToken();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('lullabies')
     .update({ share_token: token, shared_at: new Date().toISOString() })
     .eq('id', id);
@@ -376,9 +370,7 @@ export async function revokeLullabyShareAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('lullabies')
     .update({ share_token: null, shared_at: null })
     .eq('id', id);
@@ -401,9 +393,7 @@ export async function deleteLullabyAction(
     return { ok: false, error: 'ID inválido.' };
   }
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('lullabies')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);

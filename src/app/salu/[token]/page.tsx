@@ -32,10 +32,8 @@ export default async function SaluPublicPage({ params }: PageProps) {
 
   const requestClient = await createClient();
   const supabase = env.SUPABASE_SECRET_KEY ? createAdminClient() : requestClient;
-  // biome-ignore lint/suspicious/noExplicitAny: share_token es columna nueva, types stale
-  const sb = supabase as any;
 
-  const { data: child } = await sb
+  const { data: child } = await supabase
     .from('child_profiles')
     .select('id, name, birth_date, family_group_id')
     .eq('share_token', token)
@@ -91,8 +89,7 @@ export default async function SaluPublicPage({ params }: PageProps) {
       .gte('occurred_at', since)
       .order('occurred_at', { ascending: false })
       .limit(10),
-    // biome-ignore lint/suspicious/noExplicitAny: media_items types stale
-    (sb as any)
+    supabase
       .from('media_items')
       .select('id, storage_path')
       .eq('child_id', childId)

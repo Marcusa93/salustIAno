@@ -184,9 +184,7 @@ export async function attachPhotosToNoteAction(
   if (!userData.user) return { ok: false, error: 'Sesión expirada.' };
 
   // Verificamos que la nota existe y resolvemos child_id + family_group_id.
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data: note } = await sb
+  const { data: note } = await supabase
     .from('notes')
     .select('id, child_id')
     .eq('id', noteId)
@@ -195,7 +193,7 @@ export async function attachPhotosToNoteAction(
 
   if (!note) return { ok: false, error: 'No encontramos esa nota.' };
 
-  const { data: child } = await sb
+  const { data: child } = await supabase
     .from('child_profiles')
     .select('family_group_id')
     .eq('id', note.child_id)
@@ -204,7 +202,7 @@ export async function attachPhotosToNoteAction(
   if (!child?.family_group_id) {
     return { ok: false, error: 'No encontramos el grupo familiar de la nota.' };
   }
-  const familyGroupId = child.family_group_id as string;
+  const familyGroupId = child.family_group_id;
 
   let uploaded = 0;
   let failed = 0;
@@ -235,7 +233,7 @@ export async function attachPhotosToNoteAction(
       continue;
     }
 
-    const { error: insertErr } = await sb.from('media_items').insert({
+    const { error: insertErr } = await supabase.from('media_items').insert({
       child_id: note.child_id,
       family_group_id: familyGroupId,
       note_id: noteId,
@@ -268,9 +266,7 @@ export async function listNotePhotosAction(noteId: string): Promise<NotePhoto[]>
   if (typeof noteId !== 'string' || noteId.length === 0) return [];
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data } = await sb
+  const { data } = await supabase
     .from('media_items')
     .select('id, storage_path, caption')
     .eq('note_id', noteId)
@@ -298,9 +294,7 @@ export async function detachPhotoFromNoteAction(
   }
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb.from('media_items').update({ note_id: null }).eq('id', photoId);
+  const { error } = await supabase.from('media_items').update({ note_id: null }).eq('id', photoId);
 
   if (error) return { ok: false, error: 'No pudimos sacar la foto de la nota.' };
   return { ok: true };

@@ -17,9 +17,7 @@ export default async function CompartirCuentoPage({ params }: PageProps) {
   if (!token || token.length < 16) notFound();
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data, error } = await sb
+  const { data, error } = await supabase
     .from('stories')
     .select('id, title, story, moral_or_theme, characters_used')
     .eq('share_token', token)

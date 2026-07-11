@@ -32,9 +32,7 @@ export default async function CompartirAlbumPage({ params }: PageProps) {
 
   const requestClient = await createClient();
   const supabase = env.SUPABASE_SECRET_KEY ? createAdminClient() : requestClient;
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data: album, error } = await sb
+  const { data: album, error } = await supabase
     .from('albums')
     .select('id, name, kind, month_key, shared_at')
     .eq('share_token', token)
@@ -43,7 +41,7 @@ export default async function CompartirAlbumPage({ params }: PageProps) {
 
   if (error || !album) notFound();
 
-  const { data: photoRows } = await sb
+  const { data: photoRows } = await supabase
     .from('media_items')
     .select('id, storage_path, caption, taken_at')
     .eq('album_id', album.id)
@@ -53,16 +51,16 @@ export default async function CompartirAlbumPage({ params }: PageProps) {
     .limit(200);
 
   const photos: SharedPhoto[] = await Promise.all(
-    ((photoRows as Array<Record<string, unknown>> | null) ?? []).map(async (p) => {
-      const path = p.storage_path as string;
+    (photoRows ?? []).map(async (p) => {
+      const path = p.storage_path;
       const { data: signed } = await supabase.storage
         .from('photos')
         .createSignedUrl(path, 60 * 60 * 24);
       return {
-        id: p.id as string,
+        id: p.id,
         signedUrl: signed?.signedUrl ?? null,
-        caption: (p.caption as string | null) ?? null,
-        takenAt: (p.taken_at as string | null) ?? null,
+        caption: p.caption ?? null,
+        takenAt: p.taken_at ?? null,
       };
     }),
   );

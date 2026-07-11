@@ -89,8 +89,7 @@ export async function repeatDoseAction(
   const ctx = await getActorContext();
   if ('error' in ctx) return { ok: false, error: ctx.error ?? 'Error inesperado.' };
 
-  // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
-  const { data: original } = await (ctx.supabase as any)
+  const { data: original } = await ctx.supabase
     .from('medication_doses')
     .select('medication_name, dose_amount, interval_hours')
     .eq('id', id)
@@ -106,8 +105,7 @@ export async function repeatDoseAction(
       ? new Date(now.getTime() + original.interval_hours * 60 * 60 * 1000)
       : null;
 
-  // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
-  const { error: insertError } = await (ctx.supabase as any).from('medication_doses').insert({
+  const { error: insertError } = await ctx.supabase.from('medication_doses').insert({
     child_id: ctx.childId,
     medication_name: original.medication_name,
     dose_amount: original.dose_amount ?? null,

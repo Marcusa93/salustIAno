@@ -86,7 +86,11 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
     .limit(1)
     .maybeSingle();
 
-  const childId = (child?.id as string | undefined) ?? null;
+  const childId = child?.id ?? null;
+
+  if (!childId) {
+    return { ok: false, error: 'Todavía no tenés un perfil de bebé creado.' };
+  }
 
   // Resolver/crear álbum mensual para hoy.
   const albumId = await getOrCreateMonthlyAlbum(
@@ -153,9 +157,7 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
       }
     }
 
-    // biome-ignore lint/suspicious/noExplicitAny: types stale.
-    const sb = supabase as any;
-    const { error: insertErr } = await sb.from('media_items').insert({
+    const { error: insertErr } = await supabase.from('media_items').insert({
       child_id: childId,
       family_group_id: familyGroupId,
       album_id: albumId,
@@ -204,8 +206,7 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
  * (family_group_id, month_key) en la tabla evita duplicados.
  */
 async function getOrCreateMonthlyAlbum(
-  // biome-ignore lint/suspicious/noExplicitAny: tipo del cliente Supabase server.
-  supabase: any,
+  supabase: Awaited<ReturnType<typeof createClient>>,
   familyGroupId: string,
   childId: string | null,
   createdBy: string,
@@ -268,9 +269,7 @@ async function getOrCreateMonthlyAlbum(
 
 export async function listAlbumsAction(): Promise<AlbumEntry[]> {
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data: albums } = await sb
+  const { data: albums } = await supabase
     .from('albums')
     .select('id, name, kind, month_key, cover_path, share_token, shared_at')
     .is('deleted_at', null)
@@ -279,15 +278,15 @@ export async function listAlbumsAction(): Promise<AlbumEntry[]> {
 
   if (!albums) return [];
 
-  return (albums as Array<Record<string, unknown>>).map((a) => ({
-    id: a.id as string,
-    name: a.name as string,
+  return albums.map((a) => ({
+    id: a.id,
+    name: a.name,
     kind: a.kind as AlbumEntry['kind'],
-    monthKey: (a.month_key as string | null) ?? null,
-    coverPath: (a.cover_path as string | null) ?? null,
+    monthKey: a.month_key ?? null,
+    coverPath: a.cover_path ?? null,
     count: 0,
-    shareToken: (a.share_token as string | null) ?? null,
-    sharedAt: (a.shared_at as string | null) ?? null,
+    shareToken: a.share_token ?? null,
+    sharedAt: a.shared_at ?? null,
   }));
 }
 
@@ -320,9 +319,7 @@ export async function createManualAlbumAction(
     return { ok: false, error: 'No encontramos tu grupo familiar.' };
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data: created, error } = await sb
+  const { data: created, error } = await supabase
     .from('albums')
     .insert({
       family_group_id: membership.family_group_id,
@@ -339,14 +336,14 @@ export async function createManualAlbumAction(
   return {
     ok: true,
     album: {
-      id: created.id as string,
-      name: created.name as string,
+      id: created.id,
+      name: created.name,
       kind: created.kind as AlbumEntry['kind'],
-      monthKey: (created.month_key as string | null) ?? null,
-      coverPath: (created.cover_path as string | null) ?? null,
+      monthKey: created.month_key ?? null,
+      coverPath: created.cover_path ?? null,
       count: 0,
-      shareToken: (created.share_token as string | null) ?? null,
-      sharedAt: (created.shared_at as string | null) ?? null,
+      shareToken: created.share_token ?? null,
+      sharedAt: created.shared_at ?? null,
     },
   };
 }
@@ -364,9 +361,7 @@ export async function assignPhotoToAlbumAction(
   }
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb.from('media_items').update({ album_id: albumId }).eq('id', photoId);
+  const { error } = await supabase.from('media_items').update({ album_id: albumId }).eq('id', photoId);
 
   if (error) return { ok: false, error: 'No pudimos cambiar el álbum de la foto.' };
   revalidatePath('/album');
@@ -391,9 +386,7 @@ export async function shareAlbumAction(
   const token = Array.from(bytes, (b) => chars[b % chars.length]).join('');
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('albums')
     .update({ share_token: token, shared_at: new Date().toISOString() })
     .eq('id', albumId);
@@ -407,9 +400,7 @@ export async function revokeAlbumShareAction(
   albumId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('albums')
     .update({ share_token: null, shared_at: null })
     .eq('id', albumId);
@@ -421,9 +412,7 @@ export async function revokeAlbumShareAction(
 
 export async function listPhotosAction(albumId?: string | null): Promise<PhotoEntry[]> {
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  let query = sb
+  let query = supabase
     .from('media_items')
     .select('id, album_id, storage_path, caption, tags, width, height, taken_at, created_at')
     .is('deleted_at', null)
@@ -436,16 +425,16 @@ export async function listPhotosAction(albumId?: string | null): Promise<PhotoEn
   const { data, error } = await query;
   if (error || !data) return [];
 
-  return (data as Array<Record<string, unknown>>).map((r) => ({
-    id: r.id as string,
-    albumId: (r.album_id as string | null) ?? null,
-    storagePath: r.storage_path as string,
-    caption: (r.caption as string | null) ?? null,
+  return data.map((r) => ({
+    id: r.id,
+    albumId: r.album_id ?? null,
+    storagePath: r.storage_path,
+    caption: r.caption ?? null,
     tags: (r.tags as string[]) ?? [],
-    width: (r.width as number | null) ?? null,
-    height: (r.height as number | null) ?? null,
-    takenAt: (r.taken_at as string | null) ?? null,
-    createdAt: r.created_at as string,
+    width: r.width ?? null,
+    height: r.height ?? null,
+    takenAt: r.taken_at ?? null,
+    createdAt: r.created_at,
   }));
 }
 
@@ -468,21 +457,23 @@ export async function updatePhotoAction(
   updates: { caption?: string; tags?: string[] },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
 
-  const payload: Record<string, unknown> = {};
-  if (updates.caption !== undefined) {
-    payload.caption = updates.caption.trim().length > 0 ? updates.caption.trim() : null;
-  }
-  if (updates.tags !== undefined) {
-    payload.tags = updates.tags
-      .map((t) => t.trim().toLowerCase())
-      .filter((t) => t.length > 0 && t.length <= 50)
-      .slice(0, 12);
-  }
-
-  const { error } = await sb.from('media_items').update(payload).eq('id', id);
+  const { error } = await supabase
+    .from('media_items')
+    .update({
+      ...(updates.caption !== undefined
+        ? { caption: updates.caption.trim().length > 0 ? updates.caption.trim() : null }
+        : {}),
+      ...(updates.tags !== undefined
+        ? {
+            tags: updates.tags
+              .map((t) => t.trim().toLowerCase())
+              .filter((t) => t.length > 0 && t.length <= 50)
+              .slice(0, 12),
+          }
+        : {}),
+    })
+    .eq('id', id);
   if (error) return { ok: false, error: 'No pudimos guardar los cambios.' };
   revalidatePath('/album');
   return { ok: true };
@@ -508,9 +499,7 @@ export async function retagPhotoAction(
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return { ok: false, error: 'Sesión expirada.' };
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data: row } = await sb
+  const { data: row } = await supabase
     .from('media_items')
     .select('id, storage_path, family_group_id, child_id, mime_type, taken_at')
     .eq('id', id)
@@ -566,7 +555,7 @@ export async function retagPhotoAction(
   }
 
   const captionToSave = caption.trim().length > 0 ? caption.trim() : null;
-  const { error: updateErr } = await sb
+  const { error: updateErr } = await supabase
     .from('media_items')
     .update({ tags, caption: captionToSave })
     .eq('id', id);
@@ -581,17 +570,15 @@ export async function deletePhotoAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
 
   // Lookup del path para eliminar también del Storage.
-  const { data: row } = await sb
+  const { data: row } = await supabase
     .from('media_items')
     .select('storage_path')
     .eq('id', id)
     .maybeSingle();
 
-  const { error } = await sb
+  const { error } = await supabase
     .from('media_items')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
@@ -626,10 +613,8 @@ export async function renameAlbumAction(
   }
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
 
-  const { data: album } = await sb
+  const { data: album } = await supabase
     .from('albums')
     .select('id, kind')
     .eq('id', id)
@@ -644,7 +629,7 @@ export async function renameAlbumAction(
     };
   }
 
-  const { error } = await sb.from('albums').update({ name: trimmed }).eq('id', id);
+  const { error } = await supabase.from('albums').update({ name: trimmed }).eq('id', id);
   if (error) return { ok: false, error: 'No pudimos renombrar el álbum.' };
 
   revalidatePath('/album');
@@ -676,10 +661,8 @@ export async function deleteAlbumAction(
   }
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
 
-  const { data: album } = await sb
+  const { data: album } = await supabase
     .from('albums')
     .select('id, kind')
     .eq('id', id)
@@ -696,7 +679,7 @@ export async function deleteAlbumAction(
   }
 
   // 1. Sacar el album_id de las fotos (vuelven al pool general).
-  const { error: detachErr } = await sb
+  const { error: detachErr } = await supabase
     .from('media_items')
     .update({ album_id: null })
     .eq('album_id', id);
@@ -705,7 +688,7 @@ export async function deleteAlbumAction(
   }
 
   // 2. Soft-delete del álbum.
-  const { error: deleteErr } = await sb
+  const { error: deleteErr } = await supabase
     .from('albums')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);

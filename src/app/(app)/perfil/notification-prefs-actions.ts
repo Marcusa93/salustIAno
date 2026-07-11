@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import type { Json } from '@/types/database';
 import { revalidatePath } from 'next/cache';
 
 export interface NotificationPrefs {
@@ -41,9 +42,7 @@ export async function loadNotificationPrefsAction(): Promise<NotificationPrefs> 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return DEFAULT_PREFS;
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale para notification_prefs.
-  const sb = supabase as any;
-  const { data } = await sb
+  const { data } = await supabase
     .from('notification_prefs')
     .select('prefs')
     .eq('user_id', userData.user.id)
@@ -72,12 +71,9 @@ export async function setNotificationPrefAction(
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return { ok: false, error: 'Sesión expirada.' };
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-
   // Leemos las prefs actuales (o defaults), aplicamos el cambio y
   // upserteamos de un saque. UPSERT con onConflict garantiza atomicidad.
-  const { data: existing } = await sb
+  const { data: existing } = await supabase
     .from('notification_prefs')
     .select('prefs')
     .eq('user_id', userData.user.id)
@@ -89,10 +85,10 @@ export async function setNotificationPrefAction(
   };
   const updated: NotificationPrefs = { ...current, [key]: value };
 
-  const { error } = await sb
+  const { error } = await supabase
     .from('notification_prefs')
     .upsert(
-      { user_id: userData.user.id, prefs: updated, updated_at: new Date().toISOString() },
+      { user_id: userData.user.id, prefs: updated as unknown as Json, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
     );
 

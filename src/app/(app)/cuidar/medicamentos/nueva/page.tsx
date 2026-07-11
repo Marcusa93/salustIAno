@@ -46,8 +46,7 @@ export default async function NewMedicationDosePage({ searchParams }: PageProps)
   // Si viene ?from=<id>, pre-llenamos con los datos de esa dosis.
   let prefilled: Partial<MedicationDoseInput> | undefined;
   if (from && child) {
-    // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
-    const { data: source } = await (supabase as any)
+    const { data: source } = await supabase
       .from('medication_doses')
       .select('medication_name, dose_amount, interval_hours')
       .eq('id', from)

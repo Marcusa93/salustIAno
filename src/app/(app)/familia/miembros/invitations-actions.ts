@@ -61,9 +61,7 @@ export async function listInvitationsAction(): Promise<InvitationEntry[]> {
   if (!ctx) return [];
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale para family_invitations.
-  const sb = supabase as any;
-  const { data: rows } = await sb
+  const { data: rows } = await supabase
     .from('family_invitations')
     .select('id, code, role, created_by, expires_at, created_at')
     .eq('family_group_id', ctx.familyGroupId)
@@ -75,12 +73,10 @@ export async function listInvitationsAction(): Promise<InvitationEntry[]> {
   if (!rows || rows.length === 0) return [];
 
   // Resolvemos el display_name del creador con un solo round a memberships.
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb2 = supabase as any;
   const creatorIds = Array.from(
     new Set((rows as Array<{ created_by: string }>).map((r) => r.created_by)),
   );
-  const { data: creators } = await sb2
+  const { data: creators } = await supabase
     .from('family_memberships')
     .select('user_id, display_name')
     .in('user_id', creatorIds)
@@ -125,13 +121,11 @@ export async function createInvitationAction(
 
   const expiresAt = new Date(Date.now() + data.expiresInDays * 24 * 60 * 60 * 1000);
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
 
   let lastError: string | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = generateInvitationCode();
-    const { data: inserted, error } = await sb
+    const { data: inserted, error } = await supabase
       .from('family_invitations')
       .insert({
         family_group_id: ctx.familyGroupId,
@@ -158,7 +152,7 @@ export async function createInvitationAction(
     }
 
     // Buscamos el display_name del creador (somos nosotros mismos).
-    const { data: myMembership } = await sb
+    const { data: myMembership } = await supabase
       .from('family_memberships')
       .select('display_name')
       .eq('user_id', ctx.userId)
@@ -169,12 +163,12 @@ export async function createInvitationAction(
     return {
       ok: true,
       invitation: {
-        id: inserted.id as string,
-        code: inserted.code as string,
+        id: inserted.id,
+        code: inserted.code,
         role: inserted.role as InvitationEntry['role'],
-        createdAt: inserted.created_at as string,
-        createdByDisplayName: (myMembership?.display_name as string | null) ?? null,
-        expiresAt: inserted.expires_at as string,
+        createdAt: inserted.created_at,
+        createdByDisplayName: myMembership?.display_name ?? null,
+        expiresAt: inserted.expires_at,
         isExpired: false,
       },
     };
@@ -202,10 +196,8 @@ export async function revokeInvitationAction(id: string): Promise<RevokeInvitati
   }
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
 
-  const { error } = await sb
+  const { error } = await supabase
     .from('family_invitations')
     .update({ revoked_at: new Date().toISOString() })
     .eq('id', id)
@@ -235,9 +227,7 @@ export async function _findRedeemableInvitation(code: string): Promise<{
   // Usamos admin client porque el caller es anónimo (todavía no tiene
   // sesión) — RLS bloquearía SELECT si fuese authenticated.
   const admin = createAdminClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = admin as any;
-  const { data } = await sb
+  const { data } = await admin
     .from('family_invitations')
     .select('id, family_group_id, role, expires_at, redeemed_at, revoked_at')
     .eq('code', code)
@@ -261,9 +251,7 @@ export async function _findRedeemableInvitation(code: string): Promise<{
  */
 export async function _markInvitationRedeemed(invitationId: string, userId: string): Promise<void> {
   const admin = createAdminClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = admin as any;
-  await sb
+  await admin
     .from('family_invitations')
     .update({ redeemed_at: new Date().toISOString(), redeemed_by: userId })
     .eq('id', invitationId);

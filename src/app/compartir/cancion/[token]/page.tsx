@@ -18,9 +18,7 @@ export default async function CompartirCancionPage({ params }: PageProps) {
   if (!token || token.length < 16) notFound();
 
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data, error } = await sb
+  const { data, error } = await supabase
     .from('lullabies')
     .select('id, title, intro, verses, chorus, closing, mood, audio_path')
     .eq('share_token', token)

@@ -312,9 +312,7 @@ async function persistSummary(args: {
       .maybeSingle();
     if (!membership?.family_group_id) return;
 
-    // biome-ignore lint/suspicious/noExplicitAny: types stale.
-    const sb = supabase as any;
-    await sb.from('pediatric_summaries').insert({
+    await supabase.from('pediatric_summaries').insert({
       child_id: args.childId,
       family_group_id: membership.family_group_id,
       days_back: args.daysBack,
@@ -353,9 +351,7 @@ export async function listPediatricSummariesAction(): Promise<PediatricSummaryEn
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return [];
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { data, error } = await sb
+  const { data, error } = await supabase
     .from('pediatric_summaries')
     .select(
       'id, days_back, period_label, headline, metrics, observations, questions, pending_milestones, created_at',
@@ -382,9 +378,7 @@ export async function deletePediatricSummaryAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('pediatric_summaries')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);

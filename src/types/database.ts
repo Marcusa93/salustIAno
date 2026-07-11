@@ -330,6 +330,7 @@ export type Database = {
           health_insurance: string | null;
           id: string;
           is_preterm: boolean | null;
+          last_daily_summary_at: string | null;
           last_feeding_reminder_at: string | null;
           last_predicted_diaper_reminder_at: string | null;
           last_predicted_feeding_reminder_at: string | null;
@@ -338,6 +339,8 @@ export type Database = {
           pediatrician_name: string | null;
           pediatrician_phone: string | null;
           sex: string | null;
+          share_token: string | null;
+          share_token_created_at: string | null;
           updated_at: string;
         };
         Insert: {
@@ -356,6 +359,7 @@ export type Database = {
           health_insurance?: string | null;
           id?: string;
           is_preterm?: boolean | null;
+          last_daily_summary_at?: string | null;
           last_feeding_reminder_at?: string | null;
           last_predicted_diaper_reminder_at?: string | null;
           last_predicted_feeding_reminder_at?: string | null;
@@ -364,6 +368,8 @@ export type Database = {
           pediatrician_name?: string | null;
           pediatrician_phone?: string | null;
           sex?: string | null;
+          share_token?: string | null;
+          share_token_created_at?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -382,6 +388,7 @@ export type Database = {
           health_insurance?: string | null;
           id?: string;
           is_preterm?: boolean | null;
+          last_daily_summary_at?: string | null;
           last_feeding_reminder_at?: string | null;
           last_predicted_diaper_reminder_at?: string | null;
           last_predicted_feeding_reminder_at?: string | null;
@@ -390,6 +397,8 @@ export type Database = {
           pediatrician_name?: string | null;
           pediatrician_phone?: string | null;
           sex?: string | null;
+          share_token?: string | null;
+          share_token_created_at?: string | null;
           updated_at?: string;
         };
         Relationships: [

@@ -96,9 +96,7 @@ export async function redeemInvitationAction(input: RedeemInvitationInput): Prom
   const newUserId = created.user.id;
 
   // 3. Insertar membership.
-  // biome-ignore lint/suspicious/noExplicitAny: types stale para family_memberships.
-  const sb = admin as any;
-  const { error: membershipErr } = await sb.from('family_memberships').insert({
+  const { error: membershipErr } = await admin.from('family_memberships').insert({
     family_group_id: invitation.family_group_id,
     user_id: newUserId,
     role: invitation.role,

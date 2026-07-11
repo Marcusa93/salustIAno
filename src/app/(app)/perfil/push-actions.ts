@@ -57,9 +57,7 @@ export async function subscribeUserToPushAction(
 
   // Upsert por endpoint (único globalmente). Si ya existía, actualizamos
   // user_id (por si cambió el dueño del browser) y limpiamos invalidated_at.
-  // biome-ignore lint/suspicious/noExplicitAny: types stale (migration 019).
-  const sb = supabase as any;
-  const { error } = await sb.from('push_subscriptions').upsert(
+  const { error } = await supabase.from('push_subscriptions').upsert(
     {
       user_id: userData.user.id,
       family_group_id: membership.family_group_id,
@@ -82,9 +80,7 @@ export async function unsubscribeUserFromPushAction(
     return { ok: false, error: 'Endpoint inválido.' };
   }
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale (migration 019).
-  const sb = supabase as any;
-  const { error } = await sb.from('push_subscriptions').delete().eq('endpoint', endpoint);
+  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
   if (error) return { ok: false, error: 'No pudimos remover la suscripción.' };
   return { ok: true };
 }
@@ -105,9 +101,7 @@ export async function sendTestPushAction(): Promise<
   if (!userData.user) return { ok: false, error: 'Sesión expirada.' };
 
   const adminClient = createAdminClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale (push_subscriptions migration 019).
-  const adminAny = adminClient as any;
-  const { data: subs } = await adminAny
+  const { data: subs } = await adminClient
     .from('push_subscriptions')
     .select('id, endpoint, keys')
     .eq('user_id', userData.user.id)
@@ -136,7 +130,7 @@ export async function sendTestPushAction(): Promise<
       continue;
     }
     if (result.gone) {
-      await adminAny
+      await adminClient
         .from('push_subscriptions')
         .update({ invalidated_at: new Date().toISOString() })
         .eq('id', s.id);
@@ -163,9 +157,7 @@ export async function sendPushToFamily(
   if (!ensurePushConfigured()) return { sent: 0, failed: 0 };
 
   const adminClient = createAdminClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale (push_subscriptions migration 019).
-  const adminAny = adminClient as any;
-  let query = adminAny
+  let query = adminClient
     .from('push_subscriptions')
     .select('id, endpoint, keys')
     .eq('family_group_id', familyGroupId)
@@ -189,7 +181,7 @@ export async function sendPushToFamily(
     }
     failed += 1;
     if (result.gone) {
-      await adminAny
+      await adminClient
         .from('push_subscriptions')
         .update({ invalidated_at: new Date().toISOString() })
         .eq('id', s.id);

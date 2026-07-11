@@ -11,6 +11,7 @@ import {
 } from '@/lib/ai/errors';
 import { logStore } from '@/lib/ai/logger';
 import { createClient } from '@/lib/supabase/server';
+import type { Json } from '@/types/database';
 import type { StoryFormState } from './shared';
 
 /**
@@ -136,17 +137,15 @@ async function persistStory(
       .limit(1)
       .maybeSingle();
 
-    // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar.
-    const sb = supabase as any;
-    const { error: insertErr } = await sb.from('stories').insert({
+    const { error: insertErr } = await supabase.from('stories').insert({
       child_id: child?.id ?? null,
       family_group_id: membership.family_group_id,
       title: result.output.title,
       story: result.output.story,
       moral_or_theme: result.output.moralOrTheme,
       characters_used: result.output.charactersUsed,
-      input_meta: input,
-      generation_meta: result.meta,
+      input_meta: input as Json,
+      generation_meta: result.meta as Json,
       created_by: userData.user.id,
     });
     if (insertErr) {
@@ -187,9 +186,7 @@ export async function listStoriesAction(): Promise<StoryLibraryEntry[]> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return [];
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar.
-  const sb = supabase as any;
-  const { data, error } = await sb
+  const { data, error } = await supabase
     .from('stories')
     .select('id, title, story, moral_or_theme, characters_used, created_at')
     .is('deleted_at', null)
@@ -197,13 +194,13 @@ export async function listStoriesAction(): Promise<StoryLibraryEntry[]> {
     .limit(60);
 
   if (error || !data) return [];
-  return (data as Array<Record<string, unknown>>).map((r) => ({
-    id: r.id as string,
-    title: r.title as string,
-    story: r.story as string,
-    moralOrTheme: (r.moral_or_theme as string) ?? '',
+  return data.map((r) => ({
+    id: r.id,
+    title: r.title,
+    story: r.story,
+    moralOrTheme: r.moral_or_theme ?? '',
     charactersUsed: (r.characters_used as string[]) ?? [],
-    createdAt: r.created_at as string,
+    createdAt: r.created_at,
   }));
 }
 
@@ -219,9 +216,7 @@ export async function shareStoryAction(
   crypto.getRandomValues(bytes);
   const token = Array.from(bytes, (b) => chars[b % chars.length]).join('');
 
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('stories')
     .update({ share_token: token, shared_at: new Date().toISOString() })
     .eq('id', id);
@@ -233,9 +228,7 @@ export async function revokeStoryShareAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('stories')
     .update({ share_token: null, shared_at: null })
     .eq('id', id);
@@ -250,9 +243,7 @@ export async function deleteStoryAction(
     return { ok: false, error: 'ID inválido.' };
   }
   const supabase = await createClient();
-  // biome-ignore lint/suspicious/noExplicitAny: types stale.
-  const sb = supabase as any;
-  const { error } = await sb
+  const { error } = await supabase
     .from('stories')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);

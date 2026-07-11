@@ -64,8 +64,7 @@ export async function getDayShareSnapshotAction(): Promise<DayShareSnapshot | nu
         .eq('child_id', child.id)
         .is('deleted_at', null)
         .gte('started_at', todayIso),
-      // biome-ignore lint/suspicious/noExplicitAny: media_items types stale.
-      (supabase as any)
+      supabase
         .from('media_items')
         .select('storage_path, taken_at, created_at')
         .eq('child_id', child.id)

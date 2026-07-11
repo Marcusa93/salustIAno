@@ -17,9 +17,7 @@ export async function getShareTokenAction(): Promise<
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return { ok: false, error: 'Sesión expirada.' };
 
-  // biome-ignore lint/suspicious/noExplicitAny: share_token es columna nueva, types stale
-  const sb = supabase as any;
-  const { data: child } = await sb
+  const { data: child } = await supabase
     .from('child_profiles')
     .select('id, share_token, share_token_created_at')
     .is('deleted_at', null)
@@ -32,14 +30,14 @@ export async function getShareTokenAction(): Promise<
   if (child.share_token) {
     return {
       ok: true,
-      token: child.share_token as string,
-      createdAt: child.share_token_created_at as string,
+      token: child.share_token,
+      createdAt: child.share_token_created_at ?? '',
     };
   }
 
   const token = generateToken();
   const now = new Date().toISOString();
-  const { error } = await sb
+  const { error } = await supabase
     .from('child_profiles')
     .update({ share_token: token, share_token_created_at: now })
     .eq('id', child.id);
@@ -57,9 +55,7 @@ export async function revokeAndRegenerateShareTokenAction(): Promise<
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return { ok: false, error: 'Sesión expirada.' };
 
-  // biome-ignore lint/suspicious/noExplicitAny: share_token es columna nueva, types stale
-  const sb = supabase as any;
-  const { data: child } = await sb
+  const { data: child } = await supabase
     .from('child_profiles')
     .select('id')
     .is('deleted_at', null)
@@ -71,7 +67,7 @@ export async function revokeAndRegenerateShareTokenAction(): Promise<
 
   const token = generateToken();
   const now = new Date().toISOString();
-  const { error } = await sb
+  const { error } = await supabase
     .from('child_profiles')
     .update({ share_token: token, share_token_created_at: now })
     .eq('id', child.id);
