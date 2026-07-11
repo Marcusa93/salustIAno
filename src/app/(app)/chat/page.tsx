@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { Sparkles } from 'lucide-react';
 import type { Metadata } from 'next';
 import { ChatThread } from './_components/chat-thread';
-import { loadChatHistoryAction } from './actions';
+import { loadChatHistoryAction, loadChatHistoryMetaAction } from './actions';
 
 export const metadata: Metadata = {
   title: 'SalustIA',
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default async function ChatPage() {
   const supabase = await createClient();
-  const [{ data: child }, history] = await Promise.all([
+  const [{ data: child }, history, historyMeta] = await Promise.all([
     supabase
       .from('child_profiles')
       .select('name')
@@ -20,6 +20,7 @@ export default async function ChatPage() {
       .limit(1)
       .maybeSingle(),
     loadChatHistoryAction(),
+    loadChatHistoryMetaAction(),
   ]);
 
   return (
@@ -62,6 +63,19 @@ export default async function ChatPage() {
           si algo te preocupa, hablalo con la pediatra.
         </p>
       </Card>
+
+      {historyMeta && historyMeta.count > 0 && (() => {
+        const diffDays = Math.floor(
+          (Date.now() - new Date(historyMeta.oldestAt).getTime()) / (1000 * 60 * 60 * 24),
+        );
+        const exchanges = Math.floor(historyMeta.count / 2);
+        const timeLabel = diffDays === 0 ? 'hoy' : diffDays === 1 ? 'ayer' : `hace ${diffDays} días`;
+        return (
+          <p className="text-muted-foreground/60 text-xs">
+            {timeLabel} · {exchanges > 0 ? `${exchanges} intercambio${exchanges !== 1 ? 's' : ''} anterior${exchanges !== 1 ? 'es' : ''}` : 'conversación retomada'}
+          </p>
+        );
+      })()}
 
       <ChatThread childName={child?.name ?? null} initialHistory={history} />
     </div>

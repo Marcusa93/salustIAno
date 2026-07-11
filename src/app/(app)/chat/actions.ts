@@ -599,6 +599,41 @@ export async function loadChatHistoryAction(): Promise<ChatHistoryEntry[]> {
 }
 
 /**
+ * Devuelve metadata del historial del usuario: total de mensajes y
+ * `oldestAt` (ISO string del mensaje más antiguo en el límite cargado),
+ * o `null` si no hay historial. La page de /chat lo usa para mostrar
+ * un hint de continuación.
+ */
+export async function loadChatHistoryMetaAction(): Promise<{
+  count: number;
+  oldestAt: string;
+} | null> {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return null;
+
+  // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar.
+  const sb = supabase as any;
+  const { data, error } = await sb
+    .from('chat_messages')
+    .select('created_at')
+    .eq('user_id', userData.user.id)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(CHAT_HISTORY_LIMIT);
+
+  if (error || !data || (data as Array<{ created_at: string }>).length === 0) return null;
+
+  const rows = data as Array<{ created_at: string }>;
+  const oldest = rows.at(-1)?.created_at ?? rows.at(0)?.created_at;
+  if (!oldest) return null;
+  return {
+    count: rows.length,
+    oldestAt: oldest,
+  };
+}
+
+/**
  * Soft-delete de toda la conversación del usuario. No destruye audit
  * trail (ai_logs sigue intacto, los registros marcados con deleted_at
  * no se ven más en la UI pero quedan en la base).

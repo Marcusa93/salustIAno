@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Clock, Pencil, Pill, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { CountdownChip } from './_components/countdown-chip';
 import { DeleteDoseButton } from './_components/delete-dose-button';
 import { RepeatDoseButton } from './_components/repeat-dose-button';
 
@@ -196,15 +197,7 @@ export default async function MedicamentosPage() {
                       </span>
                     </div>
                     {dose.next_dose_at && (
-                      <span
-                        className={cn(
-                          'shrink-0 rounded-full px-2.5 py-0.5 font-medium text-xs',
-                          STATUS_STYLES[status],
-                        )}
-                      >
-                        <Clock className="mr-1 inline size-3" aria-hidden />
-                        {formatCountdown(dose.next_dose_at, now)}
-                      </span>
+                      <CountdownChip nextDoseAt={dose.next_dose_at} />
                     )}
                   </div>
                   <div className="flex gap-2 border-t border-border/50 pt-2">

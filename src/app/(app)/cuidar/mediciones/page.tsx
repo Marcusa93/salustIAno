@@ -235,6 +235,20 @@ export default async function MeasurementsListPage() {
             />
           </div>
 
+          {/* Hint cuando falta el sexo para calcular percentiles */}
+          {rows.length > 0 && !childSex && (
+            <p className="text-muted-foreground/80 text-xs leading-relaxed">
+              Completá el{' '}
+              <Link
+                href={`/familia/bebe/${childId}/editar` as Route}
+                className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+              >
+                perfil del bebé
+              </Link>{' '}
+              con el sexo para ver percentiles según las curvas OMS.
+            </p>
+          )}
+
           {/* Disclaimer OMS — siempre visible cuando hay percentiles. */}
           {(weightPct !== null || heightPct !== null || headPct !== null) && (
             <p className="text-muted-foreground/80 text-xs leading-relaxed">
