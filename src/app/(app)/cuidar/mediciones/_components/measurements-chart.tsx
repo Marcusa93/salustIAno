@@ -10,6 +10,7 @@ interface MeasurementPoint {
   weightGrams: number | null;
   heightCm: number | null;
   headCm: number | null;
+  isBirth?: boolean;
 }
 
 type Metric = 'weight' | 'height' | 'head';
@@ -388,6 +389,27 @@ function SvgChart({ points, metric, birthDate, sex }: SvgChartProps) {
         const v = p[meta.key] as number;
         const x = xFor(dates[i] ?? 0);
         const y = yFor(v);
+        if (p.isBirth) {
+          // Marcador especial de nacimiento: diamante + etiqueta "Nac."
+          return (
+            <g key={`p-${p.measuredAt}-${v}`}>
+              <polygon
+                points={`${x.toFixed(1)},${(y - 5).toFixed(1)} ${(x + 4.5).toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y + 5).toFixed(1)} ${(x - 4.5).toFixed(1)},${y.toFixed(1)}`}
+                fill={meta.color}
+                opacity="0.85"
+              />
+              <text
+                x={x}
+                y={y + 13}
+                textAnchor="middle"
+                fontSize="8"
+                className="fill-muted-foreground/70"
+              >
+                Nac.
+              </text>
+            </g>
+          );
+        }
         return (
           <g key={`p-${p.measuredAt}-${v}`}>
             <circle cx={x} cy={y} r="6" fill={meta.color} opacity="0.18" />

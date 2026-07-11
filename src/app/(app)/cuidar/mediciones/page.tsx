@@ -61,7 +61,7 @@ export default async function MeasurementsListPage() {
   const supabase = await createClient();
   const { data: child } = await supabase
     .from('child_profiles')
-    .select('id, name, birth_date, sex')
+    .select('id, name, birth_date, sex, birth_weight_grams, birth_height_cm')
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -134,6 +134,34 @@ export default async function MeasurementsListPage() {
     head.latest?.measured_at ?? null,
   );
 
+  const birthWeightGrams = (child.birth_weight_grams as number | null | undefined) ?? null;
+  const birthHeightCm = (child.birth_height_cm as number | null | undefined) ?? null;
+  const birthPoint =
+    birthDate && (birthWeightGrams !== null || birthHeightCm !== null)
+      ? {
+          measuredAt: `${birthDate}T12:00:00.000Z`,
+          weightGrams: birthWeightGrams,
+          heightCm: birthHeightCm,
+          headCm: null as number | null,
+          isBirth: true as const,
+        }
+      : null;
+  const chartPoints = [
+    ...(birthPoint ? [birthPoint] : []),
+    ...rows.map((m) => ({
+      measuredAt: m.measured_at,
+      weightGrams: m.weight_grams ?? null,
+      heightCm: m.height_cm ?? null,
+      headCm: m.head_circumference_cm ?? null,
+    })),
+  ];
+  const rowsWithPct = rows.map((m) => ({
+    ...m,
+    wPct: pctFor('weight', m.weight_grams, m.measured_at),
+    hPct: pctFor('length', m.height_cm, m.measured_at),
+    cPct: pctFor('head_circumference', m.head_circumference_cm, m.measured_at),
+  }));
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 py-10 sm:px-6 sm:py-14">
       <Button
@@ -174,12 +202,7 @@ export default async function MeasurementsListPage() {
           {/* Gráfico de evolución con bandas OMS de fondo cuando hay
               birth_date + sex. */}
           <MeasurementsChart
-            points={rows.map((m) => ({
-              measuredAt: m.measured_at,
-              weightGrams: m.weight_grams ?? null,
-              heightCm: m.height_cm ?? null,
-              headCm: m.head_circumference_cm ?? null,
-            }))}
+            points={chartPoints}
             birthDate={birthDate}
             sex={childSex === 'male' || childSex === 'female' ? childSex : null}
           />
@@ -227,7 +250,7 @@ export default async function MeasurementsListPage() {
               Histórico
             </h2>
             <ul className="flex flex-col gap-2">
-              {rows.map((m) => (
+              {rowsWithPct.map((m) => (
                 <li key={m.id}>
                   <Link
                     href={`/cuidar/mediciones/${m.id}` as Route}
@@ -238,10 +261,50 @@ export default async function MeasurementsListPage() {
                         {formatDate(m.measured_at)}
                       </span>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
-                        {m.weight_grams !== null && <span>Peso: {fmtWeight(m.weight_grams)}</span>}
-                        {m.height_cm !== null && <span>Talla: {fmtCm(m.height_cm)}</span>}
+                        {m.weight_grams !== null && (
+                          <span className="flex items-center gap-1.5">
+                            Peso: {fmtWeight(m.weight_grams)}
+                            {m.wPct !== null && (
+                              <span
+                                className={cn(
+                                  'inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[9px]',
+                                  percentileTone(m.wPct),
+                                )}
+                              >
+                                p{Math.round(m.wPct)}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {m.height_cm !== null && (
+                          <span className="flex items-center gap-1.5">
+                            Talla: {fmtCm(m.height_cm)}
+                            {m.hPct !== null && (
+                              <span
+                                className={cn(
+                                  'inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[9px]',
+                                  percentileTone(m.hPct),
+                                )}
+                              >
+                                p{Math.round(m.hPct)}
+                              </span>
+                            )}
+                          </span>
+                        )}
                         {m.head_circumference_cm !== null && (
-                          <span>Cabeza: {fmtCm(m.head_circumference_cm)}</span>
+                          <span className="flex items-center gap-1.5">
+                            Cabeza: {fmtCm(m.head_circumference_cm)}
+                            {m.cPct !== null && (
+                              <span
+                                className={cn(
+                                  'inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[9px]',
+                                  percentileTone(m.cPct),
+                                )}
+                              >
+                                p{Math.round(m.cPct)}
+                              </span>
+                            )}
+                          </span>
                         )}
                       </div>
                       {m.notes && (
