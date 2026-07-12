@@ -455,6 +455,23 @@ export async function getPhotoUrlAction(
   return { ok: true, url: data.signedUrl };
 }
 
+export async function getPhotoDownloadUrlAction(
+  path: string,
+  filename: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  if (typeof path !== 'string' || path.length === 0 || path.length > 500) {
+    return { ok: false, error: 'Path inválido.' };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, 300, { download: filename });
+  if (error || !data?.signedUrl) {
+    return { ok: false, error: 'No pudimos preparar la descarga.' };
+  }
+  return { ok: true, url: data.signedUrl };
+}
+
 export async function updatePhotoAction(
   id: string,
   updates: { caption?: string; tags?: string[] },

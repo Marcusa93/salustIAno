@@ -46,7 +46,10 @@ export function CountdownChip({ nextDoseAt }: { nextDoseAt: string }) {
   const status = calcStatus(nextDoseAt, now);
   return (
     <span
-      className={cn('shrink-0 rounded-full px-2.5 py-0.5 font-medium text-xs', STATUS_STYLES[status])}
+      className={cn(
+        'shrink-0 rounded-full px-2.5 py-0.5 font-medium text-xs',
+        STATUS_STYLES[status],
+      )}
     >
       <Clock className="mr-1 inline size-3" aria-hidden />
       {formatCountdown(nextDoseAt, now)}

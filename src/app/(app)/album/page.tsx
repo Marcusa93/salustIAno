@@ -8,7 +8,11 @@ export const metadata: Metadata = {
 };
 
 export default async function AlbumPage() {
-  await ensureMilestoneAlbumsAction();
+  try {
+    await ensureMilestoneAlbumsAction();
+  } catch {
+    // best-effort; no bloquea la carga de la página
+  }
   const [photos, albums] = await Promise.all([listPhotosAction(), listAlbumsAction()]);
 
   return (

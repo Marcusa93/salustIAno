@@ -196,9 +196,7 @@ export default async function MedicamentosPage() {
                         Última: {formatTime(dose.given_at)}
                       </span>
                     </div>
-                    {dose.next_dose_at && (
-                      <CountdownChip nextDoseAt={dose.next_dose_at} />
-                    )}
+                    {dose.next_dose_at && <CountdownChip nextDoseAt={dose.next_dose_at} />}
                   </div>
                   <div className="flex gap-2 border-t border-border/50 pt-2">
                     <RepeatDoseButton doseId={dose.id} medicationName={dose.medication_name} />

@@ -64,18 +64,24 @@ export default async function ChatPage() {
         </p>
       </Card>
 
-      {historyMeta && historyMeta.count > 0 && (() => {
-        const diffDays = Math.floor(
-          (Date.now() - new Date(historyMeta.oldestAt).getTime()) / (1000 * 60 * 60 * 24),
-        );
-        const exchanges = Math.floor(historyMeta.count / 2);
-        const timeLabel = diffDays === 0 ? 'hoy' : diffDays === 1 ? 'ayer' : `hace ${diffDays} días`;
-        return (
-          <p className="text-muted-foreground/60 text-xs">
-            {timeLabel} · {exchanges > 0 ? `${exchanges} intercambio${exchanges !== 1 ? 's' : ''} anterior${exchanges !== 1 ? 'es' : ''}` : 'conversación retomada'}
-          </p>
-        );
-      })()}
+      {historyMeta &&
+        historyMeta.count > 0 &&
+        (() => {
+          const diffDays = Math.floor(
+            (Date.now() - new Date(historyMeta.oldestAt).getTime()) / (1000 * 60 * 60 * 24),
+          );
+          const exchanges = Math.floor(historyMeta.count / 2);
+          const timeLabel =
+            diffDays === 0 ? 'hoy' : diffDays === 1 ? 'ayer' : `hace ${diffDays} días`;
+          return (
+            <p className="text-muted-foreground/60 text-xs">
+              {timeLabel} ·{' '}
+              {exchanges > 0
+                ? `${exchanges} intercambio${exchanges !== 1 ? 's' : ''} anterior${exchanges !== 1 ? 'es' : ''}`
+                : 'conversación retomada'}
+            </p>
+          );
+        })()}
 
       <ChatThread childName={child?.name ?? null} initialHistory={history} />
     </div>

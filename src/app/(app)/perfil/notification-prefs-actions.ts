@@ -85,12 +85,14 @@ export async function setNotificationPrefAction(
   };
   const updated: NotificationPrefs = { ...current, [key]: value };
 
-  const { error } = await supabase
-    .from('notification_prefs')
-    .upsert(
-      { user_id: userData.user.id, prefs: updated as unknown as Json, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id' },
-    );
+  const { error } = await supabase.from('notification_prefs').upsert(
+    {
+      user_id: userData.user.id,
+      prefs: updated as unknown as Json,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id' },
+  );
 
   if (error) return { ok: false, error: 'No pudimos guardar la preferencia.' };
 

@@ -41,6 +41,7 @@ import {
   createManualAlbumAction,
   deleteAlbumAction,
   deletePhotoAction,
+  getPhotoDownloadUrlAction,
   getPhotoUrlAction,
   renameAlbumAction,
   retagPhotoAction,
@@ -388,15 +389,19 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
               <>
                 <select
                   aria-label="Mover selección a álbum"
-                  onChange={(e) => handleBulkAssign(e.target.value === '' ? null : e.target.value)}
-                  value=""
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '__placeholder__') return;
+                    handleBulkAssign(v === '__pool__' ? null : v);
+                  }}
+                  value="__placeholder__"
                   disabled={bulkPending}
                   className="h-8 rounded-lg border border-input bg-background px-2 font-medium text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
-                  <option value="" disabled>
+                  <option value="__placeholder__" disabled>
                     Mover a…
                   </option>
-                  <option value="">Sin álbum</option>
+                  <option value="__pool__">Sin álbum</option>
                   {albums.map((al) => (
                     <option key={al.id} value={al.id}>
                       {al.kind === 'milestone'
@@ -1194,25 +1199,25 @@ function PhotoModal({
   }
 
   async function handleDownload() {
-    if (!url) return;
+    if (downloading) return;
     setDownloading(true);
     try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('fetch failed');
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = objectUrl;
       const slug = (photo.caption ?? photo.takenAt ?? 'foto')
         .replace(/[^a-z0-9áéíóúüñ]/gi, '-')
         .toLowerCase()
         .slice(0, 40)
         .replace(/-+$/, '');
-      a.download = `salu-${slug}.jpg`;
+      const filename = `salu-${slug}.jpg`;
+      const result = await getPhotoDownloadUrlAction(photo.storagePath, filename);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = result.url;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(objectUrl);
     } catch {
       toast.error('No pudimos descargar la foto.');
     } finally {
@@ -1271,7 +1276,7 @@ function PhotoModal({
         <div
           className={cn(
             'relative flex shrink-0 items-center justify-center bg-foreground/[0.04]',
-            'h-[55dvh] w-full',
+            'h-[48dvh] w-full',
             'sm:h-auto sm:max-h-[80dvh] sm:max-w-[60%] sm:flex-1 sm:bg-transparent',
           )}
         >
@@ -1321,8 +1326,7 @@ function PhotoModal({
         {/* Panel de detalles */}
         <div
           className={cn(
-            'flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4',
-            'pb-[max(1rem,env(safe-area-inset-bottom))]',
+            'flex flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 pb-0',
             'sm:px-3 sm:pb-0',
           )}
         >
@@ -1400,7 +1404,13 @@ function PhotoModal({
             </p>
           </div>
 
-          <div className="mt-auto flex flex-wrap gap-2 pt-2">
+          <div
+            className={cn(
+              'sticky bottom-0 -mx-4 flex flex-wrap gap-2 border-t border-border/40 bg-card px-4 py-3',
+              'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+              'sm:static sm:mx-0 sm:mt-auto sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-2',
+            )}
+          >
             {/* Descargar foto */}
             <Button
               type="button"
