@@ -15,6 +15,8 @@ export interface NotificationPrefs {
   diaper_predicted: boolean;
   /** Próxima dosis de medicamento (20 min antes). Default ON. */
   medication_due: boolean;
+  /** Stock de fórmula igual o por debajo del umbral. Default ON. */
+  formula_low_stock: boolean;
 }
 
 const DEFAULT_PREFS: NotificationPrefs = {
@@ -23,6 +25,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   feeding_predicted: false,
   diaper_predicted: false,
   medication_due: true,
+  formula_low_stock: true,
 };
 
 const VALID_KEYS = new Set<keyof NotificationPrefs>([
@@ -31,6 +34,7 @@ const VALID_KEYS = new Set<keyof NotificationPrefs>([
   'feeding_predicted',
   'diaper_predicted',
   'medication_due',
+  'formula_low_stock',
 ]);
 
 /**

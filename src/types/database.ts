@@ -726,6 +726,60 @@ export type Database = {
           },
         ];
       };
+      formula_stock: {
+        Row: {
+          alert_threshold: number;
+          brand: string | null;
+          child_id: string;
+          created_at: string;
+          current_boxes: number;
+          family_group_id: string;
+          id: string;
+          ml_per_box: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          alert_threshold?: number;
+          brand?: string | null;
+          child_id: string;
+          created_at?: string;
+          current_boxes?: number;
+          family_group_id: string;
+          id?: string;
+          ml_per_box?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          alert_threshold?: number;
+          brand?: string | null;
+          child_id?: string;
+          created_at?: string;
+          current_boxes?: number;
+          family_group_id?: string;
+          id?: string;
+          ml_per_box?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'formula_stock_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'formula_stock_family_group_id_fkey';
+            columns: ['family_group_id'];
+            isOneToOne: false;
+            referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       invitations: {
         Row: {
           accepted_at: string | null;

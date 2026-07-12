@@ -9,6 +9,7 @@ import {
   CalendarClock,
   Camera,
   ClipboardCheck,
+  Droplets,
   Moon,
   Pill,
   Ruler,
@@ -128,7 +129,7 @@ export default async function CuidarPage() {
   // Medianoche en hora AR — no del runtime (en Vercel UTC arrancaría a
   // las 21h AR del día anterior).
   const todayStart = startOfTodayAr();
-  const since30d = startOfDayArDaysAgo(30);
+  const _since30d = startOfDayArDaysAgo(30);
 
   // Fan-out de queries en paralelo. Cada una alimenta la micro-info de
   // su card; si una falla, esa card cae en el copy default y las demás
@@ -141,6 +142,7 @@ export default async function CuidarPage() {
     lastSummary,
     careGuidesCount,
     nextMedDose,
+    formulaStockRow,
   ] = await Promise.all([
     child
       ? supabase
@@ -204,6 +206,13 @@ export default async function CuidarPage() {
           .gte('given_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
           .order('next_dose_at', { ascending: true })
           .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    child
+      ? supabase
+          .from('formula_stock')
+          .select('current_boxes, alert_threshold, brand')
+          .eq('child_id', child.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
@@ -288,6 +297,18 @@ export default async function CuidarPage() {
     }
   }
 
+  // Stock de fórmula.
+  const formula = formulaStockRow.data as {
+    current_boxes: number;
+    alert_threshold: number;
+    brand: string | null;
+  } | null;
+  let formulaMicro = 'Sin configurar todavía';
+  if (formula !== null) {
+    const isLow = formula.current_boxes <= formula.alert_threshold;
+    formulaMicro = `${formula.current_boxes} caja${formula.current_boxes === 1 ? '' : 's'}${formula.brand ? ` de ${formula.brand}` : ''}${isLow ? ' · stock bajo' : ''}`;
+  }
+
   // Cards con su sección asignada — el orden de OPTIONS no importa
   // visualmente porque el render las agrupa por sección abajo.
   const OPTIONS: CuidarOption[] = [
@@ -314,6 +335,14 @@ export default async function CuidarPage() {
       description: 'Registrá cada dosis y el sistema te avisa cuándo toca la siguiente.',
       Icon: Pill,
       microInfo: medicamentosMicro,
+      section: 'salud',
+    },
+    {
+      href: '/cuidar/formula' as Route,
+      title: 'Stock de fórmula',
+      description: 'Llevá la cuenta de cuántas cajas quedan y recibí una alerta para comprar.',
+      Icon: Droplets,
+      microInfo: formulaMicro,
       section: 'salud',
     },
     {
@@ -388,7 +417,7 @@ export default async function CuidarPage() {
       {grouped.map(({ section, options }, sectionIdx) => (
         <section
           key={section.id}
-          className="animate-stagger-up flex flex-col gap-4"
+          className="flex animate-stagger-up flex-col gap-4"
           style={{ animationDelay: `${60 + sectionIdx * 80}ms` }}
         >
           <header className="flex flex-col gap-1">
@@ -414,7 +443,7 @@ function CuidarCard({ option, index }: { option: CuidarOption; index: number }) 
   return (
     <Link
       href={option.href}
-      className="animate-stagger-up rounded-2xl outline-none transition-transform duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      className="animate-stagger-up rounded-2xl outline-none transition-transform duration-150 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 active:scale-[0.97]"
       style={{ animationDelay: delay }}
     >
       <Card
