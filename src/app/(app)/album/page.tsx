@@ -1,6 +1,6 @@
 import { PageHeader } from '@/components/salu/page-header';
 import type { Metadata } from 'next';
-import { listAlbumsAction, listPhotosAction } from './actions';
+import { ensureMilestoneAlbumsAction, listAlbumsAction, listPhotosAction } from './actions';
 import { AlbumGrid } from './album-grid';
 
 export const metadata: Metadata = {
@@ -8,6 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AlbumPage() {
+  await ensureMilestoneAlbumsAction();
   const [photos, albums] = await Promise.all([listPhotosAction(), listAlbumsAction()]);
 
   return (

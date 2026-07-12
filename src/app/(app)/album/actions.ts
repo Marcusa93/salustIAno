@@ -100,7 +100,7 @@ export async function uploadPhotosAction(formData: FormData): Promise<UploadResu
     userData.user.id,
     new Date(),
   );
-  const shouldAutoTag = files.length === 1;
+  const shouldAutoTag = true;
 
   let uploaded = 0;
   let failed = 0;
@@ -361,7 +361,10 @@ export async function assignPhotoToAlbumAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from('media_items').update({ album_id: albumId }).eq('id', photoId);
+  const { error } = await supabase
+    .from('media_items')
+    .update({ album_id: albumId })
+    .eq('id', photoId);
 
   if (error) return { ok: false, error: 'No pudimos cambiar el álbum de la foto.' };
   revalidatePath('/album');
@@ -702,4 +705,122 @@ export async function deleteAlbumAction(
 
   revalidatePath('/album');
   return { ok: true };
+}
+
+export async function setCoverPhotoAction(
+  albumId: string,
+  storagePath: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!albumId || !storagePath) return { ok: false, error: 'Parámetros inválidos.' };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('albums')
+    .update({ cover_path: storagePath })
+    .eq('id', albumId);
+  if (error) return { ok: false, error: 'No pudimos actualizar la portada.' };
+  revalidatePath('/album');
+  return { ok: true };
+}
+
+export async function bulkDeletePhotosAction(
+  ids: string[],
+): Promise<{ ok: true; deleted: number } | { ok: false; error: string }> {
+  if (!ids.length || ids.length > 200) return { ok: false, error: 'Lista de IDs inválida.' };
+  const supabase = await createClient();
+
+  const { data: rows } = await supabase
+    .from('media_items')
+    .select('id, storage_path')
+    .in('id', ids)
+    .is('deleted_at', null);
+
+  if (!rows?.length) return { ok: false, error: 'No encontramos las fotos.' };
+
+  const { error } = await supabase
+    .from('media_items')
+    .update({ deleted_at: new Date().toISOString() })
+    .in('id', ids);
+
+  if (error) return { ok: false, error: 'No pudimos borrar las fotos.' };
+
+  const paths = rows.map((r) => r.storage_path as string).filter(Boolean);
+  if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
+
+  revalidatePath('/album');
+  return { ok: true, deleted: rows.length };
+}
+
+export async function bulkAssignAlbumAction(
+  ids: string[],
+  albumId: string | null,
+): Promise<{ ok: true; updated: number } | { ok: false; error: string }> {
+  if (!ids.length || ids.length > 200) return { ok: false, error: 'Lista de IDs inválida.' };
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from('media_items')
+    .update({ album_id: albumId })
+    .in('id', ids);
+  if (error) return { ok: false, error: 'No pudimos mover las fotos.' };
+  revalidatePath('/album');
+  return { ok: true, updated: count ?? ids.length };
+}
+
+/**
+ * Crea álbumes milestone faltantes ("1 mes", "2 meses", …) hasta el mes
+ * actual del bebé. Se llama en el render de la página para que siempre estén
+ * disponibles al abrir el álbum. No lanza error si falta el perfil del bebé.
+ */
+export async function ensureMilestoneAlbumsAction(): Promise<void> {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return;
+
+  const { data: membership } = await supabase
+    .from('family_memberships')
+    .select('family_group_id')
+    .eq('user_id', userData.user.id)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!membership?.family_group_id) return;
+
+  const { data: child } = await supabase
+    .from('child_profiles')
+    .select('id, birth_date')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!child?.birth_date) return;
+
+  const birthDate = new Date(child.birth_date as string);
+  const today = new Date();
+  const ageMonths = Math.floor(
+    (today.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 30.4375),
+  );
+  if (ageMonths < 1) return;
+
+  const { data: existing } = await supabase
+    .from('albums')
+    .select('name')
+    .eq('family_group_id', membership.family_group_id)
+    .eq('kind', 'milestone')
+    .is('deleted_at', null);
+
+  const existingNames = new Set((existing ?? []).map((a) => a.name as string));
+  const maxMonths = Math.min(ageMonths, 24);
+
+  for (let m = 1; m <= maxMonths; m++) {
+    const name = m === 1 ? '1 mes' : `${m} meses`;
+    if (existingNames.has(name)) continue;
+    await supabase.from('albums').insert({
+      family_group_id: membership.family_group_id,
+      child_id: child.id,
+      name,
+      kind: 'milestone',
+      created_by: userData.user.id,
+    });
+  }
 }

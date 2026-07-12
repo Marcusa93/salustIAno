@@ -7,8 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
+  ArrowLeft,
+  ArrowRight,
   Check,
   Copy,
+  Download,
   ExternalLink,
   FolderOpen,
   ImageIcon,
@@ -19,7 +22,10 @@ import {
   Plus,
   Share2,
   Sparkles,
+  Square,
+  Star,
   Trash2,
+  Trophy,
   Upload,
   X,
 } from 'lucide-react';
@@ -30,6 +36,8 @@ import {
   type AlbumEntry,
   type PhotoEntry,
   assignPhotoToAlbumAction,
+  bulkAssignAlbumAction,
+  bulkDeletePhotosAction,
   createManualAlbumAction,
   deleteAlbumAction,
   deletePhotoAction,
@@ -37,6 +45,7 @@ import {
   renameAlbumAction,
   retagPhotoAction,
   revokeAlbumShareAction,
+  setCoverPhotoAction,
   shareAlbumAction,
   updatePhotoAction,
   uploadPhotosAction,
@@ -59,14 +68,6 @@ const CLIENT_SKIP_COMPRESSION_UNDER_BYTES = 1.5 * 1024 * 1024;
 const MAX_BATCH_UPLOAD_BYTES = 18 * 1024 * 1024;
 const MAX_BATCH_UPLOAD_FILES = 4;
 
-/**
- * Grid principal del álbum. Agrupa fotos por mes (taken_at o created_at),
- * acepta multi-upload, y al click sobre una foto abre un modal con
- * caption + tags editables.
- *
- * Las URLs firmadas se piden lazy: solo cuando una thumbnail entra al
- * viewport (IntersectionObserver) y al abrir el modal.
- */
 export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
   const router = useRouter();
   const [photos, setPhotos] = useState(initialPhotos);
@@ -79,6 +80,10 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [uploading, startUpload] = useTransition();
   const [creatingAlbum, startCreateAlbum] = useTransition();
+  // Selección múltiple
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const newAlbumRef = useRef<HTMLInputElement>(null);
 
@@ -116,8 +121,7 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
 
   const activeAlbum = albumsWithCounts.find((a) => a.id === activeAlbumId) ?? null;
 
-  // Tags únicos del set actual de fotos, ordenados por frecuencia descendente
-  // y luego alfabéticamente. Mostramos hasta 12 chips para no abarrotar la UI.
+  // Tags únicos ordenados por frecuencia descendente, máx 12 chips.
   const tagChips = useMemo(() => {
     const counts = new Map<string, number>();
     for (const p of photos) {
@@ -238,6 +242,77 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
     });
   }
 
+  function toggleSelectionMode() {
+    setSelectionMode((prev) => !prev);
+    setSelectedIds(new Set());
+    if (active) setActive(null);
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (
+      !window.confirm(
+        `¿Borrar ${selectedIds.size} foto${selectedIds.size === 1 ? '' : 's'}? No se puede deshacer.`,
+      )
+    )
+      return;
+    const ids = Array.from(selectedIds);
+    startBulk(async () => {
+      const result = await bulkDeletePhotosAction(ids);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setPhotos((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      toast.success(`Borramos ${result.deleted} foto${result.deleted === 1 ? '' : 's'}.`);
+    });
+  }
+
+  function handleBulkAssign(albumId: string | null) {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    startBulk(async () => {
+      const result = await bulkAssignAlbumAction(ids, albumId);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setPhotos((prev) => prev.map((p) => (selectedIds.has(p.id) ? { ...p, albumId } : p)));
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      const albumName = albumId
+        ? (albums.find((a) => a.id === albumId)?.name ?? 'el álbum')
+        : 'sin álbum';
+      toast.success(
+        `Movimos ${result.updated} foto${result.updated === 1 ? '' : 's'} a ${albumName}.`,
+      );
+    });
+  }
+
+  function handleSetCover(albumId: string, storagePath: string) {
+    void setCoverPhotoAction(albumId, storagePath).then((r) => {
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      setAlbums((prev) =>
+        prev.map((a) => (a.id === albumId ? { ...a, coverPath: storagePath } : a)),
+      );
+      toast.success('Portada actualizada.');
+    });
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <input
@@ -260,6 +335,18 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
                 : `${photos.length} foto${photos.length === 1 ? '' : 's'} en ${groups.length} mes${groups.length === 1 ? '' : 'es'}.`}
         </p>
         <div className="flex flex-wrap gap-2">
+          {photos.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant={selectionMode ? 'secondary' : 'ghost'}
+              onClick={toggleSelectionMode}
+              disabled={uploading || bulkPending}
+            >
+              <Square className="size-4" aria-hidden />
+              {selectionMode ? 'Cancelar selección' : 'Seleccionar'}
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
@@ -287,6 +374,58 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
           </Button>
         </div>
       </div>
+
+      {/* Barra de acciones en bulk */}
+      {selectionMode && (
+        <Card className="flex flex-wrap items-center gap-3 border-primary/25 bg-primary/[0.04] p-3">
+          <span className="font-medium text-foreground text-sm">
+            {selectedIds.size === 0
+              ? 'Tocá una foto para seleccionarla.'
+              : `${selectedIds.size} foto${selectedIds.size === 1 ? '' : 's'} seleccionada${selectedIds.size === 1 ? '' : 's'}`}
+          </span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {selectedIds.size > 0 && (
+              <>
+                <select
+                  aria-label="Mover selección a álbum"
+                  onChange={(e) => handleBulkAssign(e.target.value === '' ? null : e.target.value)}
+                  value=""
+                  disabled={bulkPending}
+                  className="h-8 rounded-lg border border-input bg-background px-2 font-medium text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <option value="" disabled>
+                    Mover a…
+                  </option>
+                  <option value="">Sin álbum</option>
+                  {albums.map((al) => (
+                    <option key={al.id} value={al.id}>
+                      {al.kind === 'milestone'
+                        ? `🏆 ${al.name}`
+                        : al.kind === 'monthly'
+                          ? `📅 ${al.name}`
+                          : al.name}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleBulkDelete}
+                  disabled={bulkPending}
+                >
+                  {bulkPending ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Trash2 className="size-4" aria-hidden />
+                  )}
+                  Borrar
+                </Button>
+              </>
+            )}
+          </div>
+        </Card>
+      )}
 
       {showCreateAlbum && (
         <Card className="border-border/60 p-3">
@@ -349,23 +488,40 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
           >
             Todos
           </button>
-          {albumsWithCounts.map((al) => (
-            <button
-              key={al.id}
-              type="button"
-              onClick={() => setActiveAlbumId((prev) => (prev === al.id ? null : al.id))}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-medium text-[11px] transition-colors',
-                activeAlbumId === al.id
-                  ? 'border-primary/30 bg-primary/10 text-primary'
-                  : 'border-border/60 text-muted-foreground hover:border-border hover:text-foreground',
-              )}
-            >
-              {al.shareToken && <Link2 className="size-3" aria-hidden />}
-              {al.name}
-              <span className="text-muted-foreground/70">{al.count}</span>
-            </button>
-          ))}
+          {albumsWithCounts
+            .slice()
+            .sort((a, b) => {
+              // milestone primero, ordenados por nombre ("1 mes" < "2 meses" etc.)
+              if (a.kind === 'milestone' && b.kind !== 'milestone') return -1;
+              if (b.kind === 'milestone' && a.kind !== 'milestone') return 1;
+              if (a.kind === 'milestone' && b.kind === 'milestone') {
+                return parseMilestoneIndex(a.name) - parseMilestoneIndex(b.name);
+              }
+              return 0;
+            })
+            .map((al) => (
+              <button
+                key={al.id}
+                type="button"
+                onClick={() => setActiveAlbumId((prev) => (prev === al.id ? null : al.id))}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-medium text-[11px] transition-colors',
+                  activeAlbumId === al.id
+                    ? 'border-primary/30 bg-primary/10 text-primary'
+                    : 'border-border/60 text-muted-foreground hover:border-border hover:text-foreground',
+                )}
+              >
+                {al.kind === 'milestone' && <Trophy className="size-3" aria-hidden />}
+                {al.shareToken && al.kind !== 'milestone' && (
+                  <Link2 className="size-3" aria-hidden />
+                )}
+                {al.coverPath && al.kind !== 'milestone' && (
+                  <Star className="size-3 fill-current" aria-hidden />
+                )}
+                {al.name}
+                <span className="text-muted-foreground/70">{al.count}</span>
+              </button>
+            ))}
         </div>
       )}
 
@@ -395,8 +551,6 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
                 )
               }
               onDeleted={() => {
-                // Quitar el álbum del listado y desasignar las fotos en
-                // memoria (server ya las puso en album_id=null).
                 setAlbums((prev) => prev.filter((a) => a.id !== activeAlbum.id));
                 setPhotos((prev) =>
                   prev.map((p) => (p.albumId === activeAlbum.id ? { ...p, albumId: null } : p)),
@@ -493,7 +647,13 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                 {g.photos.map((p) => (
-                  <Thumbnail key={p.id} photo={p} onClick={() => setActive(p)} />
+                  <Thumbnail
+                    key={p.id}
+                    photo={p}
+                    onClick={selectionMode ? () => toggleSelect(p.id) : () => setActive(p)}
+                    selectionMode={selectionMode}
+                    selected={selectedIds.has(p.id)}
+                  />
                 ))}
               </div>
             </section>
@@ -503,7 +663,9 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
 
       {active && (
         <PhotoModal
+          key={active.id}
           photo={active}
+          photos={filteredPhotos}
           albums={albums}
           onClose={() => setActive(null)}
           onDelete={() => handleDelete(active.id)}
@@ -512,6 +674,8 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
             setActive((prev) => (prev ? { ...prev, ...updates } : prev));
           }}
           onAssignAlbum={(albumId) => handleAssignPhotoToAlbum(active.id, albumId)}
+          onNavigate={(photo) => setActive(photo)}
+          onSetCover={handleSetCover}
         />
       )}
     </div>
@@ -519,7 +683,7 @@ export function AlbumGrid({ initialPhotos, initialAlbums }: AlbumGridProps) {
 }
 
 // ----------------------------------------------------------------------------
-// AlbumShareBar: cuando hay álbum activo, ofrece compartir/revocar.
+// AlbumShareBar
 // ----------------------------------------------------------------------------
 
 function AlbumShareBar({
@@ -547,7 +711,6 @@ function AlbumShareBar({
         toast.error(result.error);
         return;
       }
-      // El action devuelve la URL relativa; reconstruimos el token desde ahí.
       const token = result.url.split('/').pop() ?? '';
       onShared(token, new Date().toISOString());
       toast.success('Link generado.');
@@ -578,11 +741,6 @@ function AlbumShareBar({
     }
   }
 
-  /**
-   * Web Share API: en mobile abre el sheet nativo de compartir (WhatsApp,
-   * Telegram, mail, etc.). En desktop sin soporte cae al copy del link.
-   * Usuario cancelando el share NO es un error — lo silenciamos.
-   */
   async function handleNativeShare() {
     const data = {
       title: `Álbum: ${album.name}`,
@@ -593,14 +751,12 @@ function AlbumShareBar({
       try {
         await navigator.share(data);
       } catch (err) {
-        // El user canceló el sheet — no logueamos error.
         if ((err as Error).name !== 'AbortError') {
           toast.error('No pudimos abrir el compartir.');
         }
       }
       return;
     }
-    // Fallback: copy.
     handleCopy();
   }
 
@@ -700,7 +856,7 @@ function AlbumShareBar({
 }
 
 // ----------------------------------------------------------------------------
-// ManualAlbumActions: renombrar y eliminar (solo álbumes manuales).
+// ManualAlbumActions
 // ----------------------------------------------------------------------------
 
 function ManualAlbumActions({
@@ -719,7 +875,6 @@ function ManualAlbumActions({
 
   useEffect(() => {
     if (editing) {
-      // Foco + selección del nombre actual al abrir el editor.
       inputRef.current?.focus();
       inputRef.current?.select();
     }
@@ -840,10 +995,20 @@ function ManualAlbumActions({
 }
 
 // ----------------------------------------------------------------------------
-// Thumbnail: lazy-load del signed URL cuando entra al viewport.
+// Thumbnail: lazy signed URL + overlay de selección en modo bulk.
 // ----------------------------------------------------------------------------
 
-function Thumbnail({ photo, onClick }: { photo: PhotoEntry; onClick: () => void }) {
+function Thumbnail({
+  photo,
+  onClick,
+  selectionMode = false,
+  selected = false,
+}: {
+  photo: PhotoEntry;
+  onClick: () => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   const ref = useRef<HTMLButtonElement>(null);
 
@@ -876,13 +1041,18 @@ function Thumbnail({ photo, onClick }: { photo: PhotoEntry; onClick: () => void 
       className={cn(
         'group relative aspect-square overflow-hidden rounded-xl bg-muted/40 transition-all duration-200',
         'hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2',
+        selected && 'ring-2 ring-primary ring-offset-1',
       )}
     >
       {url ? (
         <img
           src={url}
           alt={photo.caption ?? 'Foto'}
-          className="size-full object-cover transition-transform group-hover:scale-105"
+          className={cn(
+            'size-full object-cover transition-transform',
+            !selectionMode && 'group-hover:scale-105',
+            selected && 'brightness-90',
+          )}
           loading="lazy"
         />
       ) : (
@@ -890,7 +1060,24 @@ function Thumbnail({ photo, onClick }: { photo: PhotoEntry; onClick: () => void 
           <ImageIcon className="size-6" aria-hidden />
         </div>
       )}
-      {(photo.tags.length > 0 || photo.caption) && (
+
+      {/* Overlay de selección */}
+      {selectionMode && (
+        <div
+          className={cn(
+            'absolute top-2 right-2 z-10 flex size-5 items-center justify-center rounded-full border-2 transition-all',
+            selected
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-white/80 bg-black/20',
+          )}
+          aria-hidden
+        >
+          {selected && <Check className="size-3" aria-hidden />}
+        </div>
+      )}
+
+      {/* Caption/tags overlay — solo en modo normal */}
+      {!selectionMode && (photo.tags.length > 0 || photo.caption) && (
         <span className="absolute right-0 bottom-0 left-0 truncate bg-gradient-to-t from-foreground/60 to-transparent p-2 text-left font-medium text-[11px] text-white">
           {photo.caption ?? photo.tags.slice(0, 2).join(' · ')}
         </span>
@@ -900,28 +1087,40 @@ function Thumbnail({ photo, onClick }: { photo: PhotoEntry; onClick: () => void 
 }
 
 // ----------------------------------------------------------------------------
-// Modal de detalle: caption + tags editables, borrar.
+// PhotoModal — lightbox con navegación, descarga y portada.
 // ----------------------------------------------------------------------------
 
 function PhotoModal({
   photo,
+  photos,
   albums,
   onClose,
   onDelete,
   onUpdate,
   onAssignAlbum,
+  onNavigate,
+  onSetCover,
 }: {
   photo: PhotoEntry;
+  photos: PhotoEntry[];
   albums: AlbumEntry[];
   onClose: () => void;
   onDelete: () => void;
   onUpdate: (updates: { caption?: string; tags?: string[] }) => void;
   onAssignAlbum: (albumId: string | null) => void;
+  onNavigate: (photo: PhotoEntry) => void;
+  onSetCover: (albumId: string, storagePath: string) => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState(photo.caption ?? '');
   const [tagsInput, setTagsInput] = useState(photo.tags.join(', '));
   const [retagging, startRetag] = useTransition();
+  const [downloading, setDownloading] = useState(false);
+
+  const currentIndex = photos.findIndex((p) => p.id === photo.id);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < photos.length - 1;
+  const total = photos.length;
 
   useEffect(() => {
     let mounted = true;
@@ -936,16 +1135,24 @@ function PhotoModal({
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft' && hasPrev) {
+        const prev = photos[currentIndex - 1];
+        if (prev) onNavigate(prev);
+      }
+      if (e.key === 'ArrowRight' && hasNext) {
+        const next = photos[currentIndex + 1];
+        if (next) onNavigate(next);
+      }
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, onNavigate, hasPrev, hasNext, currentIndex, photos]);
 
   function saveCaption() {
     const next = caption.trim();
     if (next === (photo.caption ?? '')) return;
     onUpdate({ caption: next });
-    toast.success('Caption guardado.');
+    toast.success('Descripción guardada.');
   }
 
   function saveTags() {
@@ -955,7 +1162,7 @@ function PhotoModal({
       .filter((t) => t.length > 0);
     if (JSON.stringify(next) === JSON.stringify(photo.tags)) return;
     onUpdate({ tags: next });
-    toast.success('Tags guardadas.');
+    toast.success('Etiquetas guardadas.');
   }
 
   function handleDelete() {
@@ -986,12 +1193,33 @@ function PhotoModal({
     });
   }
 
-  // El modal NO puede ser un <button> envolvente: hacerlo así provoca que
-  // los botones internos (Borrar foto, Auto-etiquetar, etc.) no reciban
-  // los clicks porque `onClickCapture + stopPropagation` en el span hijo
-  // los frena en la fase de captura. Usamos backdrop absoluto separado:
-  // el backdrop cierra cuando se clickea la zona vacía, y los botones
-  // internos quedan en una capa por encima sin conflicto.
+  async function handleDownload() {
+    if (!url) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('fetch failed');
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      const slug = (photo.caption ?? photo.takenAt ?? 'foto')
+        .replace(/[^a-z0-9áéíóúüñ]/gi, '-')
+        .toLowerCase()
+        .slice(0, 40)
+        .replace(/-+$/, '');
+      a.download = `salu-${slug}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      toast.error('No pudimos descargar la foto.');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <dialog
       open
@@ -1008,12 +1236,11 @@ function PhotoModal({
       <div
         className={cn(
           'relative z-10 flex w-full flex-col overflow-hidden bg-card text-left shadow-2xl',
-          // Mobile: full viewport con safe-area insets para iPhone notch.
           'h-[100dvh] max-h-none rounded-none',
-          // Desktop: caja flotante centrada con altura cómoda.
           'sm:h-auto sm:max-h-[92dvh] sm:max-w-3xl sm:flex-row sm:gap-3 sm:rounded-2xl sm:p-4',
         )}
       >
+        {/* Botón cerrar */}
         <Button
           type="button"
           size="icon"
@@ -1021,22 +1248,30 @@ function PhotoModal({
           onClick={onClose}
           aria-label="Cerrar"
           className={cn(
-            // Mobile: tap target grande (44px+) sobre la foto, alto contraste.
             'absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-20 size-11 bg-background/85 shadow-md ring-1 ring-foreground/10 backdrop-blur-md',
-            // Desktop: chiquito en la esquina del card.
             'sm:top-2 sm:right-2 sm:size-8 sm:bg-background/80 sm:shadow-none sm:ring-0 sm:backdrop-blur-none',
           )}
         >
           <X className="size-5 sm:size-4" aria-hidden />
         </Button>
 
-        {/* Foto */}
+        {/* Contador de posición */}
+        {total > 1 && (
+          <span
+            className={cn(
+              'absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-20 rounded-full bg-background/85 px-2.5 py-1 font-mono text-[11px] text-muted-foreground shadow-md backdrop-blur-md',
+              'sm:top-2 sm:left-2',
+            )}
+          >
+            {currentIndex + 1} / {total}
+          </span>
+        )}
+
+        {/* Foto + botones de navegación */}
         <div
           className={cn(
-            // Mobile: la foto ocupa ~55% del alto disponible arriba.
-            'flex shrink-0 items-center justify-center bg-foreground/[0.04]',
+            'relative flex shrink-0 items-center justify-center bg-foreground/[0.04]',
             'h-[55dvh] w-full',
-            // Desktop: lado izquierdo del card, máx 60% del ancho, alto cómodo.
             'sm:h-auto sm:max-h-[80dvh] sm:max-w-[60%] sm:flex-1 sm:bg-transparent',
           )}
         >
@@ -1051,9 +1286,39 @@ function PhotoModal({
               <Loader2 className="size-6 animate-spin" aria-hidden />
             </div>
           )}
+
+          {/* Flecha anterior */}
+          {hasPrev && (
+            <button
+              type="button"
+              onClick={() => {
+                const prev = photos[currentIndex - 1];
+                if (prev) onNavigate(prev);
+              }}
+              aria-label="Foto anterior"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 flex size-9 items-center justify-center rounded-full bg-background/80 shadow-md backdrop-blur-sm transition-all hover:bg-background hover:shadow-lg focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+            </button>
+          )}
+
+          {/* Flecha siguiente */}
+          {hasNext && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = photos[currentIndex + 1];
+                if (next) onNavigate(next);
+              }}
+              aria-label="Foto siguiente"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 flex size-9 items-center justify-center rounded-full bg-background/80 shadow-md backdrop-blur-sm transition-all hover:bg-background hover:shadow-lg focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              <ArrowRight className="size-4" aria-hidden />
+            </button>
+          )}
         </div>
 
-        {/* Detalles — scrollable en mobile, side-panel en desktop */}
+        {/* Panel de detalles */}
         <div
           className={cn(
             'flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4',
@@ -1121,7 +1386,11 @@ function PhotoModal({
               <option value="">Sin álbum (pool general)</option>
               {albums.map((al) => (
                 <option key={al.id} value={al.id}>
-                  {al.kind === 'monthly' ? `📅 ${al.name}` : al.name}
+                  {al.kind === 'milestone'
+                    ? `🏆 ${al.name}`
+                    : al.kind === 'monthly'
+                      ? `📅 ${al.name}`
+                      : al.name}
                 </option>
               ))}
             </select>
@@ -1132,6 +1401,36 @@ function PhotoModal({
           </div>
 
           <div className="mt-auto flex flex-wrap gap-2 pt-2">
+            {/* Descargar foto */}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleDownload}
+              disabled={!url || downloading}
+            >
+              {downloading ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Download className="size-4" aria-hidden />
+              )}
+              {downloading ? 'Descargando…' : 'Descargar'}
+            </Button>
+
+            {/* Usar como portada */}
+            {photo.albumId && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => onSetCover(photo.albumId as string, photo.storagePath)}
+              >
+                <Star className="size-4" aria-hidden />
+                Portada del álbum
+              </Button>
+            )}
+
+            {/* Auto-etiquetar IA */}
             <Button
               type="button"
               size="sm"
@@ -1146,6 +1445,8 @@ function PhotoModal({
               )}
               {retagging ? 'Analizando…' : 'Auto-etiquetar'}
             </Button>
+
+            {/* Borrar */}
             <Button type="button" size="sm" variant="destructive" onClick={handleDelete}>
               <Trash2 className="size-4" aria-hidden />
               Borrar foto
@@ -1161,6 +1462,11 @@ function PhotoModal({
 // Helpers
 // ----------------------------------------------------------------------------
 
+function parseMilestoneIndex(name: string): number {
+  const m = /^(\d+)/.exec(name);
+  return m ? Number(m[1]) : 999;
+}
+
 function groupByMonth(photos: PhotoEntry[]): MonthGroup[] {
   const map = new Map<string, PhotoEntry[]>();
   for (const p of photos) {
@@ -1170,7 +1476,6 @@ function groupByMonth(photos: PhotoEntry[]): MonthGroup[] {
     if (!map.has(key)) map.set(key, []);
     map.get(key)?.push(p);
   }
-  // Sort keys desc.
   const keys = Array.from(map.keys()).sort((a, b) => b.localeCompare(a));
   return keys.map((k) => ({
     monthKey: k,
@@ -1206,8 +1511,6 @@ async function compressUploadFile(file: File): Promise<File> {
     const context = canvas.getContext('2d');
     if (!context) return file;
 
-    // El álbum es 100% fotográfico: si el browser re-encodea a JPEG,
-    // priorizamos peso y velocidad sobre transparencia.
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, width, height);
     context.drawImage(image, 0, 0, width, height);
@@ -1284,8 +1587,6 @@ function chunkUploadFiles(files: File[]): File[][] {
 function formatMonth(key: string): string {
   const [year, month] = key.split('-');
   if (!year || !month) return key;
-  // Día 15 a midday UTC: anchor seguro contra cambios de TZ que harían
-  // el primer día caer en el mes anterior.
   const d = new Date(Date.UTC(Number(year), Number(month) - 1, 15, 12, 0, 0));
   const label = d.toLocaleDateString('es-AR', {
     month: 'long',
