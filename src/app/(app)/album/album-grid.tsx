@@ -1323,92 +1323,94 @@ function PhotoModal({
           )}
         </div>
 
-        {/* Panel de detalles */}
-        <div
-          className={cn(
-            'flex flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 pb-0',
-            'sm:px-3 sm:pb-0',
-          )}
-        >
-          <div className="flex flex-col gap-1">
-            <span className="font-medium text-[11px] text-muted-foreground uppercase tracking-[0.18em]">
-              {photo.takenAt ? formatDate(photo.takenAt) : 'Sin fecha'}
-            </span>
-            <h3 className="font-display text-foreground text-lg tracking-tight sm:text-xl">
-              {photo.caption || 'Sin descripción'}
-            </h3>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ph-caption">Descripción</Label>
-            <Textarea
-              id="ph-caption"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              onBlur={saveCaption}
-              rows={2}
-              placeholder="Hoy, en los brazos de papá…"
-              maxLength={500}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ph-tags">Etiquetas (separadas por coma)</Label>
-            <Input
-              id="ph-tags"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-              onBlur={saveTags}
-              placeholder="papa, primer baño, sonriendo"
-              maxLength={300}
-            />
-            {photo.tags.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {photo.tags.map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 font-medium text-[11px] text-primary"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1.5 rounded-lg border border-primary/15 bg-primary/[0.04] p-3">
-            <Label htmlFor="ph-album" className="flex items-center gap-1.5 text-foreground">
-              <FolderOpen className="size-4 text-primary" aria-hidden />
-              Mover a otro álbum
-            </Label>
-            <select
-              id="ph-album"
-              value={photo.albumId ?? ''}
-              onChange={(e) => onAssignAlbum(e.target.value === '' ? null : e.target.value)}
-              className="h-9 rounded-lg border border-input bg-background px-2.5 font-medium text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              <option value="">Sin álbum (pool general)</option>
-              {albums.map((al) => (
-                <option key={al.id} value={al.id}>
-                  {al.kind === 'milestone'
-                    ? `🏆 ${al.name}`
-                    : al.kind === 'monthly'
-                      ? `📅 ${al.name}`
-                      : al.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              Se guarda al instante. Si querés un álbum nuevo, creá uno desde la grilla con "Nuevo
-              álbum" y volvé acá a moverla.
-            </p>
-          </div>
-
+        {/* Panel de detalles + botonera: wrapper transparente en mobile, columna en desktop */}
+        <div className="contents sm:flex sm:min-w-0 sm:flex-1 sm:flex-col sm:overflow-hidden">
           <div
             className={cn(
-              'sticky bottom-0 -mx-4 flex flex-wrap gap-2 border-t border-border/40 bg-card px-4 py-3',
+              'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 pb-0',
+              'sm:px-3 sm:pb-0',
+            )}
+          >
+            <div className="flex flex-col gap-1">
+              <span className="font-medium text-[11px] text-muted-foreground uppercase tracking-[0.18em]">
+                {photo.takenAt ? formatDate(photo.takenAt) : 'Sin fecha'}
+              </span>
+              <h3 className="font-display text-foreground text-lg tracking-tight sm:text-xl">
+                {photo.caption || 'Sin descripción'}
+              </h3>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ph-caption">Descripción</Label>
+              <Textarea
+                id="ph-caption"
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                onBlur={saveCaption}
+                rows={2}
+                placeholder="Hoy, en los brazos de papá…"
+                maxLength={500}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ph-tags">Etiquetas (separadas por coma)</Label>
+              <Input
+                id="ph-tags"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                onBlur={saveTags}
+                placeholder="papa, primer baño, sonriendo"
+                maxLength={300}
+              />
+              {photo.tags.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {photo.tags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 font-medium text-[11px] text-primary"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5 rounded-lg border border-primary/15 bg-primary/[0.04] p-3">
+              <Label htmlFor="ph-album" className="flex items-center gap-1.5 text-foreground">
+                <FolderOpen className="size-4 text-primary" aria-hidden />
+                Mover a otro álbum
+              </Label>
+              <select
+                id="ph-album"
+                value={photo.albumId ?? ''}
+                onChange={(e) => onAssignAlbum(e.target.value === '' ? null : e.target.value)}
+                className="h-9 rounded-lg border border-input bg-background px-2.5 font-medium text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <option value="">Sin álbum (pool general)</option>
+                {albums.map((al) => (
+                  <option key={al.id} value={al.id}>
+                    {al.kind === 'milestone'
+                      ? `🏆 ${al.name}`
+                      : al.kind === 'monthly'
+                        ? `📅 ${al.name}`
+                        : al.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Se guarda al instante. Si querés un álbum nuevo, creá uno desde la grilla con "Nuevo
+                álbum" y volvé acá a moverla.
+              </p>
+            </div>
+          </div>
+          {/* Botonera fuera del scroll — siempre visible */}
+          <div
+            className={cn(
+              'shrink-0 flex flex-wrap gap-2 border-t border-border/40 bg-card px-4 py-3',
               'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
-              'sm:static sm:mx-0 sm:mt-auto sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-2',
+              'sm:border-t-0 sm:bg-transparent sm:px-3 sm:pb-3 sm:pt-2',
             )}
           >
             {/* Descargar foto */}
