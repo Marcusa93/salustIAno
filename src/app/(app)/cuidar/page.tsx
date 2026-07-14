@@ -10,6 +10,7 @@ import {
   Camera,
   ClipboardCheck,
   Droplets,
+  FileText,
   Moon,
   Pill,
   Ruler,
@@ -361,6 +362,13 @@ export default async function CuidarPage() {
       Icon: ClipboardCheck,
       badge: 'Beta',
       microInfo: controlMicro,
+      section: 'salud',
+    },
+    {
+      href: '/cuidar/informe' as Route,
+      title: 'Informe para la pediatra',
+      description: 'Mediciones, medicamentos y datos clave en una página imprimible.',
+      Icon: FileText,
       section: 'salud',
     },
     // Patrones — cómo viene la rutina diaria.

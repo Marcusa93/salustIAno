@@ -258,6 +258,14 @@ export default async function MeasurementsListPage() {
             </p>
           )}
 
+          {/* Acceso rápido al informe */}
+          <Link
+            href={'/cuidar/informe' as Route}
+            className="inline-flex items-center gap-1.5 self-start text-muted-foreground text-xs underline decoration-dotted underline-offset-2 hover:text-foreground"
+          >
+            Ver informe completo para la pediatra →
+          </Link>
+
           {/* Lista completa */}
           <section className="flex flex-col gap-3">
             <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
@@ -268,9 +276,9 @@ export default async function MeasurementsListPage() {
                 <li key={m.id}>
                   <Link
                     href={`/cuidar/mediciones/${m.id}` as Route}
-                    className="block rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    className="block rounded-2xl outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
                   >
-                    <Card className="flex flex-col gap-1.5 border-border/60 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md hover:shadow-primary/5">
+                    <Card className="hover:-translate-y-0.5 flex flex-col gap-1.5 border-border/60 p-4 transition-all duration-200 hover:border-primary/30 hover:shadow-md hover:shadow-primary/5">
                       <span className="font-medium text-foreground text-sm">
                         {formatDate(m.measured_at)}
                       </span>
@@ -366,7 +374,7 @@ function SummaryCard({
         {percentile !== null && (
           <span
             className={cn(
-              'inline-flex items-center rounded-full px-2 py-0.5 font-mono font-medium text-[10px] tracking-wider',
+              'inline-flex items-center rounded-full px-2 py-0.5 font-medium font-mono text-[10px] tracking-wider',
               percentileTone(percentile),
             )}
             title={percentileExplain(percentile)}
