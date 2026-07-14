@@ -4,9 +4,11 @@ import {
   logBottleFeedingAction,
   logDiaperAction,
   quickCloseSleepAction,
+  quickStartSleepAction,
 } from '@/app/(app)/cuidar/eventos/actions';
 import { DiaperQuickAdd } from '@/app/(app)/home/_components/diaper-quick-add';
 import { FeedingQuickAdd } from '@/app/(app)/home/_components/feeding-quick-add';
+import { SleepQuickAdd } from '@/app/(app)/home/_components/sleep-quick-add';
 import { durationLabel } from '@/lib/baby-age';
 import { Baby, Loader2, Milk, Moon, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -80,6 +82,35 @@ function DiaperTypeBtn({ type }: { type: DiaperType }) {
       disabled={pending}
       aria-label={`Registrar pañal ${label}`}
       className="flex h-9 flex-1 items-center justify-center rounded-lg border border-border bg-card font-medium text-foreground text-xs transition-all hover:bg-muted/40 active:scale-95 disabled:opacity-60"
+    >
+      {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : label}
+    </button>
+  );
+}
+
+function SleepStartBtn({ isNap }: { isNap: boolean }) {
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  const label = isNap ? 'Siesta' : 'Noche';
+
+  function handle() {
+    start(async () => {
+      const r = await quickStartSleepAction(isNap);
+      if (!r.ok) toast.error(r.error);
+      else {
+        toast.success(`${isNap ? 'Siesta' : 'Sueño'} iniciado.`);
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      disabled={pending}
+      aria-label={`Registrar que Salu se durmió ahora (${label.toLowerCase()})`}
+      className="flex h-9 flex-1 items-center justify-center rounded-lg border border-border bg-card font-medium text-foreground text-sm transition-all hover:bg-muted/40 active:scale-95 disabled:opacity-60"
     >
       {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : label}
     </button>
@@ -165,6 +196,37 @@ export function QuickRepeatBar({ feedingPresets, activeSleep }: Props) {
         </div>
 
         <div className="border-border/50 border-t" aria-hidden />
+
+        {/* Fila sueño — solo cuando no hay sueño activo */}
+        {!activeSleep && (
+          <>
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              <span
+                className="flex size-6 shrink-0 items-center justify-center text-primary/70"
+                aria-hidden
+              >
+                <Moon className="size-4" />
+              </span>
+              <div className="flex flex-1 gap-1.5">
+                <SleepStartBtn isNap={false} />
+                <SleepStartBtn isNap={true} />
+                <SleepQuickAdd
+                  trigger={
+                    <button
+                      type="button"
+                      aria-label="Anotar sueño con opciones"
+                      className="flex h-9 items-center justify-center gap-0.5 rounded-lg border border-border border-dashed px-2.5 text-muted-foreground text-xs transition-all hover:border-primary/40 hover:text-primary"
+                    >
+                      <Plus className="size-3" aria-hidden />
+                      ajustar
+                    </button>
+                  }
+                />
+              </div>
+            </div>
+            <div className="border-border/50 border-t" aria-hidden />
+          </>
+        )}
 
         {/* Fila pañal */}
         <div className="flex items-center gap-2 px-3 py-2.5">

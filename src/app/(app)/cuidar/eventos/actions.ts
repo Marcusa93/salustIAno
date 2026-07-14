@@ -785,6 +785,59 @@ export async function logDiaperAction(
 }
 
 // ============================================================================
+// Quick start sleep — arranca una sesión de sueño con started_at = ahora
+// ============================================================================
+
+/**
+ * Abre una nueva sesión de sueño con started_at = now.
+ * Si ya hay una sesión abierta para el bebé, devuelve error sin abrir otra.
+ */
+export async function quickStartSleepAction(
+  isNap: boolean,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const ctx = await getActorContext();
+  if ('error' in ctx) return { ok: false, error: ctx.error ?? 'Error inesperado.' };
+
+  // Bloquear si ya hay sueño activo para este bebé.
+  const { data: existing } = await ctx.supabase
+    .from('sleep_sessions')
+    .select('id')
+    .eq('child_id', ctx.childId)
+    .is('ended_at', null)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (existing) return { ok: false, error: 'Ya hay un sueño en curso. Cerralo primero.' };
+
+  const now = new Date().toISOString();
+  const { data, error } = await ctx.supabase
+    .from('sleep_sessions')
+    .insert({
+      child_id: ctx.childId,
+      started_at: now,
+      is_nap: isNap,
+      quality: 'unknown',
+      created_by: ctx.userId,
+    })
+    .select('id')
+    .maybeSingle();
+
+  if (error || !data) return { ok: false, error: 'No pudimos registrar el sueño.' };
+
+  const author = await getActorDisplayName(ctx.supabase, ctx.userId);
+  await notifyFamily(ctx.supabase, ctx.userId, ctx.childId, {
+    title: `${author}: Salu se durmió`,
+    body: isNap ? 'Empieza la siesta.' : 'Se fue a dormir.',
+    url: '/home',
+    tag: `sleep-start-${data.id}`,
+  });
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true, id: data.id };
+}
+
+// ============================================================================
 // Delete (genérico — recibe table name + id, RLS controla quién puede)
 // ============================================================================
 
