@@ -9,6 +9,7 @@ import { logStore } from '@/lib/ai/logger';
 import type { ChatMessage } from '@/lib/ai/types';
 import { babyAgeFromBirth } from '@/lib/baby-age';
 import { createClient } from '@/lib/supabase/server';
+import { type Sex, percentileForMeasurement } from '@/lib/who-growth';
 import type { Proposal } from './proposals';
 import { TOOL_DEFINITIONS, TOOL_HANDLERS, type ToolContext } from './tools';
 
@@ -17,13 +18,11 @@ export { proposalSchema, summarizeProposal } from './proposals';
 
 const AGENT_NAME = 'salustia';
 const MODEL = 'anthropic/claude-haiku-4-5';
-// v6: ampliamos "Variantes y edge cases" en el prompt — manejo de
-// mayúsculas, hora sin dos puntos, hora 12h ("2 am"), eventos negados,
-// modificadores sin número ("toma corta"), múltiples eventos por línea,
-// días mezclados. También copy del mensaje de respuesta hace referencia
-// al botón "Confirmar todo" del nuevo ProposalGroup.
-// v5 sumó la sección "Dumps multi-evento". v4 agregó search_chat_history.
-const PROMPT_VERSION = 'salustia-v6';
+// v7: ambient context enriquecido con última medición (peso + percentil
+// OMS), fórmula (marca, stock) y medicamentos activos (últimas 48 h).
+// El modelo ya no necesita llamar herramientas para saber el peso actual.
+// v6: edge cases multi-evento y botón "Confirmar todo". v5 multi-evento.
+const PROMPT_VERSION = 'salustia-v7';
 const MAX_ITERATIONS = 5;
 // Cota de inyección: si la familia acumula 200 memorias, no las metemos
 // todas en cada turno. Cortamos por cantidad y por chars.
@@ -126,7 +125,7 @@ async function resolveContext(auth?: {
   const { data: child } = await supabase
     .from('child_profiles')
     .select(
-      'id, name, birth_date, pediatrician_name, pediatrician_phone, blood_type, health_insurance, gestational_weeks_at_birth, is_preterm',
+      'id, name, birth_date, sex, pediatrician_name, pediatrician_phone, blood_type, health_insurance, gestational_weeks_at_birth, is_preterm',
     )
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
@@ -161,6 +160,106 @@ async function resolveContext(auth?: {
     }
   }
 
+  // Datos dinámicos del bebé: última medición, fórmula, medicamentos.
+  // Se fetchean en paralelo para no agregar latencia apilada.
+  let liveData: LiveBabyData | null = null;
+  if (child?.id) {
+    const childId = child.id as string;
+    const childSex = (child.sex as string | null | undefined) ?? null;
+    const birthDate = (child.birth_date as string | null | undefined) ?? null;
+
+    const [measRow, formulaRow, medRows] = await Promise.all([
+      supabase
+        .from('child_measurements')
+        .select('weight_grams, height_cm, head_circumference_cm, measured_at')
+        .eq('child_id', childId)
+        .is('deleted_at', null)
+        .order('measured_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('formula_stock')
+        .select('brand, current_boxes, ml_per_box, alert_threshold')
+        .eq('child_id', childId)
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('medication_doses')
+        .select('medication_name, dose_amount, interval_hours, next_dose_at, given_at')
+        .eq('child_id', childId)
+        .is('deleted_at', null)
+        .gte('given_at', new Date(Date.now() - 48 * 3_600_000).toISOString())
+        .order('given_at', { ascending: false })
+        .limit(5),
+    ]);
+
+    const meas = measRow.data ?? null;
+    const formula = formulaRow.data ?? null;
+    const meds = medRows.data ?? [];
+
+    // Calculamos percentiles OMS si tenemos sexo + birthDate + medición.
+    let weightPct: number | null = null;
+    let heightPct: number | null = null;
+    if (meas && birthDate && (childSex === 'male' || childSex === 'female')) {
+      const sex: Sex = childSex;
+      const ageDays = Math.floor(
+        (new Date(meas.measured_at).getTime() - new Date(birthDate).getTime()) / 86_400_000,
+      );
+      if (meas.weight_grams !== null) {
+        weightPct = percentileForMeasurement({
+          sex,
+          kind: 'weight',
+          value: meas.weight_grams / 1000,
+          ageDays,
+        });
+      }
+      if (meas.height_cm !== null) {
+        heightPct = percentileForMeasurement({
+          sex,
+          kind: 'length',
+          value: meas.height_cm,
+          ageDays,
+        });
+      }
+    }
+
+    liveData = {
+      measurement: meas
+        ? {
+            weightGrams: meas.weight_grams,
+            heightCm: meas.height_cm,
+            headCm: meas.head_circumference_cm,
+            measuredAt: meas.measured_at,
+            weightPct,
+            heightPct,
+          }
+        : null,
+      formula: formula
+        ? {
+            brand: formula.brand,
+            currentBoxes: formula.current_boxes,
+            mlPerBox: formula.ml_per_box,
+            alertThreshold: formula.alert_threshold,
+          }
+        : null,
+      recentMeds: (
+        meds as Array<{
+          medication_name: string;
+          dose_amount: string | null;
+          interval_hours: number | null;
+          next_dose_at: string | null;
+          given_at: string;
+        }>
+      ).map((m) => ({
+        name: m.medication_name,
+        doseAmount: m.dose_amount,
+        intervalHours: m.interval_hours,
+        nextDoseAt: m.next_dose_at,
+        givenAt: m.given_at,
+      })),
+    };
+  }
+
   return {
     toolCtx: {
       supabase,
@@ -168,13 +267,38 @@ async function resolveContext(auth?: {
       childId: child?.id ?? null,
       proposals: [],
     },
-    ambientContext: buildAmbientContext(child, memories),
+    ambientContext: buildAmbientContext(child, memories, liveData),
   };
+}
+
+interface LiveBabyData {
+  measurement: {
+    weightGrams: number | null;
+    heightCm: number | null;
+    headCm: number | null;
+    measuredAt: string;
+    weightPct: number | null;
+    heightPct: number | null;
+  } | null;
+  formula: {
+    brand: string | null;
+    currentBoxes: number;
+    mlPerBox: number;
+    alertThreshold: number;
+  } | null;
+  recentMeds: Array<{
+    name: string;
+    doseAmount: string | null;
+    intervalHours: number | null;
+    nextDoseAt: string | null;
+    givenAt: string;
+  }>;
 }
 
 interface ChildSnapshot {
   name: string;
   birth_date: string | null;
+  sex?: string | null;
   pediatrician_name: string | null;
   pediatrician_phone: string | null;
   blood_type: string | null;
@@ -183,9 +307,28 @@ interface ChildSnapshot {
   is_preterm: boolean | null;
 }
 
+function fmtDateAr(iso: string): string {
+  return new Date(iso).toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
+}
+
+function fmtTimeAr(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Argentina/Buenos_Aires',
+  });
+}
+
 function buildAmbientContext(
   child: ChildSnapshot | null,
   memories: ReadonlyArray<{ content: string; private: boolean }>,
+  live: LiveBabyData | null = null,
 ): string {
   const sections: string[] = [];
 
@@ -216,7 +359,53 @@ function buildAmbientContext(
     if (child.blood_type) {
       lines.push(`- Grupo sanguíneo: ${child.blood_type}`);
     }
+
+    // Última medición con percentiles OMS.
+    if (live?.measurement) {
+      const m = live.measurement;
+      const dateLabel = fmtDateAr(m.measuredAt);
+      if (m.weightGrams !== null) {
+        const kg = (m.weightGrams / 1000).toFixed(2);
+        const pct = m.weightPct !== null ? ` (p${Math.round(m.weightPct)} OMS)` : '';
+        lines.push(`- Peso: ${kg} kg${pct} — medido el ${dateLabel}`);
+      }
+      if (m.heightCm !== null) {
+        const pct = m.heightPct !== null ? ` (p${Math.round(m.heightPct)} OMS)` : '';
+        lines.push(`- Talla: ${m.heightCm} cm${pct}`);
+      }
+      if (m.headCm !== null) {
+        lines.push(`- Perímetro cefálico: ${m.headCm} cm`);
+      }
+    }
+
+    // Fórmula.
+    if (live?.formula) {
+      const f = live.formula;
+      const brandLabel = f.brand ? `${f.brand} ` : '';
+      const lowWarning = f.currentBoxes <= f.alertThreshold ? ' ⚠️ stock bajo' : '';
+      lines.push(
+        `- Fórmula: ${brandLabel}${f.mlPerBox} ml/caja — quedan ${f.currentBoxes} cajas${lowWarning}`,
+      );
+    }
+
     sections.push(['## Acerca del bebé (ya lo sabés, no preguntes)', '', ...lines].join('\n'));
+  }
+
+  // Medicamentos recientes (últimas 48 h).
+  if (live?.recentMeds && live.recentMeds.length > 0) {
+    const medLines = live.recentMeds.map((med) => {
+      const dose = med.doseAmount ? ` ${med.doseAmount}` : '';
+      const givenLabel = `${fmtDateAr(med.givenAt)} a las ${fmtTimeAr(med.givenAt)}`;
+      const nextLabel = med.nextDoseAt
+        ? ` — próxima dosis: ${fmtDateAr(med.nextDoseAt)} a las ${fmtTimeAr(med.nextDoseAt)}`
+        : '';
+      return `- ${med.name}${dose} — última dosis el ${givenLabel}${nextLabel}`;
+    });
+    sections.push(
+      ['## Medicamentos activos (últimas 48 h, no preguntes si ya lo sabés)', '', ...medLines].join(
+        '\n',
+      ),
+    );
   }
 
   if (memories.length > 0) {
