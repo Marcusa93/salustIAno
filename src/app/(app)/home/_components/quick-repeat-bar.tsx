@@ -29,6 +29,7 @@ const DIAPER_TYPES: DiaperType[] = ['wet', 'dirty', 'both', 'dry'];
 interface Props {
   feedingPresets: number[];
   activeSleep: { id: string; started_at: string; is_nap: boolean } | null;
+  lastWokeUpAt: string | null;
 }
 
 function FeedingPresetBtn({ amountMl }: { amountMl: number }) {
@@ -162,10 +163,17 @@ function SleepCloseBtn({
   );
 }
 
-export function QuickRepeatBar({ feedingPresets, activeSleep }: Props) {
+export function QuickRepeatBar({ feedingPresets, activeSleep, lastWokeUpAt }: Props) {
   return (
     <div className="flex flex-col gap-2">
       {activeSleep && <SleepCloseBtn activeSleep={activeSleep} />}
+
+      {/* Ventana de vigilia — cuánto lleva despierto desde el último sueño */}
+      {!activeSleep && lastWokeUpAt && (
+        <p className="px-1 text-[11px] text-muted-foreground/70">
+          Despierto hace {durationLabel(lastWokeUpAt)}.
+        </p>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         {/* Fila toma */}

@@ -143,17 +143,15 @@ async function resolveContext(auth?: {
 
   let memories: Array<{ content: string; private: boolean }> = [];
   if (membership?.family_group_id) {
-    // biome-ignore lint/suspicious/noExplicitAny: types stale hasta regenerar Supabase types con la migration 022.
-    const sb = supabase as any;
-    const { data, error: memErr } = await sb
+    const { data, error: memErr } = await supabase
       .from('family_memories')
-      .select('content, kind, private_to_user, created_at')
+      .select('content, private_to_user, created_at')
       .eq('family_group_id', membership.family_group_id)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(MAX_INJECTED_MEMORIES);
-    if (!memErr && Array.isArray(data)) {
-      memories = (data as Array<{ content: string; private_to_user: string | null }>).map((m) => ({
+    if (!memErr && data) {
+      memories = data.map((m) => ({
         content: m.content,
         private: m.private_to_user !== null,
       }));

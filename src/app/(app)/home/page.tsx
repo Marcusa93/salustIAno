@@ -330,7 +330,11 @@ export default async function HomePage() {
       {/* Acciones rápidas: repite la última toma o el último pañal sin abrir
           ningún formulario — un solo tap registra el evento al instante.
           Cuando hay sueño activo muestra además "Se despertó". */}
-      <QuickRepeatBar feedingPresets={feedingPresets} activeSleep={activeSleep} />
+      <QuickRepeatBar
+        feedingPresets={feedingPresets}
+        activeSleep={activeSleep}
+        lastWokeUpAt={lastClosedSleepAt}
+      />
 
       {/* Coach pediátrico de sueño — solo en modo madrugada (22-06 AR).
           Lee la situación del bebé y devuelve diagnóstico + sugerencia.
