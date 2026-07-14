@@ -2,7 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { type Sex, valueAtPercentile } from '@/lib/who-growth';
+import { type Sex, percentileForMeasurement, valueAtPercentile } from '@/lib/who-growth';
 import { useState } from 'react';
 
 interface MeasurementPoint {
@@ -151,7 +151,17 @@ interface SvgChartProps {
   sex: Sex | null;
 }
 
+interface TooltipState {
+  x: number;
+  y: number;
+  value: number;
+  pct: number | null;
+  dateStr: string;
+}
+
 function SvgChart({ points, metric, birthDate, sex }: SvgChartProps) {
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
   const meta = METRIC_META[metric];
   const values = points.map((p) => p[meta.key] as number);
   const dates = points.map((p) => new Date(p.measuredAt).getTime());
@@ -292,12 +302,20 @@ function SvgChart({ points, metric, birthDate, sex }: SvgChartProps) {
   // 3 ticks horizontales (min, mid, max).
   const ticks = [minV, (minV + maxV) / 2, maxV];
 
+  function pointPercentile(v: number, dateMs: number): number | null {
+    if (!birthDate || !sex || (sex !== 'male' && sex !== 'female')) return null;
+    const ageDays = Math.floor((dateMs - new Date(birthDate).getTime()) / 86_400_000);
+    const whoValue = meta.whoKind === 'weight' ? v / 1000 : v;
+    return percentileForMeasurement({ sex, kind: meta.whoKind, value: whoValue, ageDays });
+  }
+
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className="h-auto w-full"
       role="img"
       aria-label={`Gráfico de ${meta.label}`}
+      onPointerLeave={() => setTooltip(null)}
     >
       <title>Gráfico de {meta.label}</title>
 
@@ -387,12 +405,29 @@ function SvgChart({ points, metric, birthDate, sex }: SvgChartProps) {
       {/* Puntos del bebé */}
       {points.map((p, i) => {
         const v = p[meta.key] as number;
-        const x = xFor(dates[i] ?? 0);
+        const dateMs = dates[i] ?? 0;
+        const x = xFor(dateMs);
         const y = yFor(v);
+        const pct = pointPercentile(v, dateMs);
+        const dateStr = formatDate(dateMs);
+
+        function openTooltip() {
+          setTooltip((prev) =>
+            prev?.dateStr === dateStr && prev.value === v ? null : { x, y, value: v, pct, dateStr },
+          );
+        }
+
         if (p.isBirth) {
-          // Marcador especial de nacimiento: diamante + etiqueta "Nac."
           return (
-            <g key={`p-${p.measuredAt}-${v}`}>
+            <g
+              key={`p-${p.measuredAt}-${v}`}
+              className="cursor-pointer"
+              onPointerEnter={() => setTooltip({ x, y, value: v, pct, dateStr: `Nac. ${dateStr}` })}
+              onClick={openTooltip}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openTooltip()}
+              tabIndex={0}
+              aria-label={`Nacimiento: ${formatTick(v, metric)}`}
+            >
               <polygon
                 points={`${x.toFixed(1)},${(y - 5).toFixed(1)} ${(x + 4.5).toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y + 5).toFixed(1)} ${(x - 4.5).toFixed(1)},${y.toFixed(1)}`}
                 fill={meta.color}
@@ -411,13 +446,95 @@ function SvgChart({ points, metric, birthDate, sex }: SvgChartProps) {
           );
         }
         return (
-          <g key={`p-${p.measuredAt}-${v}`}>
+          <g
+            key={`p-${p.measuredAt}-${v}`}
+            className="cursor-pointer"
+            onPointerEnter={() => setTooltip({ x, y, value: v, pct, dateStr })}
+            onClick={openTooltip}
+            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openTooltip()}
+            tabIndex={0}
+            aria-label={`${dateStr}: ${formatTick(v, metric)}`}
+          >
+            {/* Área de toque ampliada, invisible */}
+            <circle cx={x} cy={y} r="14" fill="transparent" />
             <circle cx={x} cy={y} r="6" fill={meta.color} opacity="0.18" />
             <circle cx={x} cy={y} r="3.5" fill={meta.color} />
             <circle cx={x} cy={y} r="1.3" fill="white" opacity="0.9" />
           </g>
         );
       })}
+      {/* Tooltip flotante */}
+      {tooltip &&
+        (() => {
+          const TW = 118;
+          const TH = tooltip.pct !== null ? 52 : 38;
+          const MARGIN = 8;
+          // Posición horizontal: centrado en el punto, clampeado a los bordes
+          const tx = Math.max(padL, Math.min(tooltip.x - TW / 2, W - padR - TW));
+          // Posición vertical: arriba del punto si hay espacio, abajo si no
+          const above = tooltip.y > padT + TH + MARGIN;
+          const ty = above ? tooltip.y - TH - MARGIN : tooltip.y + MARGIN;
+
+          return (
+            <g className="pointer-events-none" aria-hidden>
+              {/* Sombra */}
+              <rect
+                x={tx + 1}
+                y={ty + 2}
+                width={TW}
+                height={TH}
+                rx="6"
+                ry="6"
+                fill="black"
+                opacity="0.07"
+              />
+              {/* Fondo del tooltip */}
+              <rect
+                x={tx}
+                y={ty}
+                width={TW}
+                height={TH}
+                rx="6"
+                ry="6"
+                className="fill-card stroke-border"
+                strokeWidth="0.8"
+              />
+              {/* Valor principal */}
+              <text
+                x={tx + TW / 2}
+                y={ty + 16}
+                textAnchor="middle"
+                fontSize="13"
+                fontWeight="600"
+                className="fill-foreground"
+              >
+                {formatTick(tooltip.value, metric)}
+              </text>
+              {/* Percentil OMS */}
+              {tooltip.pct !== null && (
+                <text
+                  x={tx + TW / 2}
+                  y={ty + 30}
+                  textAnchor="middle"
+                  fontSize="10"
+                  className="fill-primary"
+                >
+                  p{Math.round(tooltip.pct)} OMS
+                </text>
+              )}
+              {/* Fecha */}
+              <text
+                x={tx + TW / 2}
+                y={ty + TH - 7}
+                textAnchor="middle"
+                fontSize="9"
+                className="fill-muted-foreground"
+              >
+                {tooltip.dateStr}
+              </text>
+            </g>
+          );
+        })()}
     </svg>
   );
 }
