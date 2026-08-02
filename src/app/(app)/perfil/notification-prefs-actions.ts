@@ -17,6 +17,8 @@ export interface NotificationPrefs {
   medication_due: boolean;
   /** Stock de fórmula igual o por debajo del umbral. Default ON. */
   formula_low_stock: boolean;
+  /** Recordatorio cada ~2h para cargar eventos (7-22h AR). Default ON. */
+  reminder_2h: boolean;
 }
 
 const DEFAULT_PREFS: NotificationPrefs = {
@@ -26,6 +28,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   diaper_predicted: false,
   medication_due: true,
   formula_low_stock: true,
+  reminder_2h: true,
 };
 
 const VALID_KEYS = new Set<keyof NotificationPrefs>([
@@ -35,6 +38,7 @@ const VALID_KEYS = new Set<keyof NotificationPrefs>([
   'diaper_predicted',
   'medication_due',
   'formula_low_stock',
+  'reminder_2h',
 ]);
 
 /**

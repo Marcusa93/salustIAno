@@ -2,7 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Baby, BellRing, CalendarClock, Loader2, Milk, Pill, Sparkles } from 'lucide-react';
+import { Baby, BellRing, CalendarClock, Clock, Loader2, Milk, Pill, Sparkles } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -52,6 +52,13 @@ const ROWS: ReadonlyArray<PrefRow> = [
     Icon: Pill,
     label: 'Dosis de medicamento',
     description: 'Avisamos 20 min antes de que toque dar una dosis programada.',
+  },
+  {
+    key: 'reminder_2h',
+    Icon: Clock,
+    label: 'Recordatorio cada 2 horas',
+    description:
+      'Un toque cada ~2h entre las 7 y las 22 para que no se te escape nada. Solo avisa si hubo más de 1.5h sin cargar nada.',
   },
 ];
 
@@ -124,7 +131,7 @@ export function NotificationPrefsCard() {
                 disabled={!prefs || isPending}
                 className={cn(
                   'flex w-full items-start gap-3 rounded-xl border border-transparent p-3 text-left transition-colors',
-                  'hover:bg-muted/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  'hover:bg-muted/30 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2',
                   'disabled:cursor-not-allowed disabled:opacity-60',
                 )}
               >

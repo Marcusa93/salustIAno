@@ -21,6 +21,10 @@ const envSchema = z.object({
   // Alexa Skill: applicationId de la Skill de Salu (Developer Console). Si está
   // seteada, el endpoint /api/alexa rechaza requests de otras skills.
   ALEXA_SKILL_ID: z.string().min(1).optional(),
+  // Cron secret — Vercel lo inyecta automáticamente en las invocaciones de
+  // cron como `Authorization: Bearer <CRON_SECRET>`. Si no está seteado
+  // (dev local), el endpoint acepta cualquier request.
+  CRON_SECRET: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
