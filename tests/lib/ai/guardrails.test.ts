@@ -30,6 +30,16 @@ describe('applyGuardrails', () => {
     expect(() => applyGuardrails(output, { agent: 'medical-summary' })).toThrow(AIGuardrailError);
   });
 
+  it('agente médico + volumen de mamadera: pasa sin error', () => {
+    const output = { feeding: '42 tomas en 7 días, cada toma 120 ml en promedio.' };
+    expect(() => applyGuardrails(output, { agent: 'pediatric-prep' })).not.toThrow();
+  });
+
+  it('agente médico + "tomá N ml" imperativo: tira AIGuardrailError', () => {
+    const output = 'tomá 5 ml cada 6 horas';
+    expect(() => applyGuardrails(output, { agent: 'pediatric-prep' })).toThrow(AIGuardrailError);
+  });
+
   it('agente médico + prescripción de medicamento: tira AIGuardrailError', () => {
     const output = { recommendation: 'dale paracetamol si tiene fiebre' };
     expect(() => applyGuardrails(output, { agent: 'pediatric-prep' })).toThrow(AIGuardrailError);

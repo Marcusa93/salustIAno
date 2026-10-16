@@ -4,14 +4,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 
-import { callLLM } from '@/lib/ai/client';
-import { AIParseError } from '@/lib/ai/errors';
-import { extractJsonObject, truncateForLog } from '@/lib/ai/json';
-import { logStore } from '@/lib/ai/logger';
+import { type AgentLogContext, runStructuredAgent } from '@/lib/ai/agents/structured-agent';
+import { describeAge } from '@/lib/ai/context/baby-context';
+import { modelProfileFor } from '@/lib/ai/models';
 
 const AGENT_NAME = 'daily-summary';
-const MODEL = 'anthropic/claude-haiku-4-5';
-const PROMPT_VERSION = 'daily-summary-v1';
+// v2: el input trae `ageLabel` (edad exacta ya calculada).
+const PROMPT_VERSION = 'daily-summary-v2';
 
 const SYSTEM_PROMPT = readFileSync(
   join(process.cwd(), 'src/lib/ai/agents/daily-summary/prompt.md'),
@@ -61,12 +60,6 @@ export interface DailySummaryOutput {
   };
 }
 
-interface AgentContext {
-  familyGroupId?: string;
-  childId?: string;
-  actorUserId?: string;
-}
-
 /**
  * Genera una frase corta y cariñosa que cuenta cómo fue el día con el bebé.
  *
@@ -76,80 +69,26 @@ interface AgentContext {
  */
 export async function summarizeDay(
   input: DailySummaryInput,
-  context: AgentContext = {},
+  context: AgentLogContext = {},
 ): Promise<DailySummaryOutput> {
-  const userPayload = JSON.stringify(input);
+  const userPayload = JSON.stringify({ ...input, ageLabel: describeAge(input.ageDays) });
 
-  let response: Awaited<ReturnType<typeof callLLM>>;
-  try {
-    response = await callLLM({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPayload },
-      ],
-      temperature: 0.6,
-      maxTokens: 350,
-      responseFormat: 'json_object',
-    });
-  } catch (err) {
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: MODEL,
-      promptVersion: PROMPT_VERSION,
-      error: err instanceof Error ? err.message : 'unknown',
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw err;
-  }
-
-  const json = extractJsonObject(response.content ?? '');
-  const parseResult = json ? dailySummarySchema.safeParse(json) : null;
-  if (!parseResult || !parseResult.success) {
-    const reason = parseResult
-      ? `schema mismatch: ${parseResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
-      : 'no se pudo extraer JSON';
-    const snippet = truncateForLog(response.content ?? '');
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      promptTokens: response.usage.promptTokens,
-      completionTokens: response.usage.completionTokens,
-      latencyMs: response.latencyMs,
-      error: `parse failed (${reason}). raw: ${snippet}`,
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw new AIParseError('No pudimos generar el resumen del día.');
-  }
-
-  const parsed = parseResult.data;
-
-  await logStore.record({
+  const { output, meta } = await runStructuredAgent({
     agent: AGENT_NAME,
-    model: response.model,
     promptVersion: PROMPT_VERSION,
-    promptTokens: response.usage.promptTokens,
-    completionTokens: response.usage.completionTokens,
-    totalTokens: response.usage.totalTokens,
-    latencyMs: response.latencyMs,
-    familyGroupId: context.familyGroupId ?? null,
-    childId: context.childId ?? null,
-    actorUserId: context.actorUserId ?? null,
+    profile: modelProfileFor(AGENT_NAME),
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPayload },
+    ],
+    outputSchema: dailySummarySchema,
+    parseErrorMessage: 'No pudimos generar el resumen del día.',
+    context,
   });
 
   return {
-    summary: parsed.summary.trim(),
-    highlight: parsed.highlight.trim(),
-    meta: {
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      totalTokens: response.usage.totalTokens,
-      latencyMs: response.latencyMs,
-    },
+    summary: output.summary.trim(),
+    highlight: output.highlight.trim(),
+    meta,
   };
 }

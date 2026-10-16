@@ -10,7 +10,6 @@ const envSchema = z.object({
   SUPABASE_SECRET_KEY: z.string().min(1).optional(),
   NEXT_PUBLIC_APP_URL: z.url().default('http://localhost:3000'),
   OPENROUTER_API_KEY: z.string().min(1).optional(),
-  OPENROUTER_DEFAULT_MODEL: z.string().min(1).default('anthropic/claude-haiku-4-5'),
   AIMLAPI_API_KEY: z.string().min(1).optional(),
   // Web Push (VAPID). Si no están seteadas, las suscripciones rechazan
   // gracefully con un mensaje en lugar de crashear.

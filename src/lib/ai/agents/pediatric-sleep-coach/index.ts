@@ -4,15 +4,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 
-import { callLLM } from '@/lib/ai/client';
-import { AIParseError } from '@/lib/ai/errors';
-import { applyGuardrails } from '@/lib/ai/guardrails';
-import { extractJsonObject, truncateForLog } from '@/lib/ai/json';
-import { logStore } from '@/lib/ai/logger';
+import { type AgentLogContext, runStructuredAgent } from '@/lib/ai/agents/structured-agent';
+import { describeAge } from '@/lib/ai/context/baby-context';
+import { modelProfileFor } from '@/lib/ai/models';
 
 const AGENT_NAME = 'pediatric-sleep-coach';
-const MODEL = 'anthropic/claude-haiku-4-5';
-const PROMPT_VERSION = 'pediatric-sleep-coach-v1';
+// v2: el input trae `ageLabel` y las ventanas de vigilia se eligen con esa edad.
+const PROMPT_VERSION = 'pediatric-sleep-coach-v2';
 
 const SYSTEM_PROMPT = readFileSync(
   join(process.cwd(), 'src/lib/ai/agents/pediatric-sleep-coach/prompt.md'),
@@ -63,12 +61,6 @@ export interface SleepCoachResult {
   };
 }
 
-interface AgentContextInput {
-  familyGroupId?: string;
-  childId?: string;
-  actorUserId?: string;
-}
-
 /**
  * Lee la situación del bebé a la madrugada y devuelve un diagnóstico
  * breve + sugerencia accionable.
@@ -84,87 +76,23 @@ interface AgentContextInput {
  */
 export async function coachNight(
   input: SleepCoachInput,
-  context: AgentContextInput = {},
+  context: AgentLogContext = {},
 ): Promise<SleepCoachResult> {
-  const userPayload = JSON.stringify(input);
+  const userPayload = JSON.stringify({ ...input, ageLabel: describeAge(input.ageDays) });
 
-  let response: Awaited<ReturnType<typeof callLLM>>;
-  try {
-    response = await callLLM({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPayload },
-      ],
-      temperature: 0.4,
-      maxTokens: 500,
-      responseFormat: 'json_object',
-    });
-  } catch (err) {
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: MODEL,
-      promptVersion: PROMPT_VERSION,
-      error: err instanceof Error ? err.message : 'unknown',
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw err;
-  }
-
-  const json = extractJsonObject(response.content ?? '');
-  const parseResult = json ? sleepCoachOutputSchema.safeParse(json) : null;
-  if (!parseResult || !parseResult.success) {
-    const reason = parseResult
-      ? `schema mismatch: ${parseResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
-      : 'no se pudo extraer JSON';
-    const snippet = truncateForLog(response.content ?? '');
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      promptTokens: response.usage.promptTokens,
-      completionTokens: response.usage.completionTokens,
-      latencyMs: response.latencyMs,
-      error: `parse failed (${reason}). raw: ${snippet}`,
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw new AIParseError('No pudimos leer la situación del sueño.');
-  }
-
-  // Guardrails determinísticos sobre el output: por más que el prompt
-  // pida "no recomendar medicación", el modelo puede equivocarse. Si
-  // aparece una dosis o nombre de medicamento, rompemos antes de mostrar.
-  const safeOutput = applyGuardrails(parseResult.data, {
+  // El runner aplica los guardrails médicos (el nombre matchea
+  // `pediatric`): si aparece una dosis o un medicamento, rompe antes de
+  // llegar a la UI.
+  return runStructuredAgent({
     agent: AGENT_NAME,
-    ...(context.familyGroupId ? { familyGroupId: context.familyGroupId } : {}),
-    ...(context.childId ? { childId: context.childId } : {}),
-    ...(context.actorUserId ? { actorUserId: context.actorUserId } : {}),
-  });
-
-  await logStore.record({
-    agent: AGENT_NAME,
-    model: response.model,
     promptVersion: PROMPT_VERSION,
-    promptTokens: response.usage.promptTokens,
-    completionTokens: response.usage.completionTokens,
-    totalTokens: response.usage.totalTokens,
-    latencyMs: response.latencyMs,
-    familyGroupId: context.familyGroupId ?? null,
-    childId: context.childId ?? null,
-    actorUserId: context.actorUserId ?? null,
+    profile: modelProfileFor(AGENT_NAME),
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPayload },
+    ],
+    outputSchema: sleepCoachOutputSchema,
+    parseErrorMessage: 'No pudimos leer la situación del sueño.',
+    context,
   });
-
-  return {
-    output: safeOutput,
-    meta: {
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      totalTokens: response.usage.totalTokens,
-      latencyMs: response.latencyMs,
-    },
-  };
 }

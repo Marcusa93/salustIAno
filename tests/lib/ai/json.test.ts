@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractJsonObject, truncateForLog } from '@/lib/ai/json';
+import { extractJsonObject } from '@/lib/ai/json';
 
 describe('extractJsonObject', () => {
   it('parsea JSON puro', () => {
@@ -42,22 +42,5 @@ describe('extractJsonObject', () => {
   it('preserva tipos anidados (arrays, booleans, números)', () => {
     const raw = '{"alarm":true,"tags":["a","b"],"count":3}';
     expect(extractJsonObject(raw)).toEqual({ alarm: true, tags: ['a', 'b'], count: 3 });
-  });
-});
-
-describe('truncateForLog', () => {
-  it('colapsa whitespace y deja contenido corto intacto', () => {
-    expect(truncateForLog('hola  \n  mundo')).toBe('hola mundo');
-  });
-
-  it('trunca con elipsis si excede maxLen', () => {
-    const long = 'a'.repeat(300);
-    const out = truncateForLog(long, 100);
-    expect(out.length).toBe(101); // 100 chars + …
-    expect(out.endsWith('…')).toBe(true);
-  });
-
-  it('devuelve string vacío si input no es string', () => {
-    expect(truncateForLog(undefined as never)).toBe('');
   });
 });

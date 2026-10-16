@@ -3,10 +3,8 @@ import 'server-only';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { callLLM } from '@/lib/ai/client';
-import { AIParseError } from '@/lib/ai/errors';
-import { extractJsonObject, truncateForLog } from '@/lib/ai/json';
-import { logStore } from '@/lib/ai/logger';
+import { type AgentLogContext, runStructuredAgent } from '@/lib/ai/agents/structured-agent';
+import { modelProfileFor } from '@/lib/ai/models';
 import type { ChatMessage, ContentPart } from '@/lib/ai/types';
 import { FALLBACK_TAG, type PhotoTags, photoTagsSchema } from './schema';
 
@@ -14,7 +12,6 @@ export { FALLBACK_TAG, photoTagsSchema } from './schema';
 export type { PhotoTags } from './schema';
 
 const AGENT_NAME = 'photo-tagger';
-const MODEL = 'anthropic/claude-haiku-4-5';
 const PROMPT_VERSION = 'photo-tagger-v1';
 
 const SYSTEM_PROMPT = readFileSync(
@@ -47,19 +44,13 @@ export interface PhotoTaggerOutput {
   };
 }
 
-interface AgentContext {
-  familyGroupId?: string;
-  childId?: string;
-  actorUserId?: string;
-}
-
 /**
  * Etiqueta una foto con 3-5 tags y un caption corto, en castellano rioplatense.
  *
  * Pipeline calcado de diaper-vision:
  *   1. Construye el mensaje multimodal (texto + imagen).
  *   2. Llama al LLM con `responseFormat: 'json_object'`.
- *   3. Parsea + valida con Zod (AIParseError si falla).
+ *   3. Parsea + valida con Zod (AIParseError si falla) y aplica guardrails.
  *   4. Loguea metadata en ai_logs (sin la imagen).
  *
  * Pensado para correr "best-effort" desde uploadPhotosAction. El caller debería
@@ -68,7 +59,7 @@ interface AgentContext {
  */
 export async function tagPhoto(
   input: PhotoTaggerInput,
-  context: AgentContext = {},
+  context: AgentLogContext = {},
 ): Promise<PhotoTaggerOutput> {
   const userParts: ContentPart[] = [
     {
@@ -88,75 +79,20 @@ export async function tagPhoto(
     { role: 'user', content: userParts },
   ];
 
-  let response: Awaited<ReturnType<typeof callLLM>>;
-  try {
-    response = await callLLM({
-      model: MODEL,
-      messages,
-      temperature: 0.3,
-      maxTokens: 300,
-      responseFormat: 'json_object',
-    });
-  } catch (err) {
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: MODEL,
-      promptVersion: PROMPT_VERSION,
-      error: err instanceof Error ? err.message : 'unknown',
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw err;
-  }
-
-  const json = extractJsonObject(response.content ?? '');
-  const parseResult = json ? photoTagsSchema.safeParse(json) : null;
-  if (!parseResult || !parseResult.success) {
-    const reason = parseResult
-      ? `schema mismatch: ${parseResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
-      : 'no se pudo extraer JSON del content';
-    const snippet = truncateForLog(response.content ?? '');
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      promptTokens: response.usage.promptTokens,
-      completionTokens: response.usage.completionTokens,
-      latencyMs: response.latencyMs,
-      error: `parse failed (${reason}). raw: ${snippet}`,
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw new AIParseError('No pudimos interpretar las etiquetas de la foto.');
-  }
-  const parsed = parseResult.data;
-
-  await logStore.record({
+  const { output, meta } = await runStructuredAgent({
     agent: AGENT_NAME,
-    model: response.model,
     promptVersion: PROMPT_VERSION,
-    promptTokens: response.usage.promptTokens,
-    completionTokens: response.usage.completionTokens,
-    totalTokens: response.usage.totalTokens,
-    latencyMs: response.latencyMs,
-    familyGroupId: context.familyGroupId ?? null,
-    childId: context.childId ?? null,
-    actorUserId: context.actorUserId ?? null,
+    profile: modelProfileFor(AGENT_NAME),
+    messages,
+    outputSchema: photoTagsSchema,
+    parseErrorMessage: 'No pudimos interpretar las etiquetas de la foto.',
+    context,
   });
 
-  const cleanTags = normalizeTags(parsed.tags);
-
   return {
-    tags: cleanTags,
-    caption: parsed.caption.trim().slice(0, 160),
-    meta: {
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      totalTokens: response.usage.totalTokens,
-      latencyMs: response.latencyMs,
-    },
+    tags: normalizeTags(output.tags),
+    caption: output.caption.trim().slice(0, 160),
+    meta,
   };
 }
 

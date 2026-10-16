@@ -4,14 +4,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 
-import { callLLM } from '@/lib/ai/client';
-import { AIParseError } from '@/lib/ai/errors';
-import { extractJsonObject, truncateForLog } from '@/lib/ai/json';
-import { logStore } from '@/lib/ai/logger';
+import { type AgentLogContext, runStructuredAgent } from '@/lib/ai/agents/structured-agent';
+import { describeAge } from '@/lib/ai/context/baby-context';
+import { modelProfileFor } from '@/lib/ai/models';
 
 const AGENT_NAME = 'pattern-finder';
-const MODEL = 'anthropic/claude-haiku-4-5';
-const PROMPT_VERSION = 'pattern-finder-v2';
+// v3: el input trae `ageLabel` (edad exacta ya calculada).
+const PROMPT_VERSION = 'pattern-finder-v3';
 
 const SYSTEM_PROMPT = readFileSync(
   join(process.cwd(), 'src/lib/ai/agents/pattern-finder/prompt.md'),
@@ -67,12 +66,6 @@ export interface PatternFinderOutput {
   };
 }
 
-interface AgentContext {
-  familyGroupId?: string;
-  childId?: string;
-  actorUserId?: string;
-}
-
 /**
  * Toma 7-14 días de datos agregados y devuelve 2-4 observaciones descriptivas.
  *
@@ -82,69 +75,21 @@ interface AgentContext {
  */
 export async function findPatterns(
   input: PatternFinderInput,
-  context: AgentContext = {},
+  context: AgentLogContext = {},
 ): Promise<PatternFinderOutput> {
-  const userPayload = JSON.stringify(input);
+  const userPayload = JSON.stringify({ ...input, ageLabel: describeAge(input.ageDays) });
 
-  let response: Awaited<ReturnType<typeof callLLM>>;
-  try {
-    response = await callLLM({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPayload },
-      ],
-      temperature: 0.5,
-      maxTokens: 600,
-      responseFormat: 'json_object',
-    });
-  } catch (err) {
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: MODEL,
-      promptVersion: PROMPT_VERSION,
-      error: err instanceof Error ? err.message : 'unknown',
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw err;
-  }
-
-  const json = extractJsonObject(response.content ?? '');
-  const parseResult = json ? patternsSchema.safeParse(json) : null;
-  if (!parseResult || !parseResult.success) {
-    const reason = parseResult
-      ? `schema mismatch: ${parseResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
-      : 'no se pudo extraer JSON';
-    const snippet = truncateForLog(response.content ?? '');
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      promptTokens: response.usage.promptTokens,
-      completionTokens: response.usage.completionTokens,
-      latencyMs: response.latencyMs,
-      error: `parse failed (${reason}). raw: ${snippet}`,
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw new AIParseError('No pudimos generar las observaciones.');
-  }
-  const parsed = parseResult.data;
-
-  await logStore.record({
+  const { output: parsed, meta } = await runStructuredAgent({
     agent: AGENT_NAME,
-    model: response.model,
     promptVersion: PROMPT_VERSION,
-    promptTokens: response.usage.promptTokens,
-    completionTokens: response.usage.completionTokens,
-    totalTokens: response.usage.totalTokens,
-    latencyMs: response.latencyMs,
-    familyGroupId: context.familyGroupId ?? null,
-    childId: context.childId ?? null,
-    actorUserId: context.actorUserId ?? null,
+    profile: modelProfileFor(AGENT_NAME),
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPayload },
+    ],
+    outputSchema: patternsSchema,
+    parseErrorMessage: 'No pudimos generar las observaciones.',
+    context,
   });
 
   // Filtro defensivo: si alguna observación parece recomendación médica,
@@ -161,11 +106,6 @@ export async function findPatterns(
   return {
     observations,
     tone: parsed.tone,
-    meta: {
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      totalTokens: response.usage.totalTokens,
-      latencyMs: response.latencyMs,
-    },
+    meta,
   };
 }
