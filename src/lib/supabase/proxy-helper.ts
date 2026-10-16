@@ -15,6 +15,9 @@ const PUBLIC_ROUTES = new Set<string>([
   // de sesión). Su seguridad la maneja el propio route handler (applicationId +
   // firma de Alexa), no el proxy — por eso va como público.
   '/api/alexa',
+  // Página de respaldo sin señal: el service worker la guarda sin cookies al
+  // instalarse, así que tiene que responder igual con o sin sesión.
+  '/offline',
 ]);
 
 const AUTH_ROUTES = new Set<string>(['/login', '/signup']);
