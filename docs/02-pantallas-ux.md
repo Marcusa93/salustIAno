@@ -34,6 +34,13 @@ Regalos interactivos, a pantalla completa y sin la navegación de la app. La pri
 
 El visor de fotos recorre todas las fotos de la carta en orden cronológico, sin importar desde qué capítulo se abrió. Mientras dura la ventana de fechas de la carta (`letter-window.ts`), el inicio muestra un sobre que lleva a ella. El contenido es privado y no está en el repo (ver [ADR 0014](../decisions/0014-cartas-contenido-privado.md)).
 
+### Salu instalada en el celu
+
+- **Instalación.** En Android aparece un banner con el botón "Instalar" (usa el diálogo nativo de Chrome). En iPhone, el banner explica Compartir → Agregar a inicio. Si lo cierran, no vuelve por 30 días.
+- **Atajos.** Mantener apretado el ícono en Android ofrece Anotar toma, sueño o pañal. Llevan a `/anotar/[tipo]`: botones grandes que registran con la hora de ahora y vuelven al inicio.
+- **Sin señal.** Si una página no carga por falta de red, se ve `/offline` en la misma URL, con "Reintentar". Cuando vuelve la conexión recarga sola. No se muestran datos guardados en el celu (ver [ADR 0016](../decisions/0016-pwa-offline-y-push.md)).
+- **Avisos.** En Mi cuenta, la tarjeta de notificaciones dice en qué estado está ese dispositivo (falta instalar, bloqueadas, apagadas o activadas) y qué hacer. Con los avisos activos, "Mandarme una de prueba" confirma que llegan.
+
 ## Tono y estética
 
 La app debe sentirse cálida, familiar, moderna y simple. No debe parecer una historia clínica fría ni una app médica hospitalaria. Debe combinar ternura, claridad, orden, confianza, facilidad de carga y visualización emocional del paso del tiempo.

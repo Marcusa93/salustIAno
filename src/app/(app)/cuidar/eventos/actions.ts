@@ -11,8 +11,8 @@ import {
   feedingEventSchema,
   sleepSessionSchema,
 } from '@/lib/validators/events';
+import { sendPushToFamily } from '@/lib/web-push';
 import { revalidatePath } from 'next/cache';
-import { sendPushToFamily } from '../../perfil/push-actions';
 
 /**
  * Helper para resolver display_name + family_group_id del usuario actual y
