@@ -1,22 +1,16 @@
 import { cn } from '@/lib/utils';
 
 /**
- * Fondo decorativo sutil — estilo manta de bebé vichy azul/blanco.
+ * Fondo decorativo: papel tibio con luz suave, sin patrones que compitan
+ * con el contenido.
  *
  * Capas (de atrás hacia adelante):
- *   1. Patrón vichy (gingham) en cuadritos de 40px: blanco + azul polvo
- *      en stripes horizontales/verticales + intersecciones azul más
- *      oscuro. Es el alma del background — "manta de bebé hecha en
- *      casa". Opacidad muy baja (~6-8%) para que no compita con el
- *      contenido.
- *   2. Tres blobs radiales con blur extremo (primary, accent peach,
- *      primary muted) que rompen la regularidad del cuadrille y dan
- *      profundidad orgánica.
- *   3. Una capa de grano SVG turbulence al 1.5% mix-blend-overlay —
- *      textura de papel artesanal.
+ *   1. Un halo del primary arriba, como la luz que entra por una ventana.
+ *   2. Un toque del accent (durazno) abajo a la izquierda, para que el
+ *      azul no quede frío.
+ *   3. Grano SVG muy tenue: textura de papel.
  *
- * Cada capa es prácticamente imperceptible sola; juntas dan la
- * sensación de "esto está hecho con cuidado" sin gritar nada.
+ * Todo sale de tokens, así se adapta solo a claro, oscuro y madrugada.
  */
 export function SoftBackdrop({ className }: { className?: string }) {
   return (
@@ -24,51 +18,20 @@ export function SoftBackdrop({ className }: { className?: string }) {
       aria-hidden
       className={cn('pointer-events-none fixed inset-0 z-0 overflow-hidden', className)}
     >
-      {/* Capa 1: patrón vichy / gingham (azul + blanco). Fade-out vertical
-          para que en pantallas largas el cuadrille no compita con el
-          contenido cerca del bottom. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: [
-            'linear-gradient(to right, oklch(0.6 0.085 235 / 0.07) 50%, transparent 50%)',
-            'linear-gradient(to bottom, oklch(0.6 0.085 235 / 0.07) 50%, transparent 50%)',
-          ].join(', '),
-          backgroundSize: '36px 36px, 36px 36px',
-          backgroundPosition: '0 0, 0 0',
-          // El mask hace que el cuadrille empiece full opaco arriba y se
-          // vaya desvaneciendo hacia el bottom — útil cuando hay scroll
-          // largo y la repetición empieza a notarse como ruido.
-          maskImage:
-            'linear-gradient(to bottom, black 0%, black 50%, rgba(0,0,0,0.4) 80%, transparent 100%)',
-          WebkitMaskImage:
-            'linear-gradient(to bottom, black 0%, black 50%, rgba(0,0,0,0.4) 80%, transparent 100%)',
-        }}
-      />
-
-      {/* Capa 2: blobs orgánicos que rompen la regularidad del cuadrille */}
-      <div
-        className="absolute -top-32 -right-32 size-[42rem] rounded-full bg-primary/8 blur-3xl"
-        style={{ opacity: 0.45 }}
-      />
-      <div
-        className="absolute top-1/3 -left-40 size-[36rem] rounded-full bg-accent blur-3xl"
-        style={{ opacity: 0.3 }}
-      />
-      <div
-        className="absolute -bottom-40 right-1/4 size-[40rem] rounded-full bg-primary/5 blur-3xl"
-        style={{ opacity: 0.4 }}
-      />
-
-      {/* Capa 3: grano SVG — papel hecho a mano */}
-      <div
-        className="absolute inset-0 opacity-[0.015] mix-blend-overlay"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")",
-          backgroundSize: '160px 160px',
-        }}
-      />
+      <div className="-top-48 -translate-x-1/2 absolute left-1/2 h-[34rem] w-[56rem] rounded-full bg-primary/10 blur-3xl" />
+      <div className="-bottom-56 -left-40 absolute size-[34rem] rounded-full bg-accent/60 blur-3xl" />
+      <svg className="absolute inset-0 size-full opacity-[0.035] mix-blend-multiply dark:mix-blend-screen">
+        <filter id="salu-grain">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.85"
+            numOctaves="2"
+            stitchTiles="stitch"
+          />
+          <feColorMatrix type="saturate" values="0" />
+        </filter>
+        <rect width="100%" height="100%" filter="url(#salu-grain)" />
+      </svg>
     </div>
   );
 }

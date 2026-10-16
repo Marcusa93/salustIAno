@@ -12,6 +12,19 @@
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-fraunces);
   --font-hand: var(--font-caveat), "Segoe Print", cursive;
+  --color-feed: var(--feed);
+  --color-feed-soft: var(--feed-soft);
+  --color-feed-foreground: var(--feed-foreground);
+  --color-sleep: var(--sleep);
+  --color-sleep-soft: var(--sleep-soft);
+  --color-sleep-foreground: var(--sleep-foreground);
+  --color-diaper: var(--diaper);
+  --color-diaper-soft: var(--diaper-soft);
+  --color-diaper-foreground: var(--diaper-foreground);
+  --color-health: var(--health);
+  --color-health-soft: var(--health-soft);
+  --color-health-foreground: var(--health-foreground);
+  --color-elevation: var(--elevation);
   --color-carta-night: var(--carta-night);
   --color-carta-night-foreground: var(--carta-night-foreground);
   --color-carta-glow: var(--carta-glow);
@@ -112,6 +125,26 @@
   --sidebar-ring: oklch(0.6 0.085 235);
 
   /*
+   * Color por tipo de registro: toma (ámbar tibio), sueño (índigo de
+   * noche), pañal (salvia) y salud (rosa). Cada uno con un tono pleno para
+   * íconos y acentos, uno suave para fondos y uno de texto con contraste AA.
+   */
+  --feed: oklch(0.74 0.12 68);
+  --feed-soft: oklch(0.955 0.035 75);
+  --feed-foreground: oklch(0.42 0.09 60);
+  --sleep: oklch(0.56 0.1 275);
+  --sleep-soft: oklch(0.945 0.025 275);
+  --sleep-foreground: oklch(0.36 0.09 275);
+  --diaper: oklch(0.66 0.08 165);
+  --diaper-soft: oklch(0.95 0.028 165);
+  --diaper-foreground: oklch(0.38 0.06 165);
+  --health: oklch(0.66 0.13 15);
+  --health-soft: oklch(0.955 0.025 15);
+  --health-foreground: oklch(0.42 0.11 15);
+  /* Sombra con el tono de la marca en vez de gris neutro. */
+  --elevation: oklch(0.32 0.05 240 / 0.14);
+
+  /*
    * Cartas (/carta/*) — dirección de arte propia, igual en claro y oscuro:
    * una carta se lee de noche, a la luz de un velador (night + glow), y se
    * escribe con lapicera azul sobre papel tibio (paper + ink).
@@ -162,6 +195,19 @@
   --sidebar-accent-foreground: oklch(0.94 0.012 90);
   --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: oklch(0.72 0.1 235);
+  --feed: oklch(0.8 0.11 70);
+  --feed-soft: oklch(0.3 0.045 65);
+  --feed-foreground: oklch(0.9 0.06 75);
+  --sleep: oklch(0.74 0.09 275);
+  --sleep-soft: oklch(0.28 0.045 275);
+  --sleep-foreground: oklch(0.9 0.04 275);
+  --diaper: oklch(0.76 0.07 165);
+  --diaper-soft: oklch(0.28 0.035 165);
+  --diaper-foreground: oklch(0.9 0.04 165);
+  --health: oklch(0.76 0.11 15);
+  --health-soft: oklch(0.3 0.045 15);
+  --health-foreground: oklch(0.92 0.04 15);
+  --elevation: oklch(0 0 0 / 0.4);
 }
 
 .night {
@@ -191,6 +237,20 @@
   --sidebar-accent-foreground: oklch(0.9 0.01 90);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.68 0.09 235);
+  /* Madrugada: colores apagados y tibios para no encandilar. */
+  --feed: oklch(0.7 0.09 65);
+  --feed-soft: oklch(0.2 0.03 60);
+  --feed-foreground: oklch(0.82 0.05 70);
+  --sleep: oklch(0.62 0.07 275);
+  --sleep-soft: oklch(0.19 0.03 275);
+  --sleep-foreground: oklch(0.82 0.03 275);
+  --diaper: oklch(0.64 0.06 165);
+  --diaper-soft: oklch(0.19 0.025 165);
+  --diaper-foreground: oklch(0.82 0.03 165);
+  --health: oklch(0.64 0.09 15);
+  --health-soft: oklch(0.2 0.03 15);
+  --health-foreground: oklch(0.84 0.03 15);
+  --elevation: oklch(0 0 0 / 0.5);
   color-scheme: dark;
 }
 
