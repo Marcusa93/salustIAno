@@ -24,6 +24,16 @@ Una sola sección con dos modos: explorar lo guardado o pedirle a la IA un cuent
 
 Miembros, roles, invitaciones y auditoría básica.
 
+### Cartas (`/carta/[slug]`)
+
+Regalos interactivos, a pantalla completa y sin la navegación de la app. La primera es la carta de Salu a mamá por el Día de la Madre 2026 (`/carta/mama-2026`). Tiene tres escenas:
+
+1. **El sobre.** Un tap lo abre, y ese mismo tap habilita el audio (iOS lo exige).
+2. **El latido.** Mamá apoya el dedo y suena el latido de una ecografía, sintetizado con Web Audio. Al completarse, se funde con la primera canción.
+3. **La carta.** Capítulos en orden cronológico (de la panza a los 5 meses), cada uno con su texto manuscrito, sus polaroids y su canción, que se funden al pasar de uno a otro. Los "aunque…" de septiembre son un mazo de fotos para deslizar. El final vuelve a la noche: mamá apoya el dedo sobre el corazón de Salu y aparece el cierre, con un contador de cuántos días y segundos hace que es su mamá.
+
+El visor de fotos recorre todas las fotos de la carta en orden cronológico, sin importar desde qué capítulo se abrió. Mientras dura la ventana de fechas de la carta (`letter-window.ts`), el inicio muestra un sobre que lleva a ella. El contenido es privado y no está en el repo (ver [ADR 0014](../decisions/0014-cartas-contenido-privado.md)).
+
 ## Tono y estética
 
 La app debe sentirse cálida, familiar, moderna y simple. No debe parecer una historia clínica fría ni una app médica hospitalaria. Debe combinar ternura, claridad, orden, confianza, facilidad de carga y visualización emocional del paso del tiempo.

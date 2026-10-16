@@ -11,6 +11,19 @@
   --font-display: var(--font-fraunces), "Newsreader", Georgia, serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-fraunces);
+  --font-hand: var(--font-caveat), "Segoe Print", cursive;
+  --color-carta-night: var(--carta-night);
+  --color-carta-night-foreground: var(--carta-night-foreground);
+  --color-carta-glow: var(--carta-glow);
+  --color-carta-paper: var(--carta-paper);
+  --color-carta-paper-edge: var(--carta-paper-edge);
+  --color-carta-ink: var(--carta-ink);
+  --color-carta-ink-soft: var(--carta-ink-soft);
+  --color-carta-rose: var(--carta-rose);
+  --color-carta-polaroid: var(--carta-polaroid);
+  --color-carta-tape: var(--carta-tape);
+  --color-carta-seal: var(--carta-seal);
+  --color-carta-shadow: var(--carta-shadow);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -97,6 +110,24 @@
   --sidebar-accent-foreground: oklch(0.32 0.05 235);
   --sidebar-border: oklch(0.92 0.012 235);
   --sidebar-ring: oklch(0.6 0.085 235);
+
+  /*
+   * Cartas (/carta/*) — dirección de arte propia, igual en claro y oscuro:
+   * una carta se lee de noche, a la luz de un velador (night + glow), y se
+   * escribe con lapicera azul sobre papel tibio (paper + ink).
+   */
+  --carta-night: oklch(0.17 0.035 262);
+  --carta-night-foreground: oklch(0.94 0.02 85);
+  --carta-glow: oklch(0.83 0.1 70);
+  --carta-paper: oklch(0.968 0.018 85);
+  --carta-paper-edge: oklch(0.915 0.03 80);
+  --carta-ink: oklch(0.33 0.075 262);
+  --carta-ink-soft: oklch(0.5 0.045 262);
+  --carta-rose: oklch(0.72 0.12 18);
+  --carta-polaroid: oklch(0.99 0.004 90);
+  --carta-tape: oklch(0.88 0.05 75 / 0.72);
+  --carta-seal: oklch(0.52 0.14 25);
+  --carta-shadow: oklch(0.25 0.04 262 / 0.35);
 }
 
 .dark {
@@ -370,7 +401,49 @@
   animation: salu-spin-slow 32s linear infinite;
 }
 
+/* Cartas: latido (lub-dub) al ritmo de --beat y corazones que suben. */
+@keyframes carta-beat {
+  0%,
+  45%,
+  100% {
+    transform: scale(1);
+  }
+  12% {
+    transform: scale(1.09);
+  }
+  26% {
+    transform: scale(1.03);
+  }
+  34% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes carta-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.6);
+  }
+  15% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift, 0px), -70vh, 0) scale(1.1);
+  }
+}
+
+.animate-carta-beat {
+  animation: carta-beat var(--beat, 0.43s) ease-out infinite;
+}
+
+.animate-carta-rise {
+  animation: carta-rise var(--rise, 7s) ease-in var(--delay, 0s) infinite both;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .animate-carta-beat,
+  .animate-carta-rise,
   .animate-page-enter,
   .animate-twinkle,
   .animate-float-y,

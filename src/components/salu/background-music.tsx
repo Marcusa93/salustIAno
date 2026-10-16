@@ -2,10 +2,13 @@
 
 import { cn } from '@/lib/utils';
 import { Volume2, VolumeX } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 const STORAGE_KEY = 'salu:music-on';
 const SRC = '/audio/en-mi-corazon-viviras.mp3';
+// Rutas con banda sonora propia: acá la música ambiente se calla.
+const SILENT_PREFIXES = ['/carta/'];
 
 /**
  * Música ambiente en loop ("En mi corazón vivirás" — Tarzán). Mounted en
@@ -20,27 +23,36 @@ export function BackgroundMusic() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [enabled, setEnabled] = useState(false);
   const [ready, setReady] = useState(false);
+  const pathname = usePathname();
+  const silenced = SILENT_PREFIXES.some((prefix) => pathname?.startsWith(prefix));
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const wantsOn = stored === '1';
-    setEnabled(wantsOn);
+    setEnabled(localStorage.getItem(STORAGE_KEY) === '1');
     setReady(true);
+  }, []);
 
-    if (!wantsOn) return;
+  useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!ready || !audio) return;
+    if (silenced || !enabled) {
+      audio.pause();
+      return;
+    }
 
+    const onFirstGesture = () => {
+      audio.play().catch(() => {});
+      removeGestureListeners();
+    };
+    const removeGestureListeners = () => {
+      window.removeEventListener('pointerdown', onFirstGesture);
+      window.removeEventListener('keydown', onFirstGesture);
+    };
     audio.play().catch(() => {
-      const onFirstGesture = () => {
-        audio.play().catch(() => {});
-        window.removeEventListener('pointerdown', onFirstGesture);
-        window.removeEventListener('keydown', onFirstGesture);
-      };
       window.addEventListener('pointerdown', onFirstGesture, { once: true });
       window.addEventListener('keydown', onFirstGesture, { once: true });
     });
-  }, []);
+    return removeGestureListeners;
+  }, [ready, enabled, silenced]);
 
   function toggle() {
     const audio = audioRef.current;
@@ -62,6 +74,7 @@ export function BackgroundMusic() {
       {/* biome-ignore lint/a11y/useMediaCaption: música ambiente decorativa, sin diálogo. */}
       <audio ref={audioRef} src={SRC} loop preload="auto" />
       <button
+        hidden={silenced}
         type="button"
         onClick={toggle}
         aria-label={enabled ? 'Silenciar música' : 'Reproducir música'}

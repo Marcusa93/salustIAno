@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { babyAgeFromBirth } from '@/lib/baby-age';
 import { expectationsFor } from '@/lib/baby-expectations';
+import { scheduledLetterAt } from '@/lib/carta/letter-window';
 import { startOfDayArDaysAgo, startOfTodayAr } from '@/lib/format-ar';
 import { greetingFor, isLateNightAr } from '@/lib/greeting';
 import { averagePerDay, formatPredictionTime, predictNextFeeding } from '@/lib/predictions';
@@ -20,6 +21,7 @@ import { DiaperQuickAdd } from './_components/diaper-quick-add';
 import { ExpectationsCard } from './_components/expectations-card';
 import { FamilyActivityCard } from './_components/family-activity-card';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
+import { LetterEnvelopeCard } from './_components/letter-envelope-card';
 import { NightCoachCard } from './_components/night-coach-card';
 import { QuickRepeatBar } from './_components/quick-repeat-bar';
 import { RealtimeRefresher } from './_components/realtime-refresher';
@@ -289,6 +291,7 @@ export default async function HomePage() {
   // Total de eventos del día — usado para gatear cards que sólo aportan
   // cuando hay actividad cargada (ShareDayCard).
   const totalEventsToday = todaySummary.feeding + todaySummary.sleep + todaySummary.diaper;
+  const scheduledLetter = scheduledLetterAt();
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -307,6 +310,9 @@ export default async function HomePage() {
           displayName={displayName}
         />
       )}
+
+      {/* Carta programada (ej. Día de la Madre): solo en su ventana de fechas. */}
+      {scheduledLetter && <LetterEnvelopeCard slug={scheduledLetter} />}
 
       {/* ZONA 1 — HUB SPATIAL: avatar 360 al centro + 6 acciones orbitando
           con líneas estilo HUD. Reemplaza el hero clásico, la "tira de
