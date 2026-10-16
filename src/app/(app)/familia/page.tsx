@@ -185,7 +185,11 @@ export default async function FamiliaPage() {
       </section>
 
       <div className="animate-stagger-up" style={{ animationDelay: '240ms' }}>
-        <MembersSection initialMembers={members} isAdmin={isAdmin} />
+        <MembersSection
+          initialMembers={members}
+          isAdmin={isAdmin}
+          isSuperadmin={members.some((m) => m.isSelf && m.isSuperadmin)}
+        />
       </div>
 
       <div className="animate-stagger-up" style={{ animationDelay: '300ms' }}>

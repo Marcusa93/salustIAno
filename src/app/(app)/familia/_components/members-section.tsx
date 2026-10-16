@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
@@ -13,14 +14,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  type FamilyActor,
+  type FamilyRole,
+  type MemberPermissions,
+  assignableRoles,
+  memberPermissions,
+} from '@/lib/family-permissions';
 import { cn } from '@/lib/utils';
-import type { CreateMemberInput, MemberRole } from '@/lib/validators/family-member';
-import { KeyRound, Loader2, MoreVertical, Plus, Trash2, UserPlus, Users } from 'lucide-react';
+import type { CreateMemberAsSuperadminInput } from '@/lib/validators/family-member';
+import {
+  KeyRound,
+  Loader2,
+  MoreVertical,
+  Plus,
+  Trash2,
+  UserPlus,
+  UserX,
+  Users,
+} from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import {
   type MemberEntry,
   createMemberAction,
+  deleteMemberAccountAction,
   removeMemberAction,
   resetMemberPasswordAction,
   updateMemberRoleAction,
@@ -44,10 +62,13 @@ const ROLE_TONE: Record<MemberEntry['role'], string> = {
 interface MembersSectionProps {
   initialMembers: MemberEntry[];
   isAdmin: boolean;
+  isSuperadmin: boolean;
 }
 
-export function MembersSection({ initialMembers, isAdmin }: MembersSectionProps) {
+export function MembersSection({ initialMembers, isAdmin, isSuperadmin }: MembersSectionProps) {
   const [members, setMembers] = useState(initialMembers);
+  const actor: FamilyActor = { role: isAdmin ? 'admin' : null, isSuperadmin };
+  const roles = assignableRoles(actor);
   const [open, setOpen] = useState(false);
   const [pendingPassword, setPendingPassword] = useState<{
     email: string;
@@ -102,7 +123,8 @@ export function MembersSection({ initialMembers, isAdmin }: MembersSectionProps)
             <MemberCard
               key={m.membershipId}
               member={m}
-              canManage={isAdmin && !m.isSelf && m.role !== 'admin'}
+              permissions={memberPermissions(actor, m)}
+              roles={roles}
               onRemoved={() =>
                 setMembers((prev) => prev.filter((x) => x.membershipId !== m.membershipId))
               }
@@ -122,7 +144,8 @@ export function MembersSection({ initialMembers, isAdmin }: MembersSectionProps)
       <CreateMemberSheet
         open={open}
         onOpenChange={setOpen}
-        onSubmit={async (input: CreateMemberInput) => {
+        allowAdmin={roles.includes('admin')}
+        onSubmit={async (input: CreateMemberAsSuperadminInput) => {
           const result = await createMemberAction(input);
           if (!result.ok) {
             toast.error(result.error);
@@ -155,23 +178,27 @@ export function MembersSection({ initialMembers, isAdmin }: MembersSectionProps)
 
 function MemberCard({
   member,
-  canManage,
+  permissions,
+  roles,
   onRemoved,
   onRoleChanged,
   onPasswordReset,
 }: {
   member: MemberEntry;
-  canManage: boolean;
+  permissions: MemberPermissions;
+  roles: FamilyRole[];
   onRemoved: () => void;
-  onRoleChanged: (newRole: MemberRole) => void;
+  onRoleChanged: (newRole: FamilyRole) => void;
   onPasswordReset: (tempPassword: string, email: string) => void;
 }) {
   const [pending, startPending] = useTransition();
+  const name = member.displayName ?? member.email ?? 'este miembro';
+  const canManage = Object.values(permissions).some(Boolean);
 
   function handleRemove() {
     if (
       !window.confirm(
-        `¿Sacar a ${member.displayName ?? member.email ?? 'este miembro'} de la familia? Pierde acceso pero la cuenta sigue existiendo.`,
+        `¿Sacar a ${name} de la familia? Pierde acceso pero la cuenta sigue existiendo.`,
       )
     ) {
       return;
@@ -187,9 +214,32 @@ function MemberCard({
     });
   }
 
-  function handleRoleChange(role: string) {
-    if (role === member.role) return;
-    if (role !== 'caregiver' && role !== 'family' && role !== 'viewer') return;
+  function handleDeleteAccount() {
+    if (
+      !window.confirm(
+        `¿Borrar la cuenta de ${name}? No va a poder volver a entrar y no se puede deshacer. Lo que cargó en la app se conserva.`,
+      )
+    ) {
+      return;
+    }
+    startPending(async () => {
+      const result = await deleteMemberAccountAction(member.membershipId);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      onRemoved();
+      toast.success(
+        result.mode === 'deleted'
+          ? 'Cuenta borrada.'
+          : 'Cuenta dada de baja. Su historial en la app se conserva.',
+      );
+    });
+  }
+
+  function handleRoleChange(value: string) {
+    const role = roles.find((r) => r === value);
+    if (!role || role === member.role) return;
     startPending(async () => {
       const result = await updateMemberRoleAction(member.membershipId, role);
       if (!result.ok) {
@@ -204,7 +254,7 @@ function MemberCard({
   function handleResetPassword() {
     if (
       !window.confirm(
-        `¿Resetear la contraseña de ${member.displayName ?? member.email ?? 'este miembro'}? La nueva contraseña va a aparecer una sola vez.`,
+        `¿Resetear la contraseña de ${name}? La nueva contraseña va a aparecer una sola vez.`,
       )
     ) {
       return;
@@ -246,12 +296,12 @@ function MemberCard({
             ROLE_TONE[member.role],
           )}
         >
-          {ROLE_LABEL[member.role]}
+          {member.isSuperadmin ? 'Superadmin' : ROLE_LABEL[member.role]}
         </span>
         {canManage && (
           <DropdownMenu>
             <DropdownMenuTrigger
-              aria-label={`Opciones para ${member.displayName ?? member.email ?? 'este miembro'}`}
+              aria-label={`Opciones para ${name}`}
               disabled={pending}
               className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:opacity-50"
             >
@@ -261,25 +311,48 @@ function MemberCard({
                 <MoreVertical className="size-4" aria-hidden />
               )}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[180px]">
-              <DropdownMenuLabel>Cambiar rol</DropdownMenuLabel>
-              <DropdownMenuRadioGroup value={member.role} onValueChange={handleRoleChange}>
-                <DropdownMenuRadioItem value="caregiver">Cuidador/a</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="family">Familia</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="viewer">Solo ver</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleResetPassword}>
-                <KeyRound />
-                Resetear contraseña
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleRemove}
-                className="text-destructive data-highlighted:bg-destructive/10 data-highlighted:text-destructive"
-              >
-                <Trash2 />
-                Sacar de la familia
-              </DropdownMenuItem>
+            <DropdownMenuContent align="end" className="min-w-[200px]">
+              {permissions.changeRole && (
+                <>
+                  {/* Base UI exige que el label viva dentro de un Group: suelto,
+                      tira MenuGroupRootContext y rompe el menú al abrirlo. */}
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Cambiar rol</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={member.role} onValueChange={handleRoleChange}>
+                      {roles.map((role) => (
+                        <DropdownMenuRadioItem key={role} value={role}>
+                          {ROLE_LABEL[role]}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {permissions.resetPassword && (
+                <DropdownMenuItem onClick={handleResetPassword}>
+                  <KeyRound />
+                  Resetear contraseña
+                </DropdownMenuItem>
+              )}
+              {permissions.remove && (
+                <DropdownMenuItem
+                  onClick={handleRemove}
+                  className="text-destructive data-highlighted:bg-destructive/10 data-highlighted:text-destructive"
+                >
+                  <UserX />
+                  Sacar de la familia
+                </DropdownMenuItem>
+              )}
+              {permissions.deleteAccount && (
+                <DropdownMenuItem
+                  onClick={handleDeleteAccount}
+                  className="text-destructive data-highlighted:bg-destructive/10 data-highlighted:text-destructive"
+                >
+                  <Trash2 />
+                  Borrar cuenta
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

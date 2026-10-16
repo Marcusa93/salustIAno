@@ -3,13 +3,17 @@ import { z } from 'zod';
 /**
  * Roles disponibles cuando un admin agrega a un miembro nuevo.
  *
- * Notar que `admin` no aparece acá: solo se puede asignar admin a través de
- * un cambio explícito (todavía no implementado) o cuando alguien crea su
- * propio family_group durante signup. Esto evita que un admin cree otro admin
- * "por error" desde el formulario.
+ * Notar que `admin` no aparece acá: un admin común no puede crear ni nombrar
+ * otros admins. Solo el superadmin puede (ver `familyRoleSchema` y
+ * `@/lib/family-permissions`), o alguien que crea su propio family_group
+ * durante signup.
  */
 export const memberRoleSchema = z.enum(['caregiver', 'family', 'viewer']);
 export type MemberRole = z.infer<typeof memberRoleSchema>;
+
+/** Todos los roles, incluido `admin`. Solo para lo que hace el superadmin. */
+export const familyRoleSchema = z.enum(['admin', 'caregiver', 'family', 'viewer']);
+export type FamilyMemberRole = z.infer<typeof familyRoleSchema>;
 
 /**
  * Input para crear un miembro nuevo. La contraseña la genera el server, no
@@ -42,3 +46,10 @@ export const createMemberSchema = z.object({
 });
 
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
+
+/** Igual que `createMemberSchema`, pero el superadmin también puede crear admins. */
+export const createMemberAsSuperadminSchema = createMemberSchema.extend({
+  role: familyRoleSchema,
+});
+
+export type CreateMemberAsSuperadminInput = z.infer<typeof createMemberAsSuperadminSchema>;
