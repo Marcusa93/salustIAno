@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { callLLM } from '@/lib/ai/client';
 import {
   type TimelineRow,
-  describeAge,
+  describeAgeFromBirth,
   describeCorrectedAge,
   summarizeRecentCare,
 } from '@/lib/ai/context/baby-context';
@@ -368,7 +368,7 @@ export function buildAmbientContext(
         lines.push(
           age.unborn
             ? `- Fecha esperada: ${child.birth_date} (todavía no nació, ${age.label.toLowerCase()})`
-            : `- Edad: ${describeAge(age.days)} (nacido el ${child.birth_date})`,
+            : `- Edad: ${describeAgeFromBirth(child.birth_date, now)} (nacido el ${child.birth_date})`,
         );
         const corrected = age.unborn
           ? null

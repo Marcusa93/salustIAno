@@ -62,6 +62,51 @@ export function describeAge(ageDays: number | null): string | null {
   return `${plural(years, 'año', 'años')}${monthsLabel} ${total}`;
 }
 
+function arCalendarDate(now: Date): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  return { year: get('year'), month: get('month'), day: get('day') };
+}
+
+function utcDay(year: number, month: number, day: number): number {
+  return Date.UTC(year, month - 1, day) / 86_400_000;
+}
+
+/**
+ * Como `describeAge`, pero con meses de calendario contados en hora de
+ * Argentina: si nació un 4, cumple mes cada 4. Es como cuenta la familia
+ * y la pediatra. Para menos de 8 semanas o más de 2 años usa el mismo
+ * formato que `describeAge`.
+ *
+ *   describeAgeFromBirth('2026-05-04', <16/10/2026 AR>) → "5 meses y 12 días (165 días)"
+ */
+export function describeAgeFromBirth(birthDate: string | null, now: Date): string | null {
+  const match = birthDate ? /^(\d{4})-(\d{2})-(\d{2})/.exec(birthDate) : null;
+  if (!match || Number.isNaN(now.getTime())) return null;
+  const [by, bm, bd] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const today = arCalendarDate(now);
+  const totalDays = utcDay(today.year, today.month, today.day) - utcDay(by, bm, bd);
+  if (totalDays < 56 || totalDays >= 730) return describeAge(totalDays);
+
+  let months = (today.year - by) * 12 + (today.month - bm);
+  if (today.day < bd) months -= 1;
+  // Día del "cumplemes" anterior; si el mes es más corto (nació un 31), el último día.
+  const anchorMonthIndex = bm - 1 + months;
+  const anchorYear = by + Math.floor(anchorMonthIndex / 12);
+  const anchorMonth = (anchorMonthIndex % 12) + 1;
+  const lastDayOfAnchorMonth = new Date(Date.UTC(anchorYear, anchorMonth, 0)).getUTCDate();
+  const anchorDay = Math.min(bd, lastDayOfAnchorMonth);
+  const rest =
+    utcDay(today.year, today.month, today.day) - utcDay(anchorYear, anchorMonth, anchorDay);
+  const restLabel = rest > 0 ? ` y ${plural(rest, 'día', 'días')}` : '';
+  return `${plural(months, 'mes', 'meses')}${restLabel} (${totalDays} días)`;
+}
+
 /**
  * Edad corregida para prematuros (< 37 semanas): la que usan las guías
  * pediátricas hasta los 2 años para hitos, sueño y alimentación. null si

@@ -4,10 +4,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { type AgentLogContext, runStructuredAgent } from '@/lib/ai/agents/structured-agent';
-import { describeAge } from '@/lib/ai/context/baby-context';
+import { describeAgeFromBirth } from '@/lib/ai/context/baby-context';
 import { AIValidationError } from '@/lib/ai/errors';
 import { modelProfileFor } from '@/lib/ai/models';
-import { chronologicalAgeDays } from '@/lib/validators/child-profile';
 import {
   type PediatricInput,
   type PediatricSummary,
@@ -64,10 +63,9 @@ export async function generatePediatricPrep(
   }
 
   const { child, period } = parsedInput.data;
-  const ageDays = chronologicalAgeDays(child.birth_date, new Date(period.toIso));
   const userPayload = JSON.stringify({
     ...parsedInput.data,
-    child: { ...child, age_label: describeAge(ageDays) },
+    child: { ...child, age_label: describeAgeFromBirth(child.birth_date, new Date(period.toIso)) },
   });
 
   const { output, meta } = await runStructuredAgent({

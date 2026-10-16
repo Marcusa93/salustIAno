@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type TimelineRow,
   describeAge,
+  describeAgeFromBirth,
   describeCorrectedAge,
   summarizeRecentCare,
 } from '@/lib/ai/context/baby-context';
@@ -40,6 +41,39 @@ describe('describeAge', () => {
   it('después de los 2 años en años y meses', () => {
     expect(describeAge(800)).toBe('2 años y 2 meses (800 días)');
     expect(describeAge(731)).toBe('2 años (731 días)');
+  });
+});
+
+describe('describeAgeFromBirth', () => {
+  // 16/10/2026 18:00 en Argentina.
+  const now = new Date('2026-10-16T21:00:00Z');
+
+  it('cuenta meses de calendario: nació un 4, cumple mes cada 4', () => {
+    expect(describeAgeFromBirth('2026-05-04', now)).toBe('5 meses y 12 días (165 días)');
+    expect(describeAgeFromBirth('2026-05-16', now)).toBe('5 meses (153 días)');
+  });
+
+  it('usa la fecha de Argentina aunque en UTC ya sea el día siguiente', () => {
+    // 16/10 22:30 AR = 17/10 01:30 UTC.
+    const lateNight = new Date('2026-10-17T01:30:00Z');
+    expect(describeAgeFromBirth('2026-05-04', lateNight)).toBe('5 meses y 12 días (165 días)');
+  });
+
+  it('si nació un 31, el cumplemes de un mes corto es el último día', () => {
+    expect(describeAgeFromBirth('2025-12-31', new Date('2026-03-01T15:00:00Z'))).toBe(
+      '2 meses y 1 día (60 días)',
+    );
+  });
+
+  it('menos de 8 semanas o más de 2 años: mismo formato que describeAge', () => {
+    expect(describeAgeFromBirth('2026-10-01', now)).toBe(describeAge(15));
+    expect(describeAgeFromBirth('2024-08-16', now)).toBe(describeAge(791));
+  });
+
+  it('sin fecha o con fecha inválida devuelve null', () => {
+    expect(describeAgeFromBirth(null, now)).toBeNull();
+    expect(describeAgeFromBirth('no-es-fecha', now)).toBeNull();
+    expect(describeAgeFromBirth('2026-05-04', new Date('invalid'))).toBeNull();
   });
 });
 

@@ -148,7 +148,8 @@ describe('salustia chat', () => {
     const dynamic = parts[1]?.text ?? '';
     expect(parts[1]?.cache_control).toBeUndefined();
     expect(dynamic).toContain('Hora actual de Argentina');
-    expect(dynamic).toContain('- Edad: 5 meses y 2 días (154 días)');
+    // 153 o 154 según la hora: la edad se cuenta en fecha de Argentina.
+    expect(dynamic).toMatch(/- Edad: 5 meses( y \d+ días?)? \(15[34] días\)/);
     expect(dynamic).toContain('## Últimos cuidados');
     expect(dynamic).toContain('hace 30 min');
     expect(dynamic).toContain('mamadera 120 ml');
