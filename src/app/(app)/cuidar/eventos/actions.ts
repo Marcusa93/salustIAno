@@ -643,6 +643,40 @@ export async function quickCloseSleepAction(
   return { ok: true };
 }
 
+/**
+ * Deshace un "se despertó" tocado por error: vuelve a abrir el sueño
+ * (ended_at = null). Solo si no hay otro sueño abierto para el bebé.
+ */
+export async function reopenSleepAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+
+  const { data: session } = await supabase
+    .from('sleep_sessions')
+    .select('child_id')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (!session) return { ok: false, error: 'No encontramos ese sueño.' };
+
+  const { data: open } = await supabase
+    .from('sleep_sessions')
+    .select('id')
+    .eq('child_id', session.child_id as string)
+    .is('ended_at', null)
+    .is('deleted_at', null)
+    .limit(1);
+  if (open && open.length > 0) return { ok: false, error: 'Ya hay otro sueño en curso.' };
+
+  const { error } = await supabase.from('sleep_sessions').update({ ended_at: null }).eq('id', id);
+  if (error) return { ok: false, error: 'No pudimos deshacerlo.' };
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true };
+}
+
 // ============================================================================
 // Repeat — registra al instante con los mismos datos que el último evento
 // ============================================================================
@@ -732,7 +766,7 @@ export async function repeatDiaperAction(): Promise<{ ok: true } | { ok: false; 
  */
 export async function logBottleFeedingAction(
   amountMl: number,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   if (!Number.isFinite(amountMl) || amountMl < 5 || amountMl > 500) {
     return { ok: false, error: 'Cantidad inválida.' };
   }
@@ -740,20 +774,24 @@ export async function logBottleFeedingAction(
   const ctx = await getActorContext();
   if ('error' in ctx) return { ok: false, error: ctx.error ?? 'Error inesperado.' };
 
-  const { error } = await ctx.supabase.from('feeding_events').insert({
-    child_id: ctx.childId,
-    occurred_at: new Date().toISOString(),
-    type: 'bottle',
-    amount_ml: Math.round(amountMl),
-    reaction: 'none',
-    created_by: ctx.userId,
-  });
+  const { data, error } = await ctx.supabase
+    .from('feeding_events')
+    .insert({
+      child_id: ctx.childId,
+      occurred_at: new Date().toISOString(),
+      type: 'bottle',
+      amount_ml: Math.round(amountMl),
+      reaction: 'none',
+      created_by: ctx.userId,
+    })
+    .select('id')
+    .single();
 
-  if (error) return { ok: false, error: 'No pudimos guardar la toma.' };
+  if (error || !data) return { ok: false, error: 'No pudimos guardar la toma.' };
 
   revalidatePath('/home');
   revalidatePath('/timeline');
-  return { ok: true };
+  return { ok: true, id: data.id as string };
 }
 
 /**
@@ -762,7 +800,7 @@ export async function logBottleFeedingAction(
  */
 export async function logDiaperAction(
   type: 'wet' | 'dirty' | 'both' | 'dry',
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const VALID_TYPES = new Set(['wet', 'dirty', 'both', 'dry']);
   if (!VALID_TYPES.has(type)) return { ok: false, error: 'Tipo de pañal inválido.' };
 
@@ -775,13 +813,17 @@ export async function logDiaperAction(
     type,
     created_by: ctx.userId,
   };
-  const { error } = await ctx.supabase.from('diaper_events').insert(payload);
+  const { data, error } = await ctx.supabase
+    .from('diaper_events')
+    .insert(payload)
+    .select('id')
+    .single();
 
-  if (error) return { ok: false, error: 'No pudimos guardar el pañal.' };
+  if (error || !data) return { ok: false, error: 'No pudimos guardar el pañal.' };
 
   revalidatePath('/home');
   revalidatePath('/timeline');
-  return { ok: true };
+  return { ok: true, id: data.id as string };
 }
 
 // ============================================================================
@@ -862,6 +904,25 @@ export async function deleteEventAction(
   if (error) {
     return { ok: false, error: 'No pudimos borrar el evento.' };
   }
+
+  revalidatePath('/home');
+  revalidatePath('/timeline');
+  return { ok: true };
+}
+
+/** Deshace un borrado (soft-delete) reciente. RLS decide quién puede. */
+export async function restoreEventAction(
+  table: EventTable,
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!ALLOWED_TABLES.includes(table)) {
+    return { ok: false, error: 'Tabla no permitida.' };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from(table).update({ deleted_at: null }).eq('id', id);
+
+  if (error) return { ok: false, error: 'No pudimos recuperar el evento.' };
 
   revalidatePath('/home');
   revalidatePath('/timeline');

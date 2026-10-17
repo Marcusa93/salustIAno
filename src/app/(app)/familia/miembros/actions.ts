@@ -1,12 +1,20 @@
 'use server';
 
+import {
+  type FamilyActor,
+  type FamilyRole,
+  type MemberPermissions,
+  assignableRoles,
+  memberPermissions,
+  readSuperadminFlag,
+} from '@/lib/family-permissions';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import {
-  type CreateMemberInput,
-  type MemberRole,
-  createMemberSchema,
-  memberRoleSchema,
+  type CreateMemberAsSuperadminInput,
+  type FamilyMemberRole,
+  createMemberAsSuperadminSchema,
+  familyRoleSchema,
 } from '@/lib/validators/family-member';
 import { revalidatePath } from 'next/cache';
 
@@ -16,9 +24,10 @@ export interface MemberEntry {
   email: string | null;
   displayName: string | null;
   relationship: string | null;
-  role: 'admin' | 'caregiver' | 'family' | 'viewer';
+  role: FamilyRole;
   acceptedAt: string;
   isSelf: boolean;
+  isSuperadmin: boolean;
 }
 
 export type CreateMemberResult =
@@ -27,7 +36,7 @@ export type CreateMemberResult =
       tempPassword: string;
       member: MemberEntry;
     }
-  | { ok: false; error: string; field?: keyof CreateMemberInput };
+  | { ok: false; error: string; field?: keyof CreateMemberAsSuperadminInput };
 
 /**
  * Genera una contraseña temporal segura de 14 caracteres con mayúscula,
@@ -70,15 +79,21 @@ function generateTempPassword(): string {
   return combined.join('');
 }
 
+interface CallerAdminContext {
+  familyGroupId: string;
+  userId: string;
+  actor: FamilyActor;
+}
+
 /**
  * Resuelve el family_group del admin que está logueado y verifica que sea
  * efectivamente admin. Si algo falla, devuelve null para que el caller lo
  * mapee a "no autorizado".
+ *
+ * El flag de superadmin sale de `app_metadata` del user verificado por
+ * Supabase Auth: solo se escribe con la secret key, nadie se lo pone solo.
  */
-async function getCallerAdminContext(): Promise<{
-  familyGroupId: string;
-  userId: string;
-} | null> {
+async function getCallerAdminContext(): Promise<CallerAdminContext | null> {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return null;
@@ -91,7 +106,83 @@ async function getCallerAdminContext(): Promise<{
     .maybeSingle();
 
   if (!membership || membership.role !== 'admin') return null;
-  return { familyGroupId: membership.family_group_id as string, userId: userData.user.id };
+  return {
+    familyGroupId: membership.family_group_id as string,
+    userId: userData.user.id,
+    actor: { role: 'admin', isSuperadmin: readSuperadminFlag(userData.user.app_metadata) },
+  };
+}
+
+type ManagedAction = keyof MemberPermissions;
+
+const SELF_MESSAGES: Record<ManagedAction, string> = {
+  changeRole: 'No podés cambiarte el rol a vos misma.',
+  resetPassword: 'Reseteá tu propia contraseña desde tu perfil.',
+  remove: 'No podés sacarte a vos misma.',
+  deleteAccount: 'No podés borrar tu propia cuenta desde acá.',
+};
+
+/**
+ * Carga la membresía sobre la que se quiere actuar, verifica que sea de la
+ * familia del admin y que `memberPermissions` habilite la acción. Devuelve
+ * el target listo para operar o el mensaje de error para la UI.
+ */
+async function loadManagedTarget(
+  ctx: CallerAdminContext,
+  membershipId: string,
+  action: ManagedAction,
+): Promise<
+  | {
+      ok: true;
+      target: { id: string; userId: string; role: FamilyRole };
+      authUser: { email: string | null; userMetadata: Record<string, unknown> };
+    }
+  | { ok: false; error: string }
+> {
+  if (typeof membershipId !== 'string' || membershipId.length === 0) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+
+  const adminClient = createAdminClient();
+  const { data: target } = await adminClient
+    .from('family_memberships')
+    .select('id, user_id, role, family_group_id, deleted_at')
+    .eq('id', membershipId)
+    .maybeSingle();
+
+  if (!target || target.deleted_at) {
+    return { ok: false, error: 'No encontramos esa membresía.' };
+  }
+  if (target.family_group_id !== ctx.familyGroupId) {
+    return { ok: false, error: 'Esa membresía no es de tu familia.' };
+  }
+
+  const { data: authData } = await adminClient.auth.admin.getUserById(target.user_id);
+  const isSelf = target.user_id === ctx.userId;
+  const isSuperadmin = readSuperadminFlag(authData.user?.app_metadata);
+  const role = target.role as FamilyRole;
+  const allowed = memberPermissions(ctx.actor, { role, isSelf, isSuperadmin })[action];
+
+  if (!allowed) {
+    if (isSelf) return { ok: false, error: SELF_MESSAGES[action] };
+    if (isSuperadmin) return { ok: false, error: 'Nadie puede gestionar al superadmin.' };
+    if (action === 'deleteAccount') {
+      return { ok: false, error: 'Solo el superadmin puede borrar cuentas.' };
+    }
+    if (role === 'admin') {
+      return { ok: false, error: 'Solo el superadmin puede gestionar a otro admin.' };
+    }
+    return { ok: false, error: 'No tenés permiso para hacer esto.' };
+  }
+
+  return {
+    ok: true,
+    target: { id: target.id as string, userId: target.user_id as string, role },
+    authUser: {
+      email: authData.user?.email ?? null,
+      userMetadata: (authData.user?.user_metadata as Record<string, unknown> | null) ?? {},
+    },
+  };
 }
 
 /**
@@ -129,11 +220,13 @@ export async function listMembersAction(): Promise<MemberEntry[]> {
   const userIds = (rows as Array<{ user_id: string }>).map((r) => r.user_id);
 
   const emailByUserId = new Map<string, string>();
+  const superadminIds = new Set<string>();
   for (const id of userIds) {
     // Una llamada por user — la cantidad de miembros por familia es chica
     // (5-10 típicamente), no vale la pena un RPC custom.
     const { data: u } = await adminClient.auth.admin.getUserById(id);
     if (u?.user?.email) emailByUserId.set(id, u.user.email);
+    if (readSuperadminFlag(u?.user?.app_metadata)) superadminIds.add(id);
   }
 
   return (rows as Array<Record<string, unknown>>).map((r) => ({
@@ -145,26 +238,29 @@ export async function listMembersAction(): Promise<MemberEntry[]> {
     role: r.role as MemberEntry['role'],
     acceptedAt: r.accepted_at as string,
     isSelf: r.user_id === userData.user?.id,
+    isSuperadmin: superadminIds.has(r.user_id as string),
   }));
 }
 
 /**
  * Crea un usuario nuevo en auth.users (con email confirmado y contraseña
  * temporal generada por el server) y lo agrega como miembro del family_group
- * del admin que llamó.
+ * del admin que llamó. Solo el superadmin puede crear admins.
  *
  * Devuelve la contraseña temporal **una sola vez** — el admin la copia y la
  * comparte por un canal seguro. Después no se puede recuperar.
  */
-export async function createMemberAction(input: CreateMemberInput): Promise<CreateMemberResult> {
-  const parsed = createMemberSchema.safeParse(input);
+export async function createMemberAction(
+  input: CreateMemberAsSuperadminInput,
+): Promise<CreateMemberResult> {
+  const parsed = createMemberAsSuperadminSchema.safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     return {
       ok: false,
       error: issue?.message ?? 'Datos inválidos.',
       ...(issue?.path[0] && typeof issue.path[0] === 'string'
-        ? { field: issue.path[0] as keyof CreateMemberInput }
+        ? { field: issue.path[0] as keyof CreateMemberAsSuperadminInput }
         : {}),
     };
   }
@@ -173,6 +269,9 @@ export async function createMemberAction(input: CreateMemberInput): Promise<Crea
   const ctx = await getCallerAdminContext();
   if (!ctx) {
     return { ok: false, error: 'Solo un admin puede crear miembros.' };
+  }
+  if (!assignableRoles(ctx.actor).includes(data.role)) {
+    return { ok: false, error: 'Solo el superadmin puede crear admins.', field: 'role' };
   }
 
   const adminClient = createAdminClient();
@@ -239,6 +338,7 @@ export async function createMemberAction(input: CreateMemberInput): Promise<Crea
         role: data.role,
         acceptedAt: inserted.accepted_at as string,
         isSelf: false,
+        isSuperadmin: false,
       },
     };
   }
@@ -302,6 +402,7 @@ export async function createMemberAction(input: CreateMemberInput): Promise<Crea
       role: data.role,
       acceptedAt: inserted.accepted_at as string,
       isSelf: false,
+      isSuperadmin: false,
     },
   };
 }
@@ -309,44 +410,23 @@ export async function createMemberAction(input: CreateMemberInput): Promise<Crea
 /**
  * Soft-delete de una membership. El user en auth.users sigue existiendo
  * (por si después lo querés reactivar) pero pierde acceso al family_group.
- * No podés sacarte a vos misma ni sacar a otro admin.
+ * No podés sacarte a vos misma; a otro admin solo lo saca el superadmin.
  */
 export async function removeMemberAction(
   membershipId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (typeof membershipId !== 'string' || membershipId.length === 0) {
-    return { ok: false, error: 'ID inválido.' };
-  }
-
   const ctx = await getCallerAdminContext();
   if (!ctx) {
     return { ok: false, error: 'Solo un admin puede sacar miembros.' };
   }
 
-  const adminClient = createAdminClient();
-  const { data: target } = await adminClient
-    .from('family_memberships')
-    .select('id, user_id, role, family_group_id, deleted_at')
-    .eq('id', membershipId)
-    .maybeSingle();
+  const loaded = await loadManagedTarget(ctx, membershipId, 'remove');
+  if (!loaded.ok) return loaded;
 
-  if (!target || target.deleted_at) {
-    return { ok: false, error: 'No encontramos esa membresía.' };
-  }
-  if (target.family_group_id !== ctx.familyGroupId) {
-    return { ok: false, error: 'Esa membresía no es de tu familia.' };
-  }
-  if (target.user_id === ctx.userId) {
-    return { ok: false, error: 'No podés sacarte a vos misma.' };
-  }
-  if (target.role === 'admin') {
-    return { ok: false, error: 'No podés sacar a otro admin.' };
-  }
-
-  const { error } = await adminClient
+  const { error } = await createAdminClient()
     .from('family_memberships')
     .update({ deleted_at: new Date().toISOString() })
-    .eq('id', membershipId);
+    .eq('id', loaded.target.id);
 
   if (error) return { ok: false, error: 'No pudimos sacar al miembro.' };
 
@@ -355,46 +435,31 @@ export async function removeMemberAction(
 }
 
 /**
- * Cambia el rol de un miembro existente. Reglas:
- *   - Solo admin puede.
- *   - No podés cambiar tu propio rol (te quedaría sin admins la familia).
- *   - No podés cambiar el rol de otro admin (mismo motivo).
- *   - El nuevo rol no puede ser 'admin' (se asigna por otra vía: signup).
+ * Cambia el rol de un miembro existente. Reglas (ver `@/lib/family-permissions`):
+ *   - Solo admin puede, y nunca sobre su propio rol.
+ *   - Cambiar el rol de otro admin, o nombrar admin a alguien, solo lo
+ *     puede hacer el superadmin.
  */
 export async function updateMemberRoleAction(
   membershipId: string,
-  newRole: MemberRole,
+  newRole: FamilyMemberRole,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const parsed = memberRoleSchema.safeParse(newRole);
+  const parsed = familyRoleSchema.safeParse(newRole);
   if (!parsed.success) return { ok: false, error: 'Rol inválido.' };
 
   const ctx = await getCallerAdminContext();
   if (!ctx) return { ok: false, error: 'Solo un admin puede cambiar roles.' };
-
-  const adminClient = createAdminClient();
-  const { data: target } = await adminClient
-    .from('family_memberships')
-    .select('id, user_id, role, family_group_id, deleted_at')
-    .eq('id', membershipId)
-    .maybeSingle();
-
-  if (!target || target.deleted_at) {
-    return { ok: false, error: 'No encontramos esa membresía.' };
-  }
-  if (target.family_group_id !== ctx.familyGroupId) {
-    return { ok: false, error: 'Esa membresía no es de tu familia.' };
-  }
-  if (target.user_id === ctx.userId) {
-    return { ok: false, error: 'No podés cambiarte el rol a vos misma.' };
-  }
-  if (target.role === 'admin') {
-    return { ok: false, error: 'No podés cambiar el rol de otro admin.' };
+  if (!assignableRoles(ctx.actor).includes(parsed.data)) {
+    return { ok: false, error: 'Solo el superadmin puede nombrar admins.' };
   }
 
-  const { error } = await adminClient
+  const loaded = await loadManagedTarget(ctx, membershipId, 'changeRole');
+  if (!loaded.ok) return loaded;
+
+  const { error } = await createAdminClient()
     .from('family_memberships')
     .update({ role: parsed.data })
-    .eq('id', membershipId);
+    .eq('id', loaded.target.id);
 
   if (error) return { ok: false, error: 'No pudimos cambiar el rol.' };
 
@@ -408,7 +473,8 @@ export async function updateMemberRoleAction(
  * vez que entre. Devuelve la pass nueva una sola vez para que el admin la
  * pase por un canal seguro.
  *
- * No se puede resetear la propia contraseña ni la de otro admin.
+ * No se puede resetear la propia contraseña; la de otro admin, solo el
+ * superadmin.
  */
 export async function resetMemberPasswordAction(
   membershipId: string,
@@ -416,45 +482,72 @@ export async function resetMemberPasswordAction(
   const ctx = await getCallerAdminContext();
   if (!ctx) return { ok: false, error: 'Solo un admin puede resetear contraseñas.' };
 
-  const adminClient = createAdminClient();
-  const { data: target } = await adminClient
-    .from('family_memberships')
-    .select('id, user_id, role, family_group_id, deleted_at')
-    .eq('id', membershipId)
-    .maybeSingle();
-
-  if (!target || target.deleted_at) {
-    return { ok: false, error: 'No encontramos esa membresía.' };
-  }
-  if (target.family_group_id !== ctx.familyGroupId) {
-    return { ok: false, error: 'Esa membresía no es de tu familia.' };
-  }
-  if (target.user_id === ctx.userId) {
-    return { ok: false, error: 'Reseteá tu propia contraseña desde tu perfil.' };
-  }
-  if (target.role === 'admin') {
-    return { ok: false, error: 'No podés resetear la contraseña de otro admin.' };
-  }
-
-  // Buscar el email + el user_metadata existente para no pisar otros campos.
-  const { data: existing, error: getErr } = await adminClient.auth.admin.getUserById(
-    target.user_id,
-  );
-  if (getErr || !existing.user?.email) {
+  const loaded = await loadManagedTarget(ctx, membershipId, 'resetPassword');
+  if (!loaded.ok) return loaded;
+  if (!loaded.authUser.email) {
     return { ok: false, error: 'No encontramos la cuenta del miembro.' };
   }
 
   const tempPassword = generateTempPassword();
-  const previousMeta = (existing.user.user_metadata as Record<string, unknown> | null) ?? {};
-  const { error: updateErr } = await adminClient.auth.admin.updateUserById(target.user_id, {
-    password: tempPassword,
-    user_metadata: { ...previousMeta, must_change_password: true },
-  });
+  const { error: updateErr } = await createAdminClient().auth.admin.updateUserById(
+    loaded.target.userId,
+    {
+      password: tempPassword,
+      user_metadata: { ...loaded.authUser.userMetadata, must_change_password: true },
+    },
+  );
 
   if (updateErr) {
     return { ok: false, error: 'No pudimos resetear la contraseña.' };
   }
 
   revalidatePath('/familia');
-  return { ok: true, tempPassword, email: existing.user.email };
+  return { ok: true, tempPassword, email: loaded.authUser.email };
+}
+
+/**
+ * Borra la cuenta de un miembro (solo superadmin). Primero intenta el
+ * borrado definitivo de auth.users, que arrastra su membresía. Si la cuenta
+ * tiene historial que la base no deja borrar (por ejemplo dosis de
+ * medicamentos que cargó), la da de baja en Supabase Auth: no puede volver
+ * a entrar, su email queda libre y los registros de la familia se conservan.
+ */
+export async function deleteMemberAccountAction(
+  membershipId: string,
+): Promise<{ ok: true; mode: 'deleted' | 'deactivated' } | { ok: false; error: string }> {
+  const ctx = await getCallerAdminContext();
+  if (!ctx) return { ok: false, error: 'Solo un admin puede borrar cuentas.' };
+
+  const loaded = await loadManagedTarget(ctx, membershipId, 'deleteAccount');
+  if (!loaded.ok) return loaded;
+
+  const adminClient = createAdminClient();
+  const { data: otherFamilies } = await adminClient
+    .from('family_memberships')
+    .select('id')
+    .eq('user_id', loaded.target.userId)
+    .neq('family_group_id', ctx.familyGroupId)
+    .is('deleted_at', null)
+    .limit(1);
+  if (otherFamilies && otherFamilies.length > 0) {
+    return { ok: false, error: 'Esa cuenta también está en otra familia: sacala de la tuya.' };
+  }
+
+  const hard = await adminClient.auth.admin.deleteUser(loaded.target.userId);
+  if (!hard.error) {
+    revalidatePath('/familia');
+    return { ok: true, mode: 'deleted' };
+  }
+
+  const soft = await adminClient.auth.admin.deleteUser(loaded.target.userId, true);
+  if (soft.error) {
+    return { ok: false, error: 'No pudimos borrar la cuenta.' };
+  }
+  await adminClient
+    .from('family_memberships')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', loaded.target.id);
+
+  revalidatePath('/familia');
+  return { ok: true, mode: 'deactivated' };
 }

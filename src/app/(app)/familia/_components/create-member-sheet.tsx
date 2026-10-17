@@ -17,10 +17,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { type CreateMemberInput, createMemberSchema } from '@/lib/validators/family-member';
+import {
+  type CreateMemberAsSuperadminInput,
+  createMemberAsSuperadminSchema,
+} from '@/lib/validators/family-member';
 import { zodResolver } from '@/lib/zod-compat';
 import { Loader2, UserPlus } from 'lucide-react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
+
+const ADMIN_OPTION = {
+  value: 'admin' as const,
+  label: 'Admin',
+  hint: 'Gestiona la familia: agrega miembros, cambia roles y resetea contraseñas.',
+};
 
 const ROLE_OPTIONS = [
   {
@@ -47,18 +56,28 @@ interface CreateMemberSheetProps {
    * Devuelve `true` si se creó OK (cierra el sheet) o `false` para mantenerlo
    * abierto (errores de campo).
    */
-  onSubmit: (input: CreateMemberInput) => Promise<boolean>;
+  onSubmit: (input: CreateMemberAsSuperadminInput) => Promise<boolean>;
+  /** Solo el superadmin puede crear admins. */
+  allowAdmin?: boolean;
 }
 
-export function CreateMemberSheet({ open, onOpenChange, onSubmit }: CreateMemberSheetProps) {
+export function CreateMemberSheet({
+  open,
+  onOpenChange,
+  onSubmit,
+  allowAdmin = false,
+}: CreateMemberSheetProps) {
+  const roleOptions = allowAdmin ? [ADMIN_OPTION, ...ROLE_OPTIONS] : ROLE_OPTIONS;
   const {
     register,
     handleSubmit,
     control,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<CreateMemberInput>({
-    resolver: zodResolver(createMemberSchema),
+  } = useForm<CreateMemberAsSuperadminInput>({
+    // El schema acepta 'admin', pero la opción solo se muestra al superadmin
+    // y el server vuelve a validar quién puede asignar qué rol.
+    resolver: zodResolver(createMemberAsSuperadminSchema),
     defaultValues: {
       email: '',
       displayName: '',
@@ -69,7 +88,7 @@ export function CreateMemberSheet({ open, onOpenChange, onSubmit }: CreateMember
 
   const watchedRole = useWatch({ control, name: 'role' });
 
-  async function submit(data: CreateMemberInput) {
+  async function submit(data: CreateMemberAsSuperadminInput) {
     const ok = await onSubmit(data);
     if (ok) reset();
   }
@@ -138,7 +157,7 @@ export function CreateMemberSheet({ open, onOpenChange, onSubmit }: CreateMember
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ROLE_OPTIONS.map((opt) => (
+                    {roleOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </SelectItem>
@@ -148,7 +167,7 @@ export function CreateMemberSheet({ open, onOpenChange, onSubmit }: CreateMember
               )}
             />
             <p className="text-muted-foreground text-xs">
-              {ROLE_OPTIONS.find((o) => o.value === watchedRole)?.hint}
+              {roleOptions.find((o) => o.value === watchedRole)?.hint}
             </p>
             {errors.role?.message && (
               <p role="alert" className="text-destructive text-sm">

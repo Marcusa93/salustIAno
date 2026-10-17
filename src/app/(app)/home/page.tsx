@@ -1,6 +1,6 @@
 import { CradleIllustration } from '@/components/salu/illustrations/cradle';
 import { TimelineEmptyIllustration } from '@/components/salu/illustrations/timeline-empty';
-import { Salu360Hub } from '@/components/salu/salu-hub';
+import { Salu360Avatar } from '@/components/salu/salu-360-avatar';
 import { WelcomeOverlay } from '@/components/salu/welcome-overlay';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,21 +9,23 @@ import { expectationsFor } from '@/lib/baby-expectations';
 import { scheduledLetterAt } from '@/lib/carta/letter-window';
 import { startOfDayArDaysAgo, startOfTodayAr } from '@/lib/format-ar';
 import { greetingFor, isLateNightAr } from '@/lib/greeting';
+import { preciseAgeLabel } from '@/lib/home-now';
 import { averagePerDay, formatPredictionTime, predictNextFeeding } from '@/lib/predictions';
 import { createClient } from '@/lib/supabase/server';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
-import { Baby, BookHeart, Milk, Moon, Plus } from 'lucide-react';
+import { wakeWindowFor } from '@/lib/wake-windows';
+import { Moon, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
-import { CloseSleepSheet } from './_components/close-sleep-sheet';
 import { DailySummaryCard } from './_components/daily-summary-card';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
 import { ExpectationsCard } from './_components/expectations-card';
 import { FamilyActivityCard } from './_components/family-activity-card';
 import { FeedingQuickAdd } from './_components/feeding-quick-add';
 import { LetterEnvelopeCard } from './_components/letter-envelope-card';
+import { LogDock } from './_components/log-dock';
 import { NightCoachCard } from './_components/night-coach-card';
-import { QuickRepeatBar } from './_components/quick-repeat-bar';
+import { NowCard } from './_components/now-card';
 import { RealtimeRefresher } from './_components/realtime-refresher';
 import { RecentEventsGrouped, type RecentTimelineRow } from './_components/recent-events-grouped';
 import { ShareDayCard } from './_components/share-day-card';
@@ -119,7 +121,6 @@ export default async function HomePage() {
     todayActivity,
     shareSnapshot,
     { data: upcomingMilestones },
-    { data: recentBottleAmounts },
   ] = await Promise.all([
     supabase.rpc('get_timeline', {
       p_child_id: child.id,
@@ -153,7 +154,7 @@ export default async function HomePage() {
       .maybeSingle(),
     supabase
       .from('feeding_events')
-      .select('occurred_at')
+      .select('occurred_at, type, amount_ml, duration_minutes')
       .eq('child_id', child.id)
       .is('deleted_at', null)
       .order('occurred_at', { ascending: false })
@@ -198,16 +199,6 @@ export default async function HomePage() {
       .lte('due_at', upcomingHorizon.toISOString())
       .order('due_at', { ascending: true, nullsFirst: false })
       .limit(3),
-    // Últimas 15 tomas de mamadera con cantidad — para calcular presets.
-    supabase
-      .from('feeding_events')
-      .select('amount_ml')
-      .eq('child_id', child.id)
-      .is('deleted_at', null)
-      .eq('type', 'bottle')
-      .not('amount_ml', 'is', null)
-      .order('occurred_at', { ascending: false })
-      .limit(15),
   ]);
 
   const recents = (recentEvents ?? []) as RecentTimelineRow[];
@@ -221,26 +212,22 @@ export default async function HomePage() {
   const lastFeedingAt = (lastFeeding?.occurred_at as string | null | undefined) ?? null;
   const lastDiaperAt = (lastDiaper?.occurred_at as string | null | undefined) ?? null;
 
-  // Presets de cantidad para el QuickLogBar: top 3 por frecuencia en las
-  // últimas 15 tomas de mamadera, relleno con defaults si hay menos de 3.
-  const recentAmounts = ((recentBottleAmounts ?? []) as { amount_ml: number }[]).map(
-    (e) => e.amount_ml,
-  );
-  const amountFreq = new Map<number, number>();
-  for (const ml of recentAmounts) {
-    amountFreq.set(ml, (amountFreq.get(ml) ?? 0) + 1);
-  }
-  const DEFAULT_ML_PRESETS = [60, 90, 120];
-  const topByFreq = Array.from(amountFreq.entries())
-    .sort((a, b) => b[1] - a[1] || a[0] - b[0])
-    .slice(0, 3)
-    .map(([ml]) => ml);
-  const feedingPresets: number[] = [...topByFreq];
-  for (const d of DEFAULT_ML_PRESETS) {
-    if (feedingPresets.length >= 3) break;
-    if (!feedingPresets.includes(d)) feedingPresets.push(d);
-  }
-  feedingPresets.sort((a, b) => a - b);
+  // Cantidades de mamadera a un toque. Desde octubre Salu toma 100 ml como
+  // mínimo; cualquier otra cantidad va por "Más".
+  const feedingPresets = [100, 120, 150, 180];
+
+  const lastFeedingDetail = lastFeeding
+    ? lastFeeding.amount_ml
+      ? `${lastFeeding.amount_ml} ml`
+      : lastFeeding.type === 'breastfeeding'
+        ? lastFeeding.duration_minutes
+          ? `pecho ${lastFeeding.duration_minutes} min`
+          : 'pecho'
+        : null
+    : null;
+  const todayMl = today
+    .filter((e) => e.event_type === 'feeding')
+    .reduce((acc, e) => acc + ((e.payload.amount_ml as number | null | undefined) ?? 0), 0);
 
   const todaySummary = {
     feeding: today.filter((e) => e.event_type === 'feeding').length,
@@ -292,6 +279,8 @@ export default async function HomePage() {
   // cuando hay actividad cargada (ShareDayCard).
   const totalEventsToday = todaySummary.feeding + todaySummary.sleep + todaySummary.diaper;
   const scheduledLetter = scheduledLetterAt();
+  const renderedAt = new Date().toISOString();
+  const ageLabel = child.birth_date ? preciseAgeLabel(child.birth_date as string) : null;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
@@ -311,35 +300,45 @@ export default async function HomePage() {
         />
       )}
 
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+            {greetingFor()}
+            {displayName ? `, ${displayName}` : ''}
+          </span>
+          <h1 className="truncate font-display text-[2.4rem] text-foreground leading-none tracking-tight">
+            {(child.name as string).split(' ')[0]}
+          </h1>
+          {ageLabel && <p className="text-muted-foreground text-sm">{ageLabel}</p>}
+          {lateNight && (
+            <p className="mt-1 flex items-center gap-1.5 text-sleep-foreground text-xs">
+              <Moon className="size-3.5" aria-hidden />
+              Modo madrugada: solo lo esencial
+            </p>
+          )}
+        </div>
+        <Salu360Avatar size={72} className="shrink-0 ring-primary/20" />
+      </header>
+
       {/* Carta programada (ej. Día de la Madre): solo en su ventana de fechas. */}
       {scheduledLetter && <LetterEnvelopeCard slug={scheduledLetter} />}
 
-      {/* ZONA 1 — HUB SPATIAL: avatar 360 al centro + 6 acciones orbitando
-          con líneas estilo HUD. Reemplaza el hero clásico, la "tira de
-          últimas" y la grilla "Anotar en dos toques" — toda la
-          información viva del bebé y los 6 quick-adds en un único
-          objeto cohesivo. */}
-      <Salu360Hub
-        displayName={displayName}
-        childName={child.name}
-        childAgeLabel={babyAgeFromBirth(child.birth_date)?.label ?? null}
-        greeting={greetingFor()}
-        active={activeSleep}
-        lastWokeUpAt={lastClosedSleepAt}
-        lastFeedingAt={lastFeedingAt}
-        lastDiaperAt={lastDiaperAt}
-        todayCounts={todaySummary}
-        lateNight={lateNight}
-        predictedNextFeedingLabel={predictedNextFeedingLabel}
-      />
-
-      {/* Acciones rápidas: repite la última toma o el último pañal sin abrir
-          ningún formulario — un solo tap registra el evento al instante.
-          Cuando hay sueño activo muestra además "Se despertó". */}
-      <QuickRepeatBar
-        feedingPresets={feedingPresets}
+      {/* AHORA — el estado de Salu y la acción que más probablemente toque. */}
+      <NowCard
         activeSleep={activeSleep}
         lastWokeUpAt={lastClosedSleepAt}
+        lastFeeding={lastFeedingAt ? { at: lastFeedingAt, detail: lastFeedingDetail } : null}
+        nextFeedingLabel={predictedNextFeedingLabel}
+        wakeWindow={wakeWindowFor(ageDays)}
+        renderedAt={renderedAt}
+      />
+
+      {/* ANOTAR — tomas y pañales a un toque, con "Deshacer". */}
+      <LogDock
+        feedingPresets={feedingPresets}
+        lastFeedingAt={lastFeedingAt}
+        lastDiaperAt={lastDiaperAt}
+        renderedAt={renderedAt}
       />
 
       {/* Coach pediátrico de sueño — solo en modo madrugada (22-06 AR).
@@ -352,83 +351,15 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* Resumen del día con IA */}
-      <div className="animate-stagger-up" style={{ animationDelay: '120ms' }}>
-        <DailySummaryCard childId={child.id as string} todayEventCount={totalEventsToday} />
-      </div>
-
-      {/* Cómo va el día — comparado contra rangos AAP por edad. La sección
-          arma triggers chicos para que cada barra abra el QuickAdd
-          correspondiente con un toque. */}
-      {expectations && (
-        <ExpectationsCard
-          expectations={expectations}
-          todayCounts={{
-            feedingsCount: todaySummary.feeding,
-            diapersCount: todaySummary.diaper,
-            sleepHours: todaySleepHours,
-          }}
-          weeklyAverage={weeklyAvg}
-          feedingTrigger={
-            <FeedingQuickAdd
-              trigger={
-                <Button type="button" size="xs" variant="ghost" aria-label="Anotar toma">
-                  <Plus className="size-3.5" aria-hidden />
-                </Button>
-              }
-            />
-          }
-          diaperTrigger={
-            <DiaperQuickAdd
-              trigger={
-                <Button type="button" size="xs" variant="ghost" aria-label="Anotar pañal">
-                  <Plus className="size-3.5" aria-hidden />
-                </Button>
-              }
-            />
-          }
-          sleepTrigger={
-            <SleepQuickAdd
-              trigger={
-                <Button type="button" size="xs" variant="ghost" aria-label="Anotar sueño">
-                  <Plus className="size-3.5" aria-hidden />
-                </Button>
-              }
-            />
-          }
-        />
-      )}
-
-      {/* Próximos controles (vencidos + 14 días) */}
-      {upcomingMilestones && upcomingMilestones.length > 0 && (
-        <div className="animate-stagger-up" style={{ animationDelay: '135ms' }}>
-          <UpcomingControlsCard
-            rows={(upcomingMilestones as Array<Record<string, unknown>>).map((m) => ({
-              id: m.id as string,
-              title: m.title as string,
-              category: m.category as MilestoneCategory,
-              due_at: (m.due_at as string | null) ?? null,
-              completed_at: (m.completed_at as string | null) ?? null,
-            }))}
-          />
-        </div>
-      )}
-
-      {/* Actividad por miembro */}
-      {todayActivity.length > 0 && (
-        <div className="animate-stagger-up" style={{ animationDelay: '255ms' }}>
-          <FamilyActivityCard activity={todayActivity} />
-        </div>
-      )}
-
-      {/* ZONA 3 — HISTORIA: recientes agrupados. */}
-      <section
-        className="flex animate-stagger-up flex-col gap-4"
-        style={{ animationDelay: '285ms' }}
-      >
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
-            Recientes
+      {/* HOY — resumen del día y línea de tiempo compacta (tocar edita,
+          deslizar borra). */}
+      <section className="flex flex-col gap-3" aria-labelledby="hoy">
+        <div className="flex items-baseline justify-between gap-2 px-1">
+          <h2
+            id="hoy"
+            className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]"
+          >
+            Hoy
           </h2>
           <Link
             href={'/timeline' as Route}
@@ -437,48 +368,162 @@ export default async function HomePage() {
             Ver todo
           </Link>
         </div>
+        <dl className="grid grid-cols-3 gap-2">
+          <SummaryStat
+            tone="feed"
+            label="Tomas"
+            value={String(todaySummary.feeding)}
+            detail={todayMl > 0 ? `${todayMl} ml` : null}
+          />
+          <SummaryStat
+            tone="diaper"
+            label="Pañales"
+            value={String(todaySummary.diaper)}
+            detail={null}
+          />
+          <SummaryStat
+            tone="sleep"
+            label="Sueño"
+            value={formatHours(todaySleepHours)}
+            detail={
+              todaySummary.sleep > 0
+                ? `${todaySummary.sleep} ${todaySummary.sleep === 1 ? 'vez' : 'veces'}`
+                : null
+            }
+          />
+        </dl>
         <RecentEventsGrouped
           rows={recents}
           emptyState={
-            <Card className="flex flex-col items-center gap-3 p-8 text-center">
+            <Card className="items-center gap-3 p-8 text-center">
               <div className="text-primary">
                 <TimelineEmptyIllustration size={120} />
               </div>
               <p className="max-w-xs text-muted-foreground text-sm leading-relaxed">
-                Todavía no hay registros. Anotá la primera toma cuando ocurra — o decísela a
-                SalustIA y ella la guarda por vos.
+                Todavía no hay registros. Anotá la primera toma con los botones de arriba, o
+                decísela a SalustIA y ella la guarda por vos.
               </p>
             </Card>
           }
         />
-        {/* Si hay sueño activo, lo dejamos visible aunque ya esté el hero arriba —
-            permite cerrar la sesión desde acá sin scrollear. */}
-        {activeSleep && (
-          <Card className="flex items-center gap-3 border-primary/30 bg-primary/5 p-3.5">
-            <Moon className="size-4 shrink-0 text-primary" aria-hidden />
-            <span className="text-muted-foreground text-xs">
-              Hay un sueño en curso. Cuando se despierte, cerralo desde el hero arriba o desde acá.
-            </span>
-            <CloseSleepSheet
-              sessionId={activeSleep.id}
-              startedAt={activeSleep.started_at}
-              trigger={
-                <Button type="button" size="xs" variant="outline" className="ml-auto">
-                  Cerrar
-                </Button>
-              }
-            />
-          </Card>
-        )}
       </section>
 
-      {/* Compartir el día con la familia extendida — texto + foto del
+      {/* Lo secundario: de madrugada se oculta para que la pantalla sea
+          mínima (Ahora, Anotar, Hoy) y no encandile con información. */}
+      {!lateNight && (
+        <>
+          {/* Resumen del día con IA */}
+          <div className="animate-stagger-up" style={{ animationDelay: '120ms' }}>
+            <DailySummaryCard childId={child.id as string} todayEventCount={totalEventsToday} />
+          </div>
+
+          {/* Cómo va el día — comparado contra rangos AAP por edad. La sección
+          arma triggers chicos para que cada barra abra el QuickAdd
+          correspondiente con un toque. */}
+          {expectations && (
+            <ExpectationsCard
+              expectations={expectations}
+              todayCounts={{
+                feedingsCount: todaySummary.feeding,
+                diapersCount: todaySummary.diaper,
+                sleepHours: todaySleepHours,
+              }}
+              weeklyAverage={weeklyAvg}
+              feedingTrigger={
+                <FeedingQuickAdd
+                  trigger={
+                    <Button type="button" size="xs" variant="ghost" aria-label="Anotar toma">
+                      <Plus className="size-3.5" aria-hidden />
+                    </Button>
+                  }
+                />
+              }
+              diaperTrigger={
+                <DiaperQuickAdd
+                  trigger={
+                    <Button type="button" size="xs" variant="ghost" aria-label="Anotar pañal">
+                      <Plus className="size-3.5" aria-hidden />
+                    </Button>
+                  }
+                />
+              }
+              sleepTrigger={
+                <SleepQuickAdd
+                  trigger={
+                    <Button type="button" size="xs" variant="ghost" aria-label="Anotar sueño">
+                      <Plus className="size-3.5" aria-hidden />
+                    </Button>
+                  }
+                />
+              }
+            />
+          )}
+
+          {/* Próximos controles (vencidos + 14 días) */}
+          {upcomingMilestones && upcomingMilestones.length > 0 && (
+            <div className="animate-stagger-up" style={{ animationDelay: '135ms' }}>
+              <UpcomingControlsCard
+                rows={(upcomingMilestones as Array<Record<string, unknown>>).map((m) => ({
+                  id: m.id as string,
+                  title: m.title as string,
+                  category: m.category as MilestoneCategory,
+                  due_at: (m.due_at as string | null) ?? null,
+                  completed_at: (m.completed_at as string | null) ?? null,
+                }))}
+              />
+            </div>
+          )}
+
+          {/* Actividad por miembro */}
+          {todayActivity.length > 0 && (
+            <div className="animate-stagger-up" style={{ animationDelay: '255ms' }}>
+              <FamilyActivityCard activity={todayActivity} />
+            </div>
+          )}
+
+          {/* Compartir el día con la familia extendida — texto + foto del
           día. Usa Web Share API en mobile, fallback a copy en desktop.
           Se oculta:
             - En madrugada (compartir a las 3am es raro y rompe el
               "modo silencioso").
             - Si no hay eventos del día (no hay nada que compartir). */}
-      {!lateNight && totalEventsToday > 0 && <ShareDayCard initial={shareSnapshot} />}
+          {totalEventsToday > 0 && <ShareDayCard initial={shareSnapshot} />}
+        </>
+      )}
     </div>
   );
+}
+
+const STAT_TONES = {
+  feed: 'bg-feed-soft text-feed-foreground',
+  diaper: 'bg-diaper-soft text-diaper-foreground',
+  sleep: 'bg-sleep-soft text-sleep-foreground',
+} as const;
+
+function SummaryStat({
+  tone,
+  label,
+  value,
+  detail,
+}: {
+  tone: keyof typeof STAT_TONES;
+  label: string;
+  value: string;
+  detail: string | null;
+}) {
+  return (
+    <div className={`flex flex-col gap-0.5 rounded-2xl px-3 py-2.5 ${STAT_TONES[tone]}`}>
+      <dt className="font-medium text-[11px] uppercase tracking-wider opacity-75">{label}</dt>
+      <dd className="font-display text-2xl tabular-nums leading-tight">{value}</dd>
+      {detail && <dd className="text-xs opacity-75">{detail}</dd>}
+    </div>
+  );
+}
+
+function formatHours(hours: number): string {
+  const totalMinutes = Math.round(hours * 60);
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}`;
 }

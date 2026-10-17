@@ -1,5 +1,6 @@
 import {
   type CreateMemberInput,
+  createMemberAsSuperadminSchema,
   createMemberSchema,
   memberRoleSchema,
 } from '@/lib/validators/family-member';
@@ -66,5 +67,19 @@ describe('createMemberSchema', () => {
 
   it('rechaza role admin', () => {
     expect(createMemberSchema.safeParse({ ...valid, role: 'admin' as never }).success).toBe(false);
+  });
+});
+
+describe('createMemberAsSuperadminSchema', () => {
+  const valid = { email: 'ana@ejemplo.com', displayName: 'Ana', role: 'admin' };
+
+  it('acepta crear un admin', () => {
+    expect(createMemberAsSuperadminSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('sigue validando el resto de los campos', () => {
+    expect(
+      createMemberAsSuperadminSchema.safeParse({ ...valid, email: 'no-es-email' }).success,
+    ).toBe(false);
   });
 });
