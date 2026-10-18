@@ -112,6 +112,17 @@ describe('letterManifestSchema', () => {
     expect(letterManifestSchema.safeParse(manifest).success).toBe(false);
   });
 
+  it('rechaza una foto que referencia un sonido inexistente', () => {
+    const manifest = baseManifest();
+    manifest.finale.moment = {
+      photo: { ...photo('fotos/46.jpg', '2026-10-17T20:30:00-03:00'), sound: 'risa' },
+      hint: 'Tocame',
+    };
+    expect(letterManifestSchema.safeParse(manifest).success).toBe(false);
+    manifest.sounds = [{ id: 'risa', title: 'La risa', src: 'sonidos/risa.mp3' }];
+    expect(letterManifestSchema.safeParse(manifest).success).toBe(true);
+  });
+
   it('rechaza un capítulo que referencia una canción inexistente', () => {
     const manifest = baseManifest();
     nth(manifest.chapters, 0).song = 'no-existe';
@@ -143,6 +154,37 @@ describe('collectStoragePaths', () => {
       'video/nacimiento.jpg',
       'video/nacimiento.mp4',
     ]);
+  });
+});
+
+describe('sonidos y momento final', () => {
+  const withMoment = () => {
+    const manifest = baseManifest();
+    manifest.sounds = [{ id: 'risa', title: 'La risa', src: 'sonidos/risa.mp3' }];
+    manifest.finale.moment = {
+      photo: { ...photo('fotos/46.jpg', '2026-10-17T20:30:00-03:00'), sound: 'risa' },
+      hint: 'Tocame',
+      after: 'Esta risa es tuya, mamá.',
+    };
+    return manifest;
+  };
+
+  it('firma la risa y la foto del momento', () => {
+    expect(collectStoragePaths(withMoment())).toEqual(
+      expect.arrayContaining(['sonidos/risa.mp3', 'fotos/46.jpg']),
+    );
+    const letter = hydrateLetter(withMoment(), (path) => `u:${path}`);
+    expect(letter.sounds).toEqual([{ id: 'risa', title: 'La risa', src: 'u:sonidos/risa.mp3' }]);
+    expect(letter.finale.moment?.photo).toMatchObject({ src: 'u:fotos/46.jpg', sound: 'risa' });
+    expect(letter.finale.moment?.photo).not.toHaveProperty('path');
+  });
+
+  it('si la foto del momento no se pudo firmar, el final queda sin momento', () => {
+    const letter = hydrateLetter(withMoment(), (path) =>
+      path === 'fotos/46.jpg' ? undefined : `u:${path}`,
+    );
+    expect(letter.finale.moment).toBeUndefined();
+    expect(letter.finale.signature).toBe('Salu');
   });
 });
 

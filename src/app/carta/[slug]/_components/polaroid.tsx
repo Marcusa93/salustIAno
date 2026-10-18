@@ -3,27 +3,57 @@
 import { polaroidDateLabel } from '@/lib/carta/dates';
 import type { LetterPhoto } from '@/lib/carta/manifest';
 import { cn } from '@/lib/utils';
-import { motion } from 'motion/react';
+import { Volume2 } from 'lucide-react';
+import { motion, useAnimationControls } from 'motion/react';
+import { useState } from 'react';
 import { Tape } from './atmosphere';
 import { usePhotoViewer } from './photo-viewer';
+import { useOptionalSoundtrack } from './soundtrack-provider';
 
 // "Revelado" de foto instantánea: arranca lavada y cálida, y toma color.
 const UNDEVELOPED = 'saturate(0.1) sepia(0.55) brightness(1.4) contrast(0.7)';
 const DEVELOPED = 'saturate(1) sepia(0) brightness(1) contrast(1)';
 
+/**
+ * Foto instantánea con cinta, que se "revela" al aparecer. Tocarla abre el
+ * visor; si tiene sonido (`photo.sound`), en cambio, suena y da un saltito.
+ */
 export function Polaroid({
   photo,
   tilt,
   size = 'sm',
   className,
+  soundHint = 'Tocame',
+  onSoundPlayed,
 }: {
   photo: LetterPhoto;
   tilt: number;
   size?: 'sm' | 'lg';
   className?: string;
+  soundHint?: string;
+  onSoundPlayed?: () => void;
 }) {
   const { openPhoto } = usePhotoViewer();
+  const soundtrack = useOptionalSoundtrack()?.soundtrack;
+  const bounce = useAnimationControls();
+  const [played, setPlayed] = useState(false);
   const large = size === 'lg';
+  const sound = soundtrack ? photo.sound : undefined;
+
+  const onTap = () => {
+    if (!sound || !soundtrack) {
+      openPhoto(photo.src);
+      return;
+    }
+    void soundtrack.playEffect(sound);
+    void bounce.start({
+      scale: [1, 1.05, 0.98, 1.02, 1],
+      rotate: [0, -2.5, 2, -1, 0],
+      transition: { duration: 0.9, ease: 'easeOut' },
+    });
+    setPlayed(true);
+    onSoundPlayed?.();
+  };
 
   return (
     <motion.figure
@@ -41,11 +71,15 @@ export function Polaroid({
         className={cn('-top-3 -translate-x-1/2 left-1/2', large ? 'w-24' : 'w-14')}
         style={{ rotate: `${-tilt * 1.6}deg` }}
       />
-      <button
+      <motion.button
         type="button"
-        onClick={() => openPhoto(photo.src)}
-        aria-label={`Ver foto: ${photo.alt}`}
-        className="block w-full cursor-zoom-in outline-none focus-visible:ring-4 focus-visible:ring-carta-glow/60"
+        onClick={onTap}
+        animate={bounce}
+        aria-label={sound ? `${soundHint}: ${photo.alt}` : `Ver foto: ${photo.alt}`}
+        className={cn(
+          'relative block w-full outline-none focus-visible:ring-4 focus-visible:ring-carta-glow/60',
+          sound ? 'cursor-pointer' : 'cursor-zoom-in',
+        )}
       >
         <motion.img
           src={photo.src}
@@ -67,7 +101,16 @@ export function Polaroid({
             !large && 'aspect-[4/5]',
           )}
         />
-      </button>
+        {sound && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-2 bottom-2 flex items-center gap-1.5 rounded-full bg-carta-polaroid/90 px-3 py-1 font-hand text-carta-ink text-xl shadow-md"
+          >
+            <Volume2 className={cn('size-4', !played && 'animate-pulse')} />
+            {soundHint}
+          </span>
+        )}
+      </motion.button>
       <figcaption className={cn('flex flex-col px-1', large ? 'pt-3' : 'pt-2')}>
         {photo.caption && (
           <span

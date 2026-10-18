@@ -29,15 +29,33 @@ class FakeNode {
   }
 }
 
+class FakeBufferSource {
+  buffer: unknown = null;
+  connectedTo: unknown = null;
+  onended: (() => void) | null = null;
+  start = vi.fn();
+  connect<T>(node: T): T {
+    this.connectedTo = node;
+    return node;
+  }
+}
+
 class FakeContext {
   currentTime = 0;
   destination = new FakeNode();
+  sources: FakeBufferSource[] = [];
   createGain() {
     return new FakeNode();
   }
   createMediaElementSource() {
     return new FakeNode();
   }
+  createBufferSource() {
+    const source = new FakeBufferSource();
+    this.sources.push(source);
+    return source;
+  }
+  decodeAudioData = vi.fn(async () => ({ duration: 2.4 }));
   resume = vi.fn(async () => {});
   close = vi.fn(async () => {});
 }
@@ -67,7 +85,7 @@ function nth<T>(items: T[], index: number): T {
   return item;
 }
 
-function setup() {
+function setup(effects: { id: string; src: string }[] = []) {
   const audios: FakeAudio[] = [];
   const contexts: FakeContext[] = [];
   const gains: FakeNode[] = [];
@@ -93,9 +111,11 @@ function setup() {
         contexts.push(ctx);
         return ctx as unknown as AudioContext;
       },
+      fetchAudio: vi.fn(async () => new ArrayBuffer(8)),
     },
+    effects,
   );
-  // nth(gains, 0) es el master; nth(gains, 1) y nth(gains, 2), los dos decks.
+  // nth(gains, 0): master (mute). nth(gains, 1): música (se baja). 2 y 3: los decks.
   return { soundtrack, audios, contexts, gains };
 }
 
@@ -123,8 +143,8 @@ describe('Soundtrack', () => {
       expect(audio.crossOrigin).toBe('anonymous');
       expect(audio.loop).toBe(true);
     }
-    expect(nth(gains, 1).gain.target).toBe(0);
     expect(nth(gains, 2).gain.target).toBe(0);
+    expect(nth(gains, 3).gain.target).toBe(0);
     expect(nth(gains, 0).gain.target).toBe(1);
   });
 
@@ -133,7 +153,7 @@ describe('Soundtrack', () => {
     soundtrack.unlock();
     soundtrack.play('piano');
     expect(nth(audios, 0).src).toBe('/audio/piano.mp3');
-    expect(nth(gains, 1).gain.target).toBe(1);
+    expect(nth(gains, 2).gain.target).toBe(1);
   });
 
   it('cambiar de canción funde entre decks y pausa el viejo al terminar el fundido', () => {
@@ -143,8 +163,8 @@ describe('Soundtrack', () => {
     soundtrack.play('nuestra');
 
     expect(nth(audios, 1).src).toBe('https://storage.test/nuestra.mp3');
-    expect(nth(gains, 2).gain.target).toBe(1);
-    expect(nth(gains, 1).gain.target).toBe(0);
+    expect(nth(gains, 3).gain.target).toBe(1);
+    expect(nth(gains, 2).gain.target).toBe(0);
 
     nth(audios, 0).pause.mockClear();
     vi.advanceTimersByTime(CROSSFADE_SECONDS * 1000 + 150);
@@ -159,27 +179,64 @@ describe('Soundtrack', () => {
     nth(audios, 1).src = 'sin-tocar';
     soundtrack.play('piano');
     expect(nth(audios, 1).src).toBe('sin-tocar');
-    expect(nth(gains, 2).gain.target).toBe(0);
+    expect(nth(gains, 3).gain.target).toBe(0);
   });
 
   it('ignora canciones que no existen', () => {
     const { soundtrack, gains } = setup();
     soundtrack.unlock();
     soundtrack.play('no-existe');
-    expect(nth(gains, 1).gain.target).toBe(0);
     expect(nth(gains, 2).gain.target).toBe(0);
+    expect(nth(gains, 3).gain.target).toBe(0);
   });
 
-  it('baja la música para el video y la silencia con mute', () => {
+  it('baja solo la música (no el master, por donde pasa el latido) y silencia todo con mute', () => {
     const { soundtrack, gains } = setup();
     soundtrack.unlock();
     soundtrack.setDucked(true);
-    expect(nth(gains, 0).gain.target).toBe(DUCK_LEVEL);
+    expect(nth(gains, 1).gain.target).toBe(DUCK_LEVEL);
+    expect(nth(gains, 0).gain.target).toBe(1);
     soundtrack.setMuted(true);
     expect(nth(gains, 0).gain.target).toBe(0);
     soundtrack.setMuted(false);
     soundtrack.setDucked(false);
     expect(nth(gains, 0).gain.target).toBe(1);
+    expect(nth(gains, 1).gain.target).toBe(1);
+  });
+
+  it('un efecto suena por el master y baja la música mientras dura', async () => {
+    const { soundtrack, gains, contexts } = setup([
+      { id: 'risa', src: 'https://storage.test/risa.mp3' },
+    ]);
+    soundtrack.unlock();
+    await soundtrack.playEffect('risa');
+
+    const ctx = nth(contexts, 0);
+    const source = nth(ctx.sources, 0);
+    expect(source.start).toHaveBeenCalled();
+    expect(source.connectedTo).toBe(nth(gains, 0));
+    expect(nth(gains, 1).gain.target).toBe(DUCK_LEVEL);
+
+    source.onended?.();
+    expect(nth(gains, 1).gain.target).toBe(1);
+  });
+
+  it('decodifica cada efecto una sola vez', async () => {
+    const { soundtrack, contexts } = setup([{ id: 'risa', src: 'https://storage.test/risa.mp3' }]);
+    soundtrack.unlock();
+    await soundtrack.playEffect('risa');
+    await soundtrack.playEffect('risa');
+    expect(nth(contexts, 0).decodeAudioData).toHaveBeenCalledTimes(1);
+    expect(nth(contexts, 0).sources).toHaveLength(2);
+  });
+
+  it('ignora efectos desconocidos o antes de desbloquear', async () => {
+    const { soundtrack, contexts } = setup([{ id: 'risa', src: 'https://storage.test/risa.mp3' }]);
+    await soundtrack.playEffect('risa');
+    expect(contexts).toHaveLength(0);
+    soundtrack.unlock();
+    await soundtrack.playEffect('no-existe');
+    expect(nth(contexts, 0).sources).toHaveLength(0);
   });
 
   it('pausa en segundo plano y retoma al volver', () => {

@@ -13,12 +13,14 @@ const SoundtrackContext = createContext<SoundtrackValue | null>(null);
 
 export function SoundtrackProvider({
   songs,
+  effects = [],
   children,
 }: {
   songs: SoundtrackSong[];
+  effects?: SoundtrackSong[];
   children: ReactNode;
 }) {
-  const [soundtrack] = useState(() => new Soundtrack(songs));
+  const [soundtrack] = useState(() => new Soundtrack(songs, {}, effects));
   const [muted, setMutedState] = useState(false);
 
   useEffect(() => {
@@ -40,6 +42,11 @@ export function SoundtrackProvider({
       {children}
     </SoundtrackContext.Provider>
   );
+}
+
+/** Para componentes que también se usan fuera de una carta (sin sonido). */
+export function useOptionalSoundtrack(): SoundtrackValue | null {
+  return useContext(SoundtrackContext);
 }
 
 export function useSoundtrack(): SoundtrackValue {

@@ -58,9 +58,10 @@ for (const chapter of manifest.chapters ?? []) {
   }
   for (const card of chapter.aunque?.cards ?? []) files.add(card.media.path);
 }
-for (const song of manifest.songs ?? []) {
+for (const song of [...(manifest.songs ?? []), ...(manifest.sounds ?? [])]) {
   if (!song.src.startsWith('/')) files.add(song.src);
 }
+if (manifest.finale?.moment) files.add(manifest.finale.moment.photo.path);
 
 const missing = [];
 for (const file of files) {

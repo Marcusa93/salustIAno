@@ -27,7 +27,7 @@ export function LetterExperience({ letter }: { letter: Letter }) {
 
   return (
     <MotionConfig reducedMotion="user">
-      <SoundtrackProvider songs={letter.songs}>
+      <SoundtrackProvider songs={letter.songs} effects={letter.sounds}>
         <PhotoViewerProvider photos={photosInChronologicalOrder(letter)} birthAt={letter.birthAt}>
           <AnimatePresence>
             {stage === 'sealed' && (

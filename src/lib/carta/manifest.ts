@@ -31,6 +31,8 @@ const photoSchema = z.object({
   featured: z.boolean().optional(),
   // `contain` para fotos que no se pueden recortar (ej. una captura de pantalla).
   fit: z.enum(['cover', 'contain']).optional(),
+  // Id de `sounds`: al tocar la foto suena (ej. la risa de Salu).
+  sound: z.string().min(1).optional(),
 });
 
 const videoSchema = photoSchema.extend({
@@ -85,6 +87,8 @@ export const letterManifestSchema = z
     dateline: z.string().min(1).optional(),
     intro: z.array(z.string().min(1)).min(1),
     songs: z.array(songSchema).min(1),
+    // Efectos cortos que suenan al tocar algo (no son canciones de fondo).
+    sounds: z.array(songSchema).optional(),
     chapters: z.array(chapterSchema).min(1),
     finale: z.object({
       song: z.string().min(1).optional(),
@@ -99,6 +103,14 @@ export const letterManifestSchema = z
           label: z.string().min(1),
           lines: z.array(z.string().min(1)).min(1),
           signature: z.string().min(1),
+        })
+        .optional(),
+      // Una última foto para tocar (con su sonido), después de la firma.
+      moment: z
+        .object({
+          photo: photoSchema,
+          hint: z.string().min(1),
+          after: z.string().min(1).optional(),
         })
         .optional(),
       // Cierre con cámara: "faltaba una foto, la de hoy". Se guarda en el álbum.
@@ -123,12 +135,27 @@ export const letterManifestSchema = z
         ctx.addIssue({ code: 'custom', message: `La canción "${id}" no está en songs.` });
       }
     }
+
+    const soundIds = new Set((manifest.sounds ?? []).map((sound) => sound.id));
+    const photos = [
+      ...manifest.chapters.flatMap((chapter) => [
+        ...chapter.media,
+        ...(chapter.aunque?.cards ?? []).map((card) => card.media),
+      ]),
+      ...(manifest.finale.moment ? [manifest.finale.moment.photo] : []),
+    ];
+    for (const media of photos) {
+      if (media.sound && !soundIds.has(media.sound)) {
+        ctx.addIssue({ code: 'custom', message: `El sonido "${media.sound}" no está en sounds.` });
+      }
+    }
   });
 
 export type LetterManifest = z.infer<typeof letterManifestSchema>;
 type ManifestPhoto = z.infer<typeof photoSchema>;
 type ManifestVideo = z.infer<typeof videoSchema>;
 type ManifestChapter = z.infer<typeof chapterSchema>;
+type ManifestFinale = LetterManifest['finale'];
 
 export type LetterPhoto = Omit<ManifestPhoto, 'path'> & { src: string };
 export type LetterVideo = Omit<ManifestVideo, 'path' | 'poster'> & {
@@ -153,10 +180,16 @@ export interface LetterChapter extends Omit<ManifestChapter, 'media' | 'aunque'>
   };
 }
 
+export interface LetterFinale extends Omit<ManifestFinale, 'moment'> {
+  moment?: { photo: LetterPhoto; hint: string; after?: string };
+}
+
 /** La carta lista para el cliente: cada archivo con su URL firmada. */
-export interface Letter extends Omit<LetterManifest, 'songs' | 'chapters'> {
+export interface Letter extends Omit<LetterManifest, 'songs' | 'sounds' | 'chapters' | 'finale'> {
   songs: LetterSong[];
+  sounds: LetterSong[];
   chapters: LetterChapter[];
+  finale: LetterFinale;
   /** Fotos que se sacaron desde el final de la carta (viven en el álbum). */
   memories: LetterPhoto[];
 }
@@ -171,9 +204,10 @@ export function collectStoragePaths(manifest: LetterManifest): string[] {
     }
     for (const card of chapter.aunque?.cards ?? []) paths.add(card.media.path);
   }
-  for (const song of manifest.songs) {
+  for (const song of [...manifest.songs, ...(manifest.sounds ?? [])]) {
     if (!isPublicAsset(song.src)) paths.add(song.src);
   }
+  if (manifest.finale.moment) paths.add(manifest.finale.moment.photo.path);
   return [...paths];
 }
 
@@ -218,14 +252,29 @@ export function hydrateLetter(
       : { ...rest, media };
   });
 
-  const songs = manifest.songs
-    .map((song): LetterSong | null => {
-      const src = isPublicAsset(song.src) ? song.src : urlFor(song.src);
-      return src ? { ...song, src } : null;
-    })
-    .filter((song): song is LetterSong => song !== null);
+  const audio = (list: LetterManifest['songs']) =>
+    list
+      .map((song): LetterSong | null => {
+        const src = isPublicAsset(song.src) ? song.src : urlFor(song.src);
+        return src ? { ...song, src } : null;
+      })
+      .filter((song): song is LetterSong => song !== null);
 
-  return { ...manifest, songs, chapters, memories: [] };
+  const { moment, ...finaleRest } = manifest.finale;
+  const momentPhoto = moment ? photo(moment.photo) : null;
+  const finale: LetterFinale =
+    moment && momentPhoto
+      ? { ...finaleRest, moment: { ...moment, photo: momentPhoto } }
+      : finaleRest;
+
+  return {
+    ...manifest,
+    songs: audio(manifest.songs),
+    sounds: audio(manifest.sounds ?? []),
+    chapters,
+    finale,
+    memories: [],
+  };
 }
 
 /** Fotos de toda la carta en orden cronológico — para el visor. */

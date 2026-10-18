@@ -12,6 +12,7 @@ import { NightSky } from './atmosphere';
 import { Handwritten } from './handwritten';
 import { LetterSelfie } from './letter-selfie';
 import { usePhotoViewer } from './photo-viewer';
+import { Polaroid } from './polaroid';
 import { useSoundtrack } from './soundtrack-provider';
 import { useHold } from './use-hold';
 
@@ -68,6 +69,11 @@ export function Finale({
   const { openAt } = usePhotoViewer();
   const synth = useRef<HeartbeatSynth | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [laughed, setLaughed] = useState(false);
+  // Pausas entre lo que aparece después del corazón: firma, foto, P.D., contador.
+  const momentDelay = 3.4;
+  const postscriptDelay = finale.moment ? 5 : 3.8;
+  const counterDelay = 3.6 + (finale.moment ? 1.6 : 0) + (finale.postscript ? 2 : 0);
   const now = useNow(revealed);
 
   const heartbeat = () => {
@@ -94,6 +100,12 @@ export function Finale({
   });
 
   useEffect(() => () => synth.current?.stop(0.2), []);
+
+  // La risa se baja apenas se abre el final, para que suene sin demora al tocar.
+  const momentSound = finale.moment?.photo.sound;
+  useEffect(() => {
+    if (revealed && momentSound) soundtrack.preloadEffect(momentSound);
+  }, [revealed, momentSound, soundtrack]);
 
   const fillY = useTransform(hold.progress, [0, 1], [92, 0]);
   const beatStyle = { '--beat': `${60 / BABY_BPM}s` } as CSSProperties;
@@ -192,12 +204,42 @@ export function Finale({
               {finale.signature}
             </motion.p>
 
+            {finale.moment && (
+              <motion.div
+                className="flex flex-col items-center gap-4"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: momentDelay, duration: 1.4, ease: easeWarm }}
+              >
+                <Polaroid
+                  photo={finale.moment.photo}
+                  tilt={-2}
+                  size="lg"
+                  className="w-full max-w-[20rem]"
+                  soundHint={finale.moment.hint}
+                  onSoundPlayed={() => setLaughed(true)}
+                />
+                <AnimatePresence>
+                  {laughed && finale.moment.after && (
+                    <motion.p
+                      className="font-hand text-[2rem] text-carta-glow leading-tight"
+                      initial={{ opacity: 0, y: 8, filter: 'blur(6px)' }}
+                      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                      transition={{ delay: 0.6, duration: 1.2, ease: easeWarm }}
+                    >
+                      {finale.moment.after}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
             {finale.postscript && (
               <motion.div
                 className="flex flex-col gap-4"
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 3.8, duration: 1.4, ease: easeWarm }}
+                transition={{ delay: postscriptDelay, duration: 1.4, ease: easeWarm }}
               >
                 <p className="font-display text-carta-glow text-lg italic">
                   {finale.postscript.label}
@@ -213,7 +255,7 @@ export function Finale({
               className="flex flex-col items-center gap-2 border-carta-night-foreground/15 border-t pt-12 text-center"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: finale.postscript ? 5.6 : 3.6, duration: 1.2, ease: easeWarm }}
+              transition={{ delay: counterDelay, duration: 1.2, ease: easeWarm }}
             >
               <p className="font-sans text-[0.7rem] text-carta-night-foreground/60 uppercase tracking-[0.3em]">
                 Sos mi mamá hace
