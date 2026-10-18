@@ -12,6 +12,9 @@ import { Polaroid } from './polaroid';
 const TILTS = [-2.4, 1.9, -1.3, 2.7, -2, 1.2, -2.8, 1.6];
 const tiltAt = (i: number) => TILTS[i % TILTS.length] ?? 0;
 
+/** Id del capítulo en la página: para el índice y para "seguir donde estabas". */
+export const chapterAnchor = (id: string) => `cap-${id}`;
+
 function FeaturedMedia({ media, tilt }: { media: LetterMedia; tilt: number }) {
   if (media.kind === 'video') return <BirthVideo video={media} tilt={tilt} />;
   return <Polaroid photo={media} tilt={tilt} size="lg" className="mx-auto w-full max-w-[21rem]" />;
@@ -34,6 +37,7 @@ export function ChapterSection({
 
   return (
     <motion.section
+      id={chapterAnchor(chapter.id)}
       aria-labelledby={`capitulo-${chapter.id}`}
       className="relative pt-28"
       onViewportEnter={() => onEnter(chapter)}

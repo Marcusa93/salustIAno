@@ -1,29 +1,68 @@
 'use client';
 
-import { type Letter, type LetterChapter, photosInChronologicalOrder } from '@/lib/carta/manifest';
+import {
+  type Letter,
+  type LetterChapter,
+  type LetterSong,
+  photosInChronologicalOrder,
+} from '@/lib/carta/manifest';
+import {
+  FINALE,
+  clearProgress,
+  readProgress,
+  resumableChapter,
+  safeStorage,
+  saveProgress,
+} from '@/lib/carta/progress';
 import { easeWarm } from '@/lib/motion';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PaperGrain } from './atmosphere';
-import { ChapterSection } from './chapter-section';
+import { ChapterSection, chapterAnchor } from './chapter-section';
 import { Envelope } from './envelope';
 import { Finale } from './finale';
 import { Handwritten } from './handwritten';
 import { HeartbeatGate } from './heartbeat-gate';
-import { ChapterRail, SoundToggle } from './letter-chrome';
+import { ChapterRail, ExitLetterLink, SoundToggle } from './letter-chrome';
 import { PhotoViewerProvider } from './photo-viewer';
 import { SoundtrackProvider, useSoundtrack } from './soundtrack-provider';
 
 type Stage = 'sealed' | 'heartbeat' | 'letter';
 
+/** Dónde está cada parte de la carta en la página, para saltar ahí. */
+function anchorFor(id: string): string {
+  return id === FINALE ? FINALE : chapterAnchor(id);
+}
+
 /**
  * La carta tiene tres escenas: el sobre cerrado, el latido y la carta en
  * sí (capítulos + final). Cada escena desbloquea la siguiente con un gesto,
- * que es además lo que habilita el audio en iOS.
+ * que es además lo que habilita el audio en iOS. Si ya la había empezado,
+ * el sobre ofrece seguir donde quedó.
  */
 export function LetterExperience({ letter }: { letter: Letter }) {
   const [stage, setStage] = useState<Stage>('sealed');
+  const [resumeFrom, setResumeFrom] = useState<string | null>(null);
+  const [startAt, setStartAt] = useState<string | null>(null);
   const firstSongId = letter.chapters[0]?.song ?? letter.songs[0]?.id;
+
+  // El progreso vive en el dispositivo: se lee recién en el cliente.
+  useEffect(() => {
+    const saved = readProgress(safeStorage(), letter.slug);
+    setResumeFrom(
+      resumableChapter(
+        saved,
+        letter.chapters.map((chapter) => chapter.id),
+      ),
+    );
+  }, [letter.slug, letter.chapters]);
+
+  const resumeLabel =
+    resumeFrom === null
+      ? null
+      : resumeFrom === FINALE
+        ? 'el final'
+        : (letter.chapters.find((chapter) => chapter.id === resumeFrom)?.label ?? null);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -34,7 +73,15 @@ export function LetterExperience({ letter }: { letter: Letter }) {
               <Envelope
                 key="sealed"
                 envelope={letter.envelope}
-                onOpened={() => setStage('heartbeat')}
+                resumeLabel={resumeLabel}
+                onOpened={() => {
+                  clearProgress(safeStorage(), letter.slug);
+                  setStage('heartbeat');
+                }}
+                onResume={() => {
+                  setStartAt(resumeFrom);
+                  setStage('letter');
+                }}
               />
             )}
             {stage === 'heartbeat' && (
@@ -47,7 +94,7 @@ export function LetterExperience({ letter }: { letter: Letter }) {
             )}
           </AnimatePresence>
           {stage === 'letter' ? (
-            <LetterPaper letter={letter} />
+            <LetterPaper letter={letter} startAt={startAt} />
           ) : (
             <div className="min-h-dvh bg-carta-night" />
           )}
@@ -57,25 +104,41 @@ export function LetterExperience({ letter }: { letter: Letter }) {
   );
 }
 
-function LetterPaper({ letter }: { letter: Letter }) {
+function LetterPaper({ letter, startAt }: { letter: Letter; startAt: string | null }) {
   const { soundtrack } = useSoundtrack();
   const [current, setCurrent] = useState<LetterChapter | null>(null);
+  const [nowPlaying, setNowPlaying] = useState<LetterSong | null>(null);
+  const playingId = useRef<string | null>(null);
   const defaultSong = letter.songs[0]?.id;
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+    const target = startAt ? document.getElementById(anchorFor(startAt)) : null;
+    if (target) target.scrollIntoView({ block: 'start' });
+    else window.scrollTo(0, 0);
+  }, [startAt]);
+
+  const playSong = (songId: string | undefined) => {
+    if (!songId) return;
+    soundtrack.play(songId);
+    if (playingId.current === songId) return;
+    playingId.current = songId;
+    setNowPlaying(letter.songs.find((song) => song.id === songId) ?? null);
+  };
 
   const enterChapter = (chapter: LetterChapter) => {
     setCurrent(chapter);
-    const song = chapter.song ?? defaultSong;
-    if (song) soundtrack.play(song);
+    saveProgress(safeStorage(), letter.slug, chapter.id);
+    playSong(chapter.song ?? defaultSong);
   };
 
   const enterFinale = () => {
     setCurrent(null);
-    const song = letter.finale.song ?? defaultSong;
-    if (song) soundtrack.play(song);
+    saveProgress(safeStorage(), letter.slug, FINALE);
+    playSong(letter.finale.song ?? defaultSong);
+  };
+
+  const jumpTo = (id: string) => {
+    document.getElementById(anchorFor(id))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -86,7 +149,13 @@ function LetterPaper({ letter }: { letter: Letter }) {
       transition={{ duration: 1.4, ease: easeWarm }}
     >
       <PaperGrain />
-      <ChapterRail chapter={current} />
+      <ExitLetterLink />
+      <ChapterRail
+        chapters={letter.chapters}
+        current={current}
+        nowPlaying={nowPlaying}
+        onJump={jumpTo}
+      />
       <SoundToggle />
 
       <article className="relative z-10 mx-auto max-w-xl px-7 pt-[calc(env(safe-area-inset-top)+5.5rem)] pb-32">

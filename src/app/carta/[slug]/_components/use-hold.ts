@@ -19,6 +19,8 @@ export function useHold({ durationMs, onStart, onCancel, onComplete }: HoldOptio
   const progress = useMotionValue(0);
   const [holding, setHolding] = useState(false);
   const [done, setDone] = useState(false);
+  // Veces que soltó antes de completar: para explicarle que hay que sostener.
+  const [earlyReleases, setEarlyReleases] = useState(0);
   const startedAt = useRef<number | null>(null);
   const frame = useRef<number | null>(null);
   const callbacks = useRef({ onStart, onCancel, onComplete });
@@ -56,6 +58,7 @@ export function useHold({ durationMs, onStart, onCancel, onComplete }: HoldOptio
   const end = () => {
     if (startedAt.current === null) return;
     startedAt.current = null;
+    setEarlyReleases((n) => n + 1);
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     setHolding(false);
     animate(progress, 0, { duration: 0.5 });
@@ -88,5 +91,5 @@ export function useHold({ durationMs, onStart, onCancel, onComplete }: HoldOptio
     onContextMenu: (event: { preventDefault: () => void }) => event.preventDefault(),
   };
 
-  return { progress, holding, done, handlers };
+  return { progress, holding, done, earlyReleases, handlers };
 }

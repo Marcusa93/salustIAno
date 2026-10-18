@@ -2,21 +2,31 @@
 
 import type { Letter } from '@/lib/carta/manifest';
 import { easeWarm } from '@/lib/motion';
-import { Volume2 } from 'lucide-react';
+import { BookOpen, Volume2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import { NightSky } from './atmosphere';
+import { ExitLetterLink } from './letter-chrome';
 import { useSoundtrack } from './soundtrack-provider';
 
 const OPEN_ANIMATION_MS = 1500;
 
-/** Escena 1: el sobre cerrado. El tap que lo abre también desbloquea el audio. */
+/**
+ * Escena 1: el sobre cerrado. El tap que lo abre también desbloquea el
+ * audio. Si ya la había empezado a leer, ofrece seguir donde quedó (ese
+ * tap también desbloquea el audio y saltea el sobre y el latido).
+ */
 export function Envelope({
   envelope,
+  resumeLabel,
   onOpened,
+  onResume,
 }: {
   envelope: Letter['envelope'];
+  /** "Agosto", "el final"… o `null` si no hay dónde seguir. */
+  resumeLabel: string | null;
   onOpened: () => void;
+  onResume: () => void;
 }) {
   const { soundtrack } = useSoundtrack();
   const [opening, setOpening] = useState(false);
@@ -28,12 +38,19 @@ export function Envelope({
     window.setTimeout(onOpened, OPEN_ANIMATION_MS);
   };
 
+  const resume = () => {
+    if (opening) return;
+    soundtrack.unlock();
+    onResume();
+  };
+
   return (
     <motion.div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-carta-night px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-carta-night-foreground"
       exit={{ opacity: 0, transition: { duration: 0.6 } }}
     >
       <NightSky />
+      <ExitLetterLink tone="night" />
 
       <motion.p
         className="relative mb-12 font-display text-carta-night-foreground/70 text-sm uppercase tracking-[0.35em]"
@@ -127,7 +144,23 @@ export function Envelope({
         animate={{ opacity: opening ? 0 : 1 }}
         transition={{ delay: opening ? 0 : 1.2, duration: 0.8 }}
       >
-        <span className="font-hand text-3xl text-carta-glow">Tocá para abrir</span>
+        {resumeLabel ? (
+          <>
+            <button
+              type="button"
+              onClick={resume}
+              className="flex items-center gap-2 rounded-full bg-carta-glow px-6 py-3.5 font-medium text-base text-carta-night shadow-[0_10px_30px_-10px_var(--carta-glow)] transition-transform active:scale-95"
+            >
+              <BookOpen className="size-5" aria-hidden />
+              Seguir donde estabas
+            </button>
+            <span className="font-hand text-carta-night-foreground/80 text-xl">
+              Ibas por {resumeLabel}. O tocá el sobre para empezar de nuevo.
+            </span>
+          </>
+        ) : (
+          <span className="font-hand text-3xl text-carta-glow">Tocá para abrir</span>
+        )}
         <span className="flex items-center gap-2 text-carta-night-foreground/70 text-sm">
           <Volume2 className="size-4" aria-hidden />
           {envelope.hint}

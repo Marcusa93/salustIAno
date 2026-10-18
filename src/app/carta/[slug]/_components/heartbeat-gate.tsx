@@ -150,10 +150,14 @@ export function HeartbeatGate({
         className="relative mt-10 max-w-[16rem] text-carta-night-foreground/70 text-sm"
         animate={{ opacity: heard ? 0 : 1 }}
       >
-        {hold.holding ? 'Así… un ratito más.' : copy.instruction}
+        {hold.holding
+          ? 'Así… un ratito más.'
+          : hold.earlyReleases > 0
+            ? 'Dejá el dedo apoyado un ratito más.'
+            : copy.instruction}
       </motion.p>
 
-      {showFallback && !heard && (
+      {(showFallback || hold.earlyReleases >= 2) && !heard && (
         <button
           type="button"
           onClick={finish}

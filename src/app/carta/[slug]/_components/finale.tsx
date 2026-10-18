@@ -5,8 +5,9 @@ import type { HeartbeatSynth } from '@/lib/carta/heartbeat-synth';
 import type { Letter, LetterPhoto } from '@/lib/carta/manifest';
 import { easeWarm } from '@/lib/motion';
 import { cn } from '@/lib/utils';
-import { Heart, Images, RotateCcw } from 'lucide-react';
+import { Heart, House, Images, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion, useTransform } from 'motion/react';
+import Link from 'next/link';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { NightSky } from './atmosphere';
 import { Handwritten } from './handwritten';
@@ -81,6 +82,14 @@ export function Finale({
     return synth.current;
   };
 
+  const complete = () => {
+    if (revealed) return;
+    heartbeat().stop(2.2);
+    soundtrack.setDucked(false);
+    navigator.vibrate?.([40, 90, 40]);
+    setRevealed(true);
+  };
+
   const hold = useHold({
     durationMs: HOLD_MS,
     onStart: () => {
@@ -91,12 +100,7 @@ export function Finale({
       heartbeat().stop();
       soundtrack.setDucked(false);
     },
-    onComplete: () => {
-      heartbeat().stop(2.2);
-      soundtrack.setDucked(false);
-      navigator.vibrate?.([40, 90, 40]);
-      setRevealed(true);
-    },
+    onComplete: complete,
   });
 
   useEffect(() => () => synth.current?.stop(0.2), []);
@@ -112,6 +116,7 @@ export function Finale({
 
   return (
     <motion.section
+      id="final"
       aria-label="Final de la carta"
       className="relative overflow-hidden bg-carta-night text-carta-night-foreground"
       onViewportEnter={onEnter}
@@ -180,10 +185,24 @@ export function Finale({
                 className="mt-8 font-hand text-[1.7rem] text-carta-glow"
                 exit={{ opacity: 0, y: -6 }}
               >
-                {hold.holding ? 'Ese soy yo.' : finale.touchPrompt}
+                {hold.holding
+                  ? 'Ese soy yo.'
+                  : hold.earlyReleases > 0
+                    ? 'Dejá el dedo apoyado, un ratito más.'
+                    : finale.touchPrompt}
               </motion.p>
             )}
           </AnimatePresence>
+          {/* Si el gesto no le sale (soltó dos veces), que pueda seguir igual. */}
+          {!revealed && hold.earlyReleases >= 2 && (
+            <button
+              type="button"
+              onClick={complete}
+              className="mt-4 text-carta-night-foreground/60 text-xs underline underline-offset-4"
+            >
+              Seguir sin esperar
+            </button>
+          )}
         </div>
 
         {revealed && (
@@ -292,6 +311,13 @@ export function Finale({
                   <RotateCcw className="size-4" aria-hidden />
                   Volver a leer
                 </button>
+                <Link
+                  href="/home"
+                  className="flex items-center gap-2 rounded-full bg-carta-night-foreground/10 px-5 py-3 text-sm transition-colors hover:bg-carta-night-foreground/20"
+                >
+                  <House className="size-4" aria-hidden />
+                  Volver a Salu
+                </Link>
               </div>
             </motion.div>
           </motion.div>
