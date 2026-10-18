@@ -62,6 +62,7 @@ for (const song of [...(manifest.songs ?? []), ...(manifest.sounds ?? [])]) {
   if (!song.src.startsWith('/')) files.add(song.src);
 }
 if (manifest.finale?.moment) files.add(manifest.finale.moment.photo.path);
+if (manifest.heartbeat?.photo) files.add(manifest.heartbeat.photo.path);
 
 const missing = [];
 for (const file of files) {

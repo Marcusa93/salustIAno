@@ -1,13 +1,14 @@
 'use client';
 
+import { polaroidDateLabel } from '@/lib/carta/dates';
 import type { HeartbeatSynth } from '@/lib/carta/heartbeat-synth';
-import type { Letter } from '@/lib/carta/manifest';
+import type { Letter, LetterPhoto } from '@/lib/carta/manifest';
 import { easeWarm } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { Fingerprint } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import { NightSky } from './atmosphere';
+import { NightSky, Tape } from './atmosphere';
 import { useSoundtrack } from './soundtrack-provider';
 import { useHold } from './use-hold';
 
@@ -15,12 +16,44 @@ import { useHold } from './use-hold';
 const FETAL_BPM = 140;
 const HOLD_MS = 3800;
 const AFTER_MS = 4200;
+// Con foto, un rato más: que se revele y se pueda mirar antes de la carta.
+const AFTER_WITH_PHOTO_MS = 7000;
 const FALLBACK_AFTER_MS = 12_000;
+
+/** Polaroid que se revela sola, sin tocar: la foto de "ese día". */
+function RevealedPhoto({ photo }: { photo: LetterPhoto }) {
+  return (
+    <motion.figure
+      key="photo"
+      className="relative mt-10 w-[15rem] bg-carta-polaroid p-2.5 pb-3 shadow-[0_24px_48px_-16px_var(--carta-shadow)]"
+      initial={{ opacity: 0, y: 24, rotate: -5, scale: 0.92 }}
+      animate={{ opacity: 1, y: 0, rotate: -2, scale: 1 }}
+      transition={{ duration: 1.4, ease: easeWarm }}
+    >
+      <Tape className="-top-3 -translate-x-1/2 left-1/2 w-20 rotate-3" />
+      <motion.img
+        src={photo.src}
+        alt={photo.alt}
+        width={photo.width}
+        height={photo.height}
+        draggable={false}
+        className="aspect-[3/4] w-full bg-carta-paper-edge object-cover"
+        initial={{ filter: 'saturate(0.1) sepia(0.55) brightness(1.4) contrast(0.7)' }}
+        animate={{ filter: 'saturate(1) sepia(0) brightness(1) contrast(1)' }}
+        transition={{ duration: 3.2, ease: 'easeOut', delay: 0.4 }}
+      />
+      <figcaption className="flex items-end justify-between px-1 pt-2 font-hand text-carta-ink">
+        <span className="text-xl leading-tight">{photo.caption ?? ''}</span>
+        <span className="text-carta-ink-soft text-sm">{polaroidDateLabel(photo.takenAt)}</span>
+      </figcaption>
+    </motion.figure>
+  );
+}
 
 /**
  * Escena 2: "Antes de verme, ya me escuchabas". Mientras mamá sostiene el
  * dedo, suena el latido de la ecografía; al completarse, el latido se
- * funde con la primera canción.
+ * funde con la primera canción y (si hay) se revela la foto de ese día.
  */
 export function HeartbeatGate({
   copy,
@@ -46,7 +79,7 @@ export function HeartbeatGate({
     setHeard(true);
     heartbeat().stop(3);
     if (firstSongId) soundtrack.play(firstSongId);
-    window.setTimeout(onDone, AFTER_MS);
+    window.setTimeout(onDone, copy.photo ? AFTER_WITH_PHOTO_MS : AFTER_MS);
   };
 
   const hold = useHold({
@@ -91,63 +124,78 @@ export function HeartbeatGate({
         </AnimatePresence>
       </div>
 
-      <motion.button
-        type="button"
-        {...hold.handlers}
-        aria-label={`${copy.instruction} Mantené apretado.`}
-        className="relative mt-16 grid size-48 touch-none select-none place-items-center rounded-full outline-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] focus-visible:ring-4 focus-visible:ring-carta-glow/50"
-        animate={heard ? { scale: 1.4, opacity: 0 } : { scale: 1, opacity: 1 }}
-        transition={{ duration: heard ? 2.4 : 0.6, ease: easeWarm }}
-        disabled={heard}
-      >
-        <span
-          aria-hidden
-          style={beatStyle}
-          className={cn(
-            'absolute inset-0 rounded-full bg-carta-glow/15 blur-md transition-opacity duration-500',
-            hold.holding ? 'animate-carta-beat opacity-100' : 'animate-breathe opacity-60',
-          )}
-        />
-        <span
-          aria-hidden
-          style={beatStyle}
-          className={cn(
-            'absolute inset-6 rounded-full border border-carta-glow/30 bg-carta-night',
-            hold.holding && 'animate-carta-beat',
-          )}
-        />
-        <svg aria-hidden viewBox="0 0 100 100" className="-rotate-90 absolute inset-0 size-full">
-          <circle
-            cx="50"
-            cy="50"
-            r="47"
-            fill="none"
-            className="stroke-carta-glow/15"
-            strokeWidth="1.5"
-          />
-          <motion.circle
-            cx="50"
-            cy="50"
-            r="47"
-            fill="none"
-            className="stroke-carta-glow"
-            strokeWidth="2"
-            strokeLinecap="round"
-            style={{ pathLength: hold.progress }}
-          />
-        </svg>
-        <Fingerprint
-          aria-hidden
-          strokeWidth={1.2}
-          className={cn(
-            'relative size-14 text-carta-glow transition-transform duration-300',
-            hold.holding && 'scale-90',
-          )}
-        />
-      </motion.button>
+      <AnimatePresence mode="wait">
+        {heard && copy.photo ? (
+          <RevealedPhoto key="photo" photo={copy.photo} />
+        ) : (
+          <motion.button
+            key="hold"
+            type="button"
+            {...hold.handlers}
+            aria-label={`${copy.instruction} Mantené apretado.`}
+            className="relative mt-16 grid size-48 touch-none select-none place-items-center rounded-full outline-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] focus-visible:ring-4 focus-visible:ring-carta-glow/50"
+            animate={heard ? { scale: 1.4, opacity: 0 } : { scale: 1, opacity: 1 }}
+            exit={{ scale: 1.3, opacity: 0, transition: { duration: 0.7 } }}
+            transition={{ duration: heard ? 2.4 : 0.6, ease: easeWarm }}
+            disabled={heard}
+          >
+            <span
+              aria-hidden
+              style={beatStyle}
+              className={cn(
+                'absolute inset-0 rounded-full bg-carta-glow/15 blur-md transition-opacity duration-500',
+                hold.holding ? 'animate-carta-beat opacity-100' : 'animate-breathe opacity-60',
+              )}
+            />
+            <span
+              aria-hidden
+              style={beatStyle}
+              className={cn(
+                'absolute inset-6 rounded-full border border-carta-glow/30 bg-carta-night',
+                hold.holding && 'animate-carta-beat',
+              )}
+            />
+            <svg
+              aria-hidden
+              viewBox="0 0 100 100"
+              className="-rotate-90 absolute inset-0 size-full"
+            >
+              <circle
+                cx="50"
+                cy="50"
+                r="47"
+                fill="none"
+                className="stroke-carta-glow/15"
+                strokeWidth="1.5"
+              />
+              <motion.circle
+                cx="50"
+                cy="50"
+                r="47"
+                fill="none"
+                className="stroke-carta-glow"
+                strokeWidth="2"
+                strokeLinecap="round"
+                style={{ pathLength: hold.progress }}
+              />
+            </svg>
+            <Fingerprint
+              aria-hidden
+              strokeWidth={1.2}
+              className={cn(
+                'relative size-14 text-carta-glow transition-transform duration-300',
+                hold.holding && 'scale-90',
+              )}
+            />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <motion.p
-        className="relative mt-10 max-w-[16rem] text-carta-night-foreground/70 text-sm"
+        className={cn(
+          'relative mt-10 max-w-[16rem] text-carta-night-foreground/70 text-sm',
+          heard && copy.photo && 'hidden',
+        )}
         animate={{ opacity: heard ? 0 : 1 }}
       >
         {hold.holding

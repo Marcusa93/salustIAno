@@ -179,6 +179,16 @@ describe('sonidos y momento final', () => {
     expect(letter.finale.moment?.photo).not.toHaveProperty('path');
   });
 
+  it('firma la foto del latido y la deja lista para la pantalla del principio', () => {
+    const manifest = baseManifest();
+    manifest.heartbeat.photo = photo('fotos/03.jpg', '2026-05-04T18:36:20-03:00');
+    expect(collectStoragePaths(manifest)).toContain('fotos/03.jpg');
+    const letter = hydrateLetter(manifest, (path) => `u:${path}`);
+    expect(letter.heartbeat.photo).toMatchObject({ src: 'u:fotos/03.jpg' });
+    expect(letter.heartbeat.after).toBe('Ese era yo.');
+    expect(hydrateLetter(baseManifest(), (path) => `u:${path}`).heartbeat.photo).toBeUndefined();
+  });
+
   it('si la foto del momento no se pudo firmar, el final queda sin momento', () => {
     const letter = hydrateLetter(withMoment(), (path) =>
       path === 'fotos/46.jpg' ? undefined : `u:${path}`,

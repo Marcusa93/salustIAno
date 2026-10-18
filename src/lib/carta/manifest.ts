@@ -82,6 +82,8 @@ export const letterManifestSchema = z
       prompt: z.string().min(1),
       instruction: z.string().min(1),
       after: z.string().min(1),
+      // Foto que se revela junto al "after" ("Ese era yo…").
+      photo: photoSchema.optional(),
     }),
     // Encabezado de carta: "Tucumán, 18 de octubre de 2026".
     dateline: z.string().min(1).optional(),
@@ -143,6 +145,7 @@ export const letterManifestSchema = z
         ...(chapter.aunque?.cards ?? []).map((card) => card.media),
       ]),
       ...(manifest.finale.moment ? [manifest.finale.moment.photo] : []),
+      ...(manifest.heartbeat.photo ? [manifest.heartbeat.photo] : []),
     ];
     for (const media of photos) {
       if (media.sound && !soundIds.has(media.sound)) {
@@ -156,6 +159,7 @@ type ManifestPhoto = z.infer<typeof photoSchema>;
 type ManifestVideo = z.infer<typeof videoSchema>;
 type ManifestChapter = z.infer<typeof chapterSchema>;
 type ManifestFinale = LetterManifest['finale'];
+type ManifestHeartbeat = LetterManifest['heartbeat'];
 
 export type LetterPhoto = Omit<ManifestPhoto, 'path'> & { src: string };
 export type LetterVideo = Omit<ManifestVideo, 'path' | 'poster'> & {
@@ -180,12 +184,18 @@ export interface LetterChapter extends Omit<ManifestChapter, 'media' | 'aunque'>
   };
 }
 
+export interface LetterHeartbeat extends Omit<ManifestHeartbeat, 'photo'> {
+  photo?: LetterPhoto;
+}
+
 export interface LetterFinale extends Omit<ManifestFinale, 'moment'> {
   moment?: { photo: LetterPhoto; hint: string; after?: string };
 }
 
 /** La carta lista para el cliente: cada archivo con su URL firmada. */
-export interface Letter extends Omit<LetterManifest, 'songs' | 'sounds' | 'chapters' | 'finale'> {
+export interface Letter
+  extends Omit<LetterManifest, 'songs' | 'sounds' | 'chapters' | 'finale' | 'heartbeat'> {
+  heartbeat: LetterHeartbeat;
   songs: LetterSong[];
   sounds: LetterSong[];
   chapters: LetterChapter[];
@@ -208,6 +218,7 @@ export function collectStoragePaths(manifest: LetterManifest): string[] {
     if (!isPublicAsset(song.src)) paths.add(song.src);
   }
   if (manifest.finale.moment) paths.add(manifest.finale.moment.photo.path);
+  if (manifest.heartbeat.photo) paths.add(manifest.heartbeat.photo.path);
   return [...paths];
 }
 
@@ -267,8 +278,15 @@ export function hydrateLetter(
       ? { ...finaleRest, moment: { ...moment, photo: momentPhoto } }
       : finaleRest;
 
+  const { photo: heartbeatPhoto, ...heartbeatRest } = manifest.heartbeat;
+  const heartbeatSrc = heartbeatPhoto ? photo(heartbeatPhoto) : null;
+  const heartbeat: LetterHeartbeat = heartbeatSrc
+    ? { ...heartbeatRest, photo: heartbeatSrc }
+    : heartbeatRest;
+
   return {
     ...manifest,
+    heartbeat,
     songs: audio(manifest.songs),
     sounds: audio(manifest.sounds ?? []),
     chapters,
