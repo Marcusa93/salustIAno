@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   elapsedParts,
+  isOverdueSleep,
   isStale,
   preciseAgeLabel,
   sinceLabel,
   sleepKindAt,
+  suggestedWakeTime,
   wakeProgress,
 } from './home-now';
 
@@ -110,5 +112,33 @@ describe('sleepKindAt', () => {
     expect(sleepKindAt(at('2026-10-16T03:00:00-03:00'))).toBe('night');
     expect(sleepKindAt(at('2026-10-16T07:00:00-03:00'))).toBe('nap');
     expect(sleepKindAt(at('2026-10-16T15:30:00-03:00'))).toBe('nap');
+  });
+});
+
+describe('isOverdueSleep', () => {
+  const started = '2026-10-16T18:59:00-03:00';
+
+  it('un sueño de menos de 24 h todavía se puede cerrar "ahora"', () => {
+    expect(isOverdueSleep(started, at('2026-10-17T18:58:00-03:00'))).toBe(false);
+  });
+
+  it('a las 24 h exactas ya no: la base pide menos de 24 h', () => {
+    expect(isOverdueSleep(started, at('2026-10-17T18:59:00-03:00'))).toBe(true);
+    expect(isOverdueSleep(started, at('2026-10-17T22:30:00-03:00'))).toBe(true);
+  });
+});
+
+describe('suggestedWakeTime', () => {
+  const started = '2026-10-16T18:59:00-03:00';
+
+  it('propone "ahora" si el sueño es normal', () => {
+    const now = at('2026-10-17T07:10:00-03:00');
+    expect(suggestedWakeTime(started, now)).toEqual(now);
+  });
+
+  it('si quedó abierto de más, propone una hora después de que empezó', () => {
+    expect(suggestedWakeTime(started, at('2026-10-17T22:30:00-03:00'))).toEqual(
+      at('2026-10-16T19:59:00-03:00'),
+    );
   });
 });

@@ -5,11 +5,19 @@ import {
   quickCloseSleepAction,
   quickStartSleepAction,
   reopenSleepAction,
+  restoreEventAction,
 } from '@/app/(app)/cuidar/eventos/actions';
 import { useNow } from '@/hooks/useNow';
-import { formatTimeAr } from '@/lib/format-ar';
+import { formatDateAr, formatTimeAr } from '@/lib/format-ar';
 import { haptic } from '@/lib/haptics';
-import { elapsedParts, isStale, sinceLabel, sleepKindAt, wakeProgress } from '@/lib/home-now';
+import {
+  elapsedParts,
+  isOverdueSleep,
+  isStale,
+  sinceLabel,
+  sleepKindAt,
+  wakeProgress,
+} from '@/lib/home-now';
 import { cn } from '@/lib/utils';
 import type { WakeWindow } from '@/lib/wake-windows';
 import { Loader2, Milk, Moon, Sun, Sunrise } from 'lucide-react';
@@ -17,6 +25,7 @@ import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
+import { CloseSleepSheet } from './close-sleep-sheet';
 
 interface NowCardProps {
   activeSleep: { id: string; started_at: string; is_nap: boolean } | null;
@@ -51,6 +60,8 @@ export function NowCard({
   const [pending, startTransition] = useTransition();
   const [kind, setKind] = useState<'nap' | 'night'>(() => sleepKindAt(new Date(renderedAt)));
   const sleeping = activeSleep !== null;
+  // Un sueño abierto hace 24 h o más es un olvido: no se puede cerrar "ahora".
+  const overdue = sleeping && isOverdueSleep(activeSleep.started_at, now);
 
   const since = sleeping ? activeSleep.started_at : lastWokeUpAt;
   const elapsed = since ? elapsedParts(since, now) : null;
@@ -71,6 +82,28 @@ export function NowCard({
           label: 'Deshacer',
           onClick: async () => {
             const undone = await reopenSleepAction(activeSleep.id);
+            if (!undone.ok) toast.error(undone.error);
+            router.refresh();
+          },
+        },
+      });
+      router.refresh();
+    });
+  };
+
+  const discardSleep = () => {
+    if (!activeSleep) return;
+    startTransition(async () => {
+      const result = await deleteEventAction('sleep_sessions', activeSleep.id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success('Listo, lo descartamos.', {
+        action: {
+          label: 'Deshacer',
+          onClick: async () => {
+            const undone = await restoreEventAction('sleep_sessions', activeSleep.id);
             if (!undone.ok) toast.error(undone.error);
             router.refresh();
           },
@@ -128,11 +161,21 @@ export function NowCard({
           <Sun className="size-4" aria-hidden />
         )}
         <span>
-          {sleeping ? (activeSleep.is_nap ? 'Durmiendo la siesta' : 'Durmiendo') : 'Despierto'}
+          {overdue
+            ? 'Quedó un sueño abierto'
+            : sleeping
+              ? activeSleep.is_nap
+                ? 'Durmiendo la siesta'
+                : 'Durmiendo'
+              : 'Despierto'}
         </span>
       </div>
 
-      {elapsed ? (
+      {overdue ? (
+        <p className="relative mt-3 font-display text-3xl leading-tight">
+          ¿A qué hora se despertó?
+        </p>
+      ) : elapsed ? (
         <p className="relative mt-3 flex items-baseline gap-1.5 font-display leading-none">
           {elapsed.hours > 0 && (
             <>
@@ -149,9 +192,11 @@ export function NowCard({
 
       {since && (
         <p className="relative mt-2 text-sm opacity-75">
-          {sleeping
-            ? `Desde las ${formatTimeAr(since)}`
-            : `Se despertó a las ${formatTimeAr(since)}`}
+          {overdue
+            ? `Está abierto desde el ${formatDateAr(since, { weekday: 'long', day: 'numeric', month: 'long' })} a las ${formatTimeAr(since)}. Seguro se olvidó de cerrar.`
+            : sleeping
+              ? `Desde las ${formatTimeAr(since)}`
+              : `Se despertó a las ${formatTimeAr(since)}`}
         </p>
       )}
 
@@ -184,7 +229,31 @@ export function NowCard({
       )}
 
       <div className="relative mt-6 flex flex-col gap-2">
-        {sleeping ? (
+        {overdue ? (
+          <>
+            <CloseSleepSheet
+              sessionId={activeSleep.id}
+              startedAt={activeSleep.started_at}
+              trigger={
+                <button
+                  type="button"
+                  className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-sleep font-medium text-base text-primary-foreground shadow-lg shadow-sleep/30 transition-transform active:scale-[0.98]"
+                >
+                  <Sunrise className="size-5" aria-hidden />
+                  Anotar cuándo se despertó
+                </button>
+              }
+            />
+            <button
+              type="button"
+              onClick={discardSleep}
+              disabled={pending}
+              className="h-11 rounded-2xl font-medium text-sm underline-offset-4 opacity-80 hover:underline disabled:opacity-50"
+            >
+              No durmió: descartarlo
+            </button>
+          </>
+        ) : sleeping ? (
           <button
             type="button"
             onClick={wakeUp}

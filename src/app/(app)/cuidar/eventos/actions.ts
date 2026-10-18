@@ -1,5 +1,6 @@
 'use server';
 
+import { isOverdueSleep } from '@/lib/home-now';
 import { createClient } from '@/lib/supabase/server';
 import {
   type CloseSleepInput,
@@ -610,6 +611,15 @@ export async function quickCloseSleepAction(
 
   const now = new Date();
 
+  // La base no acepta sueños de 24 h o más: uno abierto hace tanto es un
+  // olvido y hay que cerrarlo con la hora real (el inicio abre el formulario).
+  if (isOverdueSleep(existing.started_at as string, now)) {
+    return {
+      ok: false,
+      error: 'Ese sueño quedó abierto más de 24 horas. Anotá a qué hora se despertó.',
+    };
+  }
+
   const { data, error } = await supabase
     .from('sleep_sessions')
     .update({ ended_at: now.toISOString() })
@@ -619,7 +629,8 @@ export async function quickCloseSleepAction(
     .select('id')
     .maybeSingle();
 
-  if (error || !data) return { ok: false, error: 'No pudimos cerrar el sueño.' };
+  if (error) return { ok: false, error: 'No pudimos cerrar el sueño.' };
+  if (!data) return { ok: false, error: 'Ese sueño ya estaba cerrado.' };
 
   if (userData?.user) {
     const startMs = new Date(existing.started_at as string).getTime();

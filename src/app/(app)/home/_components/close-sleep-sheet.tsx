@@ -19,6 +19,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { isOverdueSleep, suggestedWakeTime } from '@/lib/home-now';
 import {
   type CloseSleepInput,
   SLEEP_QUALITY_LABELS,
@@ -33,13 +34,6 @@ import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 const QUALITIES = sleepQualityEnum.options;
-
-function nowLocalISO(): string {
-  const d = new Date();
-  const off = d.getTimezoneOffset();
-  const local = new Date(d.getTime() - off * 60 * 1000);
-  return local.toISOString().slice(0, 16);
-}
 
 function isoToLocalInput(iso: string): string {
   const d = new Date(iso);
@@ -56,6 +50,9 @@ interface CloseSleepSheetProps {
 
 export function CloseSleepSheet({ sessionId, startedAt, trigger }: CloseSleepSheetProps) {
   const [open, setOpen] = useState(false);
+  // Si quedó abierto de más (24 h o más), "ahora" no es una opción válida.
+  const overdue = isOverdueSleep(startedAt);
+  const defaultEnd = () => isoToLocalInput(suggestedWakeTime(startedAt).toISOString());
 
   const {
     register,
@@ -67,7 +64,7 @@ export function CloseSleepSheet({ sessionId, startedAt, trigger }: CloseSleepShe
     resolver: zodResolver(closeSleepSchema),
     defaultValues: {
       started_at: isoToLocalInput(startedAt),
-      ended_at: nowLocalISO(),
+      ended_at: defaultEnd(),
       quality: 'unknown',
     },
   });
@@ -85,7 +82,7 @@ export function CloseSleepSheet({ sessionId, startedAt, trigger }: CloseSleepShe
     toast.success('Listo, anotamos cuándo se despertó.');
     reset({
       started_at: isoToLocalInput(startedAt),
-      ended_at: nowLocalISO(),
+      ended_at: defaultEnd(),
       quality: 'unknown',
     });
     setOpen(false);
@@ -104,7 +101,9 @@ export function CloseSleepSheet({ sessionId, startedAt, trigger }: CloseSleepShe
             Se despertó
           </SheetTitle>
           <SheetDescription>
-            Anotamos cuándo terminó este sueño. Por defecto va a "ahora", podés ajustarlo.
+            {overdue
+              ? 'Este sueño quedó abierto de más. Poné la hora en que se despertó de verdad.'
+              : 'Anotamos cuándo terminó este sueño. Por defecto va a "ahora", podés ajustarlo.'}
           </SheetDescription>
         </SheetHeader>
 

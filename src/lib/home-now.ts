@@ -21,6 +21,27 @@ export function elapsedParts(fromISO: string, now: Date = new Date()): DurationP
   return { hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60, totalMinutes };
 }
 
+/**
+ * La base rechaza sueños de 24 h o más (`sleep_sessions_max_duration`). Un
+ * sueño abierto hace tanto es casi seguro un olvido: ya no se puede cerrar
+ * "ahora" y hay que preguntar a qué hora se despertó de verdad.
+ */
+export const MAX_SLEEP_MINUTES = 24 * 60;
+
+export function isOverdueSleep(startedISO: string, now: Date = new Date()): boolean {
+  return elapsedParts(startedISO, now).totalMinutes >= MAX_SLEEP_MINUTES;
+}
+
+/**
+ * Hora que propone el formulario de "se despertó": ahora, salvo que el
+ * sueño quedó abierto de más; ahí una hora después de que empezó (válida
+ * para la base, y obviamente para ajustar).
+ */
+export function suggestedWakeTime(startedISO: string, now: Date = new Date()): Date {
+  if (!isOverdueSleep(startedISO, now)) return now;
+  return new Date(Date.parse(startedISO) + 60 * MINUTE_MS);
+}
+
 /** "recién", "hace 12 min", "hace 2 h 5 min", "hace 2 días" y, pasada la semana, "el 14 jul". */
 export function sinceLabel(fromISO: string, now: Date = new Date()): string {
   const { hours, minutes, totalMinutes } = elapsedParts(fromISO, now);
