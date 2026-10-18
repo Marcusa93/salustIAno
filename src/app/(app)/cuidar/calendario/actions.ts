@@ -7,10 +7,10 @@ import {
   milestoneCreateSchema,
   milestoneUpdateSchema,
 } from '@/lib/validators/milestone';
+import { sendPushToFamily } from '@/lib/web-push';
 import type { Route } from 'next';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { sendPushToFamily } from '../../perfil/push-actions';
 
 type ActionResult<TInput> =
   | { ok: true }

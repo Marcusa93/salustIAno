@@ -2,9 +2,9 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { sendPushToFamily } from '@/lib/web-push';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { sendPushToFamily } from '../../perfil/push-actions';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
