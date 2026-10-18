@@ -62,6 +62,78 @@ describe('callLLM', () => {
     expect(body.response_format).toEqual({ type: 'json_object' });
   });
 
+  it('manda reasoning y descarta temperature en modelos Claude 5.5', async () => {
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValueOnce(okResponse);
+
+    await callLLM({
+      model: 'anthropic/claude-sonnet-5.5',
+      messages: [{ role: 'user', content: 'hola' }],
+      temperature: 0.7,
+      maxTokens: 4000,
+      reasoning: { effort: 'low', exclude: true },
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+    const body = JSON.parse(init.body);
+    expect(body.temperature).toBeUndefined();
+    expect(body.max_tokens).toBe(4000);
+    expect(body.reasoning).toEqual({ effort: 'low', exclude: true });
+  });
+
+  it('mantiene temperature en modelos que la aceptan', async () => {
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValueOnce(okResponse);
+
+    await callLLM({
+      model: 'anthropic/claude-haiku-4.5',
+      messages: [{ role: 'user', content: 'hola' }],
+      temperature: 0.3,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(init.body).temperature).toBe(0.3);
+  });
+
+  it('devuelve los reasoning_details para reenviarlos en el loop de tools', async () => {
+    const details = [{ type: 'reasoning.encrypted', data: 'opaque' }];
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        model: 'anthropic/claude-sonnet-5.5',
+        choices: [
+          {
+            message: {
+              content: null,
+              tool_calls: [
+                { id: 'call_1', type: 'function', function: { name: 'x', arguments: '{}' } },
+              ],
+              reasoning_details: details,
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+    } as unknown as Response);
+
+    const res = await callLLM({
+      model: 'anthropic/claude-sonnet-5.5',
+      messages: [{ role: 'user', content: 'hola' }],
+    });
+    expect(res.reasoningDetails).toEqual(details);
+    expect(res.toolCalls).toHaveLength(1);
+  });
+
+  it('reasoningDetails vacío si el provider no los manda', async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse);
+    const res = await callLLM({
+      model: 'anthropic/claude-haiku-5.5',
+      messages: [{ role: 'user', content: 'hola' }],
+    });
+    expect(res.reasoningDetails).toEqual([]);
+  });
+
   it('omite response_format cuando el request incluye imagen', async () => {
     const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValueOnce(okResponse);

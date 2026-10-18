@@ -617,7 +617,8 @@ async function handleFreeText(
   let out: Awaited<ReturnType<typeof chat>>;
   try {
     out = await chat(
-      { messages: [{ role: 'user', content: userText }], voice: 'baby' },
+      // 'fast': Alexa corta a los ~8 s, no hay margen para razonar.
+      { messages: [{ role: 'user', content: userText }], voice: 'baby', speed: 'fast' },
       {
         auth: { supabase: admin, userId: target.createdBy },
         familyGroupId: target.familyGroupId,

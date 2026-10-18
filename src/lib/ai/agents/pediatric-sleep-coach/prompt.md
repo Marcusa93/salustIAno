@@ -30,6 +30,7 @@ Sos un asistente especializado en sueño infantil que analiza la situación de U
 
 JSON con:
 - `ageDays`: edad del bebé en días (null si no hay fecha de nacimiento).
+- `ageLabel`: la misma edad ya pasada a meses/semanas y días (ej. "4 meses y 12 días (134 días)"). Usala para ubicarte en la tabla de wake windows y en la sección de hambre nocturna; no conviertas `ageDays` a meses por tu cuenta.
 - `nowAr`: hora actual en Argentina, formato ISO local "YYYY-MM-DDTHH:mm".
 - `lastFeedingMinutesAgo`: minutos desde la última toma. null si nunca tomó / no hay registro.
 - `lastDiaperMinutesAgo`: minutos desde el último pañal. null si no hay registro.

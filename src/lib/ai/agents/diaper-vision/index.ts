@@ -3,10 +3,8 @@ import 'server-only';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { callLLM } from '@/lib/ai/client';
-import { AIParseError } from '@/lib/ai/errors';
-import { extractJsonObject, truncateForLog } from '@/lib/ai/json';
-import { logStore } from '@/lib/ai/logger';
+import { type AgentLogContext, runStructuredAgent } from '@/lib/ai/agents/structured-agent';
+import { modelProfileFor } from '@/lib/ai/models';
 import type { ChatMessage, ContentPart } from '@/lib/ai/types';
 import { type DiaperAnalysis, diaperAnalysisSchema } from './schema';
 
@@ -14,7 +12,6 @@ export { diaperAnalysisSchema, KNOWN_COLORS, KNOWN_CONSISTENCIES } from './schem
 export type { DiaperAnalysis } from './schema';
 
 const AGENT_NAME = 'diaper-vision';
-const MODEL = 'anthropic/claude-haiku-4-5';
 const PROMPT_VERSION = 'diaper-vision-v2';
 
 const SYSTEM_PROMPT = readFileSync(
@@ -47,12 +44,6 @@ export interface DiaperVisionOutput {
   };
 }
 
-interface AgentContext {
-  familyGroupId?: string;
-  childId?: string;
-  actorUserId?: string;
-}
-
 /**
  * Analiza una foto de pañal y devuelve un objeto estructurado con color,
  * consistencia, observaciones y señales de alerta.
@@ -60,7 +51,7 @@ interface AgentContext {
  * Pipeline:
  *   1. Construye el mensaje multimodal (texto + imagen).
  *   2. Llama al LLM con `responseFormat: 'json_object'`.
- *   3. Parsea + valida con Zod (AIParseError si falla).
+ *   3. Parsea + valida con Zod (AIParseError si falla) y aplica guardrails.
  *   4. Loguea metadata en ai_logs (sin la imagen ni el texto).
  *
  * Si el pipeline falla, igual loguea el error y re-tira para que el caller
@@ -68,7 +59,7 @@ interface AgentContext {
  */
 export async function analyzeDiaperPhoto(
   input: DiaperVisionInput,
-  context: AgentContext = {},
+  context: AgentLogContext = {},
 ): Promise<DiaperVisionOutput> {
   const userParts: ContentPart[] = [
     {
@@ -90,71 +81,15 @@ export async function analyzeDiaperPhoto(
     { role: 'user', content: userParts },
   ];
 
-  let response: Awaited<ReturnType<typeof callLLM>>;
-  try {
-    response = await callLLM({
-      model: MODEL,
-      messages,
-      temperature: 0.2,
-      maxTokens: 600,
-      responseFormat: 'json_object',
-    });
-  } catch (err) {
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: MODEL,
-      promptVersion: PROMPT_VERSION,
-      error: err instanceof Error ? err.message : 'unknown',
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw err;
-  }
-
-  const json = extractJsonObject(response.content ?? '');
-  const parseResult = json ? diaperAnalysisSchema.safeParse(json) : null;
-  if (!parseResult || !parseResult.success) {
-    const reason = parseResult
-      ? `schema mismatch: ${parseResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
-      : 'no se pudo extraer JSON del content';
-    const snippet = truncateForLog(response.content ?? '');
-    await logStore.record({
-      agent: AGENT_NAME,
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      promptTokens: response.usage.promptTokens,
-      completionTokens: response.usage.completionTokens,
-      latencyMs: response.latencyMs,
-      error: `parse failed (${reason}). raw: ${snippet}`,
-      familyGroupId: context.familyGroupId ?? null,
-      childId: context.childId ?? null,
-      actorUserId: context.actorUserId ?? null,
-    });
-    throw new AIParseError('No pudimos interpretar la respuesta del análisis.');
-  }
-  const parsed = parseResult.data;
-
-  await logStore.record({
+  const { output, meta } = await runStructuredAgent({
     agent: AGENT_NAME,
-    model: response.model,
     promptVersion: PROMPT_VERSION,
-    promptTokens: response.usage.promptTokens,
-    completionTokens: response.usage.completionTokens,
-    totalTokens: response.usage.totalTokens,
-    latencyMs: response.latencyMs,
-    familyGroupId: context.familyGroupId ?? null,
-    childId: context.childId ?? null,
-    actorUserId: context.actorUserId ?? null,
+    profile: modelProfileFor(AGENT_NAME),
+    messages,
+    outputSchema: diaperAnalysisSchema,
+    parseErrorMessage: 'No pudimos interpretar la respuesta del análisis.',
+    context,
   });
 
-  return {
-    analysis: parsed,
-    meta: {
-      model: response.model,
-      promptVersion: PROMPT_VERSION,
-      totalTokens: response.usage.totalTokens,
-      latencyMs: response.latencyMs,
-    },
-  };
+  return { analysis: output, meta };
 }

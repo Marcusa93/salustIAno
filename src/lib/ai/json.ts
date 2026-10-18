@@ -45,15 +45,3 @@ function tryParse(s: string): unknown {
     return null;
   }
 }
-
-/**
- * Devuelve un snippet razonablemente legible del raw content para incluir
- * en logs cuando el parse falla. Trunca a 240 chars y colapsa whitespace
- * para no inundar `ai_logs.error`.
- */
-export function truncateForLog(raw: string, maxLen = 240): string {
-  if (typeof raw !== 'string') return '';
-  const compact = raw.replace(/\s+/g, ' ').trim();
-  if (compact.length <= maxLen) return compact;
-  return `${compact.slice(0, maxLen)}…`;
-}

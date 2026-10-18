@@ -11,7 +11,10 @@ import type { AgentContext } from './types';
  * que pase por acá sin ser detectado, se suma un patrón.
  */
 const DANGEROUS_PATTERNS_MEDICAL: RegExp[] = [
-  /tom[áa]\s+\d+\s*(mg|miligramos|ml|mililitros)/i,
+  /tom[áa]\s+\d+\s*(mg|miligramos)/i,
+  // En ml solo el imperativo "tomá": "toma 120 ml" es el volumen de una
+  // mamadera y aparece en resúmenes legítimos.
+  /tomá\s+\d+\s*(ml|mililitros)/i,
   /(dale|dele|d[aá])\s+(paracetamol|ibuprofeno|amoxicilina|aspirina)/i,
   /(diagn[oó]stico|diagn[oó]sticar)\s+(es|de|como):/i,
   /(seguro|definitivamente|sin duda)\s+(tiene|es)\s+(\w+itis|enfermedad)/i,

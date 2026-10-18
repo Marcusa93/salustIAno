@@ -4,8 +4,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { callLLM } from '@/lib/ai/client';
+import {
+  type TimelineRow,
+  describeAgeFromBirth,
+  describeCorrectedAge,
+  summarizeRecentCare,
+} from '@/lib/ai/context/baby-context';
 import { AIError } from '@/lib/ai/errors';
+import { applyGuardrails } from '@/lib/ai/guardrails';
 import { logStore } from '@/lib/ai/logger';
+import { modelProfileFor } from '@/lib/ai/models';
 import type { ChatMessage } from '@/lib/ai/types';
 import { babyAgeFromBirth } from '@/lib/baby-age';
 import { createClient } from '@/lib/supabase/server';
@@ -17,12 +25,15 @@ export type { Proposal } from './proposals';
 export { proposalSchema, summarizeProposal } from './proposals';
 
 const AGENT_NAME = 'salustia';
-const MODEL = 'anthropic/claude-haiku-4-5';
+// v8: ambient context con edad exacta (y corregida si es prematuro) y un
+// bloque "Últimos cuidados" (estado de sueño, última toma, último pañal y
+// totales de hoy). El modelo ya no necesita tools para "¿cuándo comió?".
 // v7: ambient context enriquecido con última medición (peso + percentil
 // OMS), fórmula (marca, stock) y medicamentos activos (últimas 48 h).
 // El modelo ya no necesita llamar herramientas para saber el peso actual.
 // v6: edge cases multi-evento y botón "Confirmar todo". v5 multi-evento.
-const PROMPT_VERSION = 'salustia-v7';
+const PROMPT_VERSION = 'salustia-v8';
+const RECENT_CARE_WINDOW_MS = 24 * 3_600_000;
 const MAX_ITERATIONS = 5;
 // Cota de inyección: si la familia acumula 200 memorias, no las metemos
 // todas en cada turno. Cortamos por cantidad y por chars.
@@ -41,6 +52,12 @@ const VOICE_BABY_PREFIX = readFileSync(
 
 export type SalustiaVoice = 'assistant' | 'baby';
 
+/**
+ * 'default': Sonnet con razonamiento bajo (chat de la app).
+ * 'fast': Haiku sin razonamiento, para canales con timeout corto (Alexa).
+ */
+export type SalustiaSpeed = 'default' | 'fast';
+
 export interface SalustiaInput {
   /**
    * Conversación previa más el último mensaje del usuario. El agente le
@@ -53,6 +70,7 @@ export interface SalustiaInput {
    * tools y reglas operativas son idénticas — solo cambia la forma.
    */
   voice?: SalustiaVoice;
+  speed?: SalustiaSpeed;
 }
 
 export interface SalustiaOutput {
@@ -166,7 +184,7 @@ async function resolveContext(auth?: {
     const childSex = (child.sex as string | null | undefined) ?? null;
     const birthDate = (child.birth_date as string | null | undefined) ?? null;
 
-    const [measRow, formulaRow, medRows] = await Promise.all([
+    const [measRow, formulaRow, medRows, careRows] = await Promise.all([
       supabase
         .from('child_measurements')
         .select('weight_grams, height_cm, head_circumference_cm, measured_at')
@@ -189,11 +207,19 @@ async function resolveContext(auth?: {
         .gte('given_at', new Date(Date.now() - 48 * 3_600_000).toISOString())
         .order('given_at', { ascending: false })
         .limit(5),
+      supabase.rpc('get_timeline', {
+        p_child_id: childId,
+        p_event_types: ['feeding', 'sleep', 'diaper'],
+        p_from: new Date(Date.now() - RECENT_CARE_WINDOW_MS).toISOString(),
+        p_limit: 100,
+        p_offset: 0,
+      }),
     ]);
 
     const meas = measRow.data ?? null;
     const formula = formulaRow.data ?? null;
     const meds = medRows.data ?? [];
+    const recentCare: TimelineRow[] = careRows.data ?? [];
 
     // Calculamos percentiles OMS si tenemos sexo + birthDate + medición.
     let weightPct: number | null = null;
@@ -255,6 +281,7 @@ async function resolveContext(auth?: {
         nextDoseAt: m.next_dose_at,
         givenAt: m.given_at,
       })),
+      recentCare,
     };
   }
 
@@ -291,6 +318,8 @@ interface LiveBabyData {
     nextDoseAt: string | null;
     givenAt: string;
   }>;
+  /** Tomas, sueños y pañales de las últimas 24 h (get_timeline). */
+  recentCare: TimelineRow[];
 }
 
 interface ChildSnapshot {
@@ -323,23 +352,30 @@ function fmtTimeAr(iso: string): string {
   });
 }
 
-function buildAmbientContext(
+export function buildAmbientContext(
   child: ChildSnapshot | null,
   memories: ReadonlyArray<{ content: string; private: boolean }>,
   live: LiveBabyData | null = null,
+  now: Date = new Date(),
 ): string {
   const sections: string[] = [];
 
   if (child) {
     const lines: string[] = [`- Nombre: ${child.name}`];
     if (child.birth_date) {
-      const age = babyAgeFromBirth(child.birth_date);
+      const age = babyAgeFromBirth(child.birth_date, now);
       if (age) {
         lines.push(
           age.unborn
             ? `- Fecha esperada: ${child.birth_date} (todavía no nació, ${age.label.toLowerCase()})`
-            : `- Edad: ${age.label} (nacido el ${child.birth_date})`,
+            : `- Edad: ${describeAgeFromBirth(child.birth_date, now)} (nacido el ${child.birth_date})`,
         );
+        const corrected = age.unborn
+          ? null
+          : describeCorrectedAge(age.days, child.gestational_weeks_at_birth);
+        if (corrected) {
+          lines.push(`- Edad corregida por prematurez: ${corrected}`);
+        }
       } else {
         lines.push(`- Fecha de nacimiento: ${child.birth_date}`);
       }
@@ -387,6 +423,16 @@ function buildAmbientContext(
     }
 
     sections.push(['## Acerca del bebé (ya lo sabés, no preguntes)', '', ...lines].join('\n'));
+
+    if (live) {
+      sections.push(
+        [
+          '## Últimos cuidados (últimas 24 h, ya lo sabés)',
+          '',
+          ...summarizeRecentCare(live.recentCare, now),
+        ].join('\n'),
+      );
+    }
   }
 
   // Medicamentos recientes (últimas 48 h).
@@ -444,6 +490,7 @@ export async function chat(
   const startedAt = Date.now();
   const voice: SalustiaVoice = input.voice ?? 'assistant';
   const agentLabel = voice === 'baby' ? `${AGENT_NAME}-baby` : AGENT_NAME;
+  const profile = modelProfileFor(input.speed === 'fast' ? 'salustia-fast' : 'salustia');
 
   let toolCtx: ToolContext;
   let ambientContext = '';
@@ -454,7 +501,7 @@ export async function chat(
   } catch (err) {
     await logStore.record({
       agent: agentLabel,
-      model: MODEL,
+      model: profile.model,
       promptVersion: PROMPT_VERSION,
       error: err instanceof Error ? err.message : 'unknown',
       familyGroupId: context.familyGroupId ?? null,
@@ -508,25 +555,38 @@ export async function chat(
     '- El sistema convierte tu ISO a UTC automáticamente. Vos siempre escribís en hora AR sin sufijo.',
   ].join('\n');
 
+  // El system va en dos partes: la estática (prompt + voz) con breakpoint
+  // de caché, y la que cambia en cada turno (hora + contexto del bebé).
+  // Así tools + prompt quedan cacheados entre iteraciones del loop y
+  // entre mensajes seguidos de la familia.
+  const staticSystem =
+    voice === 'baby' ? `${VOICE_BABY_PREFIX}\n\n---\n\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
   const ambientBlock = ambientContext ? `\n\n---\n\n${ambientContext}` : '';
-  const systemContent =
-    voice === 'baby'
-      ? `${VOICE_BABY_PREFIX}\n\n---\n\n${SYSTEM_PROMPT}\n\n---\n\n${timeAnchor}${ambientBlock}`
-      : `${SYSTEM_PROMPT}\n\n---\n\n${timeAnchor}${ambientBlock}`;
-  const messages: ChatMessage[] = [{ role: 'system', content: systemContent }, ...input.messages];
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: [
+        { type: 'text', text: staticSystem, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: `${timeAnchor}${ambientBlock}` },
+      ],
+    },
+    ...input.messages,
+  ];
 
   const toolCallsMade: string[] = [];
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
-  let lastModel = MODEL;
+  let lastModel = profile.model;
 
   try {
     for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
       const response = await callLLM({
-        model: MODEL,
+        model: profile.model,
         messages,
-        temperature: 0.4,
-        maxTokens: 1024,
+        maxTokens: profile.maxTokens,
+        // Sin `exclude`: necesitamos los reasoning_details para reenviarlos
+        // junto a los tool calls en la próxima iteración.
+        reasoning: { effort: profile.effort },
         tools: TOOL_DEFINITIONS,
       });
 
@@ -539,6 +599,25 @@ export async function chat(
         const totalTokens = totalPromptTokens + totalCompletionTokens;
         const latencyMs = Date.now() - startedAt;
 
+        // Fallback de texto: si el modelo no devolvió contenido (caso
+        // típico — emitió tool calls de propose_* en una iteración
+        // intermedia y la última iteración terminó sin texto), damos un
+        // mensaje útil. Sin esto la burbuja queda vacía, el assistant se
+        // persiste con content="" y la próxima llamada arrastra una
+        // entrada huérfana en el historial.
+        const rawReply = (response.content ?? '').trim();
+        const candidate = rawReply
+          ? rawReply
+          : toolCtx.proposals.length > 0
+            ? voice === 'baby'
+              ? 'Te dejo abajo lo que entendí. Tocá "Confirmar todo" o decidí una por una.'
+              : 'Te dejo abajo las cards con lo que entendí. Confirmá cada una o tocá "Confirmar todo".'
+            : voice === 'baby'
+              ? 'Estoy acá, contame.'
+              : 'Listo. ¿Algo más?';
+        // Si el guardrail rechaza, el catch de abajo loguea el error una vez.
+        const reply = applyGuardrails(candidate, { agent: agentLabel });
+
         await logStore.record({
           agent: agentLabel,
           model: lastModel,
@@ -549,23 +628,6 @@ export async function chat(
           familyGroupId: context.familyGroupId ?? null,
           actorUserId: context.actorUserId ?? null,
         });
-
-        // Fallback de texto: si el modelo no devolvió contenido (caso
-        // típico — emitió tool calls de propose_* en una iteración
-        // intermedia y la última iteración terminó sin texto), damos un
-        // mensaje útil. Sin esto la burbuja queda vacía, el assistant se
-        // persiste con content="" y la próxima llamada arrastra una
-        // entrada huérfana en el historial.
-        const rawReply = (response.content ?? '').trim();
-        const reply = rawReply
-          ? rawReply
-          : toolCtx.proposals.length > 0
-            ? voice === 'baby'
-              ? 'Te dejo abajo lo que entendí. Tocá "Confirmar todo" o decidí una por una.'
-              : 'Te dejo abajo las cards con lo que entendí. Confirmá cada una o tocá "Confirmar todo".'
-            : voice === 'baby'
-              ? 'Estoy acá, contame.'
-              : 'Listo. ¿Algo más?';
 
         return {
           reply,
@@ -586,6 +648,9 @@ export async function chat(
         role: 'assistant',
         content: response.content || null,
         tool_calls: response.toolCalls,
+        ...(response.reasoningDetails && response.reasoningDetails.length > 0
+          ? { reasoning_details: response.reasoningDetails }
+          : {}),
       });
 
       // Ejecutamos cada tool call y appendeamos su resultado.

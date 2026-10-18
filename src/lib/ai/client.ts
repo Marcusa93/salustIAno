@@ -2,10 +2,13 @@ import 'server-only';
 
 import { env } from '@/lib/env';
 import { AIConfigError, AINetworkError, AIProviderError } from './errors';
+import { acceptsTemperature } from './models';
 import type { ChatRequest, ChatResponse, ToolCall } from './types';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const REQUEST_TIMEOUT_MS = 60_000;
+// Los modelos 5.5 razonan antes de responder: 60 s quedaba justo para los
+// agentes de análisis con esfuerzo medio.
+const REQUEST_TIMEOUT_MS = 90_000;
 
 interface OpenRouterToolCall {
   id?: string;
@@ -20,6 +23,7 @@ interface OpenRouterChoice {
   message?: {
     content?: string | null;
     tool_calls?: OpenRouterToolCall[];
+    reasoning_details?: unknown;
   };
   finish_reason?: string;
 }
@@ -78,7 +82,7 @@ function requestHasImageContent(request: ChatRequest): boolean {
  * modelo decide invocar funciones, `toolCalls` viene poblado y `content`
  * suele ser empty. El loop de orquestación queda del lado del agente.
  *
- * Sin retry, sin streaming. Timeout de 60s vía AbortController.
+ * Sin retry, sin streaming. Timeout de 90 s vía AbortController.
  *
  * @throws {AIConfigError} si OPENROUTER_API_KEY no está seteada.
  * @throws {AINetworkError} si fetch falla (timeout, DNS, conexión cortada).
@@ -112,8 +116,9 @@ export async function callLLM(request: ChatRequest): Promise<ChatResponse> {
       body: JSON.stringify({
         model: request.model,
         messages: request.messages,
-        temperature: request.temperature,
+        temperature: acceptsTemperature(request.model) ? request.temperature : undefined,
         max_tokens: request.maxTokens,
+        reasoning: request.reasoning,
         response_format: responseFormat,
         tools: request.tools && request.tools.length > 0 ? request.tools : undefined,
       }),
@@ -141,12 +146,15 @@ export async function callLLM(request: ChatRequest): Promise<ChatResponse> {
   const choice = data.choices?.[0];
   const content = choice?.message?.content ?? '';
   const toolCalls = normalizeToolCalls(choice?.message?.tool_calls);
+  const rawReasoning = choice?.message?.reasoning_details;
+  const reasoningDetails: unknown[] = Array.isArray(rawReasoning) ? rawReasoning : [];
   const finishReason = choice?.finish_reason ?? null;
   const usage = data.usage ?? {};
 
   return {
     content,
     toolCalls,
+    reasoningDetails,
     finishReason,
     model: data.model ?? request.model,
     usage: {

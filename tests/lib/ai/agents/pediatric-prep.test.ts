@@ -159,7 +159,19 @@ describe('generatePediatricPrep', () => {
     const result = await generatePediatricPrep(validInput);
     expect(result.summary.headline).toContain('Buena alimentación');
     expect(result.meta.totalTokens).toBe(1400);
-    expect(result.meta.promptVersion).toBe('pediatric-prep-v1');
+    expect(result.meta.promptVersion).toBe('pediatric-prep-v2');
+  });
+
+  it('manda la edad exacta al cierre del período y el perfil de Sonnet', async () => {
+    mockOK(validSummary);
+    await generatePediatricPrep(validInput);
+    const req = callLLMMock.mock.calls[0]?.[0] as {
+      model: string;
+      messages: Array<{ role: string; content: string }>;
+    };
+    expect(req.model).toBe('anthropic/claude-sonnet-5.5');
+    const payload = JSON.parse(req.messages[1]?.content ?? '{}');
+    expect(payload.child.age_label).toMatch(/\(\d+ días\)$/);
   });
 
   it('lanza AIValidationError si el input no pasa el schema', async () => {
@@ -192,7 +204,7 @@ describe('generatePediatricPrep', () => {
     await expect(generatePediatricPrep(validInput)).rejects.toBeInstanceOf(AIParseError);
   });
 
-  it('loguea el snippet del raw content cuando el parse falla', async () => {
+  it('cuando el parse falla loguea el motivo pero nunca el contenido', async () => {
     callLLMMock.mockResolvedValueOnce({
       content: 'tampoco soy json válido',
       toolCalls: [],
@@ -204,7 +216,8 @@ describe('generatePediatricPrep', () => {
     await expect(generatePediatricPrep(validInput)).rejects.toBeInstanceOf(AIParseError);
     const entry = recordMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
     expect(entry.error).toContain('parse failed');
-    expect(entry.error).toContain('tampoco soy json');
+    expect(entry.error).toContain('finish=stop');
+    expect(JSON.stringify(entry)).not.toContain('tampoco soy json');
   });
 });
 

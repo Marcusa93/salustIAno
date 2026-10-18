@@ -30,6 +30,13 @@ export interface ToolCall {
 export interface TextContentPart {
   type: 'text';
   text: string;
+  /**
+   * Breakpoint de prompt caching (Anthropic vía OpenRouter). Todo lo que
+   * viene antes de esta parte, incluidas las tools, queda cacheado ~5 min.
+   * Solo tiene sentido en texto estable: cualquier cambio de un byte
+   * invalida el caché.
+   */
+  cache_control?: { type: 'ephemeral' };
 }
 
 export interface ImageContentPart {
@@ -55,6 +62,13 @@ export interface ChatMessage {
   content: string | ContentPart[] | null;
   /** Solo presente en messages con role = 'assistant'. */
   tool_calls?: ToolCall[];
+  /**
+   * Bloques de razonamiento opacos que devolvió el modelo en un turno con
+   * tool calls. Hay que reenviarlos tal cual en el mensaje assistant para
+   * que Claude continúe el mismo razonamiento al recibir los resultados.
+   * No se leen ni se loguean.
+   */
+  reasoning_details?: unknown[];
   /** Solo presente en messages con role = 'tool', linkea a una `ToolCall.id`. */
   tool_call_id?: string;
   /** Solo presente en messages con role = 'tool', nombre de la función. */
@@ -80,11 +94,30 @@ export interface ToolDefinition {
   };
 }
 
+/**
+ * Esfuerzo de razonamiento (`reasoning.effort` de OpenRouter, que para
+ * Claude se traduce a `output_config.effort`). 'none' apaga el
+ * razonamiento y solo vale en modelos donde no es obligatorio (Haiku).
+ */
+export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high';
+
 export interface ChatRequest {
   model: string;
   messages: ChatMessage[];
+  /**
+   * Los modelos Claude 4.7+ / 5.x rechazan temperature: el cliente la
+   * descarta para esos modelos. Ver `acceptsTemperature` en models.ts.
+   */
   temperature?: number;
+  /** Tope de tokens de salida. En modelos con razonamiento incluye el razonamiento. */
   maxTokens?: number;
+  /**
+   * Control del razonamiento. `exclude: true` hace que OpenRouter no
+   * devuelva el texto ni los bloques de razonamiento (se cobran igual).
+   * Los loops con tools tienen que dejarlo en false para poder reenviar
+   * `reasoning_details`.
+   */
+  reasoning?: { effort: ReasoningEffort; exclude?: boolean };
   /**
    * Forzar respuesta JSON. Cuando se setea, el provider intenta devolver
    * un JSON parseable en el `content`.
@@ -115,6 +148,11 @@ export interface ChatResponse {
   finishReason: string | null;
   model: string;
   usage: ChatResponseUsage;
+  /**
+   * Bloques de razonamiento opacos para reenviar en el próximo turno de un
+   * loop con tools. Vacío o ausente si el request pidió `exclude: true`.
+   */
+  reasoningDetails?: unknown[];
   /** Latencia medida del lado nuestro (ms entre request y response). */
   latencyMs: number;
 }
