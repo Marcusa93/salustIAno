@@ -86,7 +86,7 @@ export function Envelope({
         <motion.span
           aria-hidden
           className="absolute inset-x-4 top-3 bottom-6 rounded-sm bg-carta-polaroid shadow-sm"
-          animate={opening ? { y: '-62%' } : { y: 0 }}
+          animate={opening ? { y: '-62%', opacity: 1 } : { y: 0, opacity: 0 }}
           transition={{ delay: 0.55, duration: 0.9, ease: easeWarm }}
         >
           <span className="block px-5 pt-4 text-left font-hand text-2xl text-carta-ink/70">
@@ -97,30 +97,32 @@ export function Envelope({
         {/* Cuerpo del sobre: dos solapas laterales y la de abajo. */}
         <span
           aria-hidden
-          className="absolute inset-0 rounded-md bg-carta-paper shadow-[0_30px_60px_-20px_var(--carta-shadow)] [clip-path:polygon(0_0,50%_52%,100%_0,100%_100%,0_100%)]"
+          className="absolute inset-0 rounded-md bg-carta-paper shadow-[0_30px_60px_-20px_var(--carta-shadow)] [clip-path:polygon(0_0,50%_42%,100%_0,100%_100%,0_100%)]"
         />
         <span
           aria-hidden
-          className="absolute inset-0 rounded-md bg-carta-paper-edge/60 [clip-path:polygon(0_0,50%_55%,0_100%)]"
+          className="absolute inset-0 rounded-md bg-carta-paper-edge/60 [clip-path:polygon(0_0,50%_50%,0_100%)]"
         />
         <span
           aria-hidden
-          className="absolute inset-0 rounded-md bg-carta-paper-edge/40 [clip-path:polygon(100%_0,50%_55%,100%_100%)]"
+          className="absolute inset-0 rounded-md bg-carta-paper-edge/40 [clip-path:polygon(100%_0,50%_50%,100%_100%)]"
         />
 
-        <span className="absolute inset-x-0 bottom-[16%] flex flex-col items-center gap-1">
-          <span className="font-hand text-4xl text-carta-ink">{envelope.to}</span>
+        <span className="absolute inset-x-0 bottom-[6%] flex flex-col items-center">
+          <span className="font-hand text-[2.1rem] text-carta-ink leading-tight">
+            {envelope.to}
+          </span>
           <span className="font-hand text-carta-ink-soft text-xl">{envelope.from}</span>
         </span>
 
-        <span className="absolute top-3 right-3 rotate-6 border-2 border-carta-seal/50 border-dashed px-2 py-1 font-display text-[0.65rem] text-carta-seal tracking-widest">
+        <span className="absolute top-3 right-3 z-20 rotate-6 border-2 border-carta-seal/50 border-dashed px-2 py-1 font-display text-[0.65rem] text-carta-seal tracking-widest">
           {envelope.stamp}
         </span>
 
         {/* Solapa de arriba: se da vuelta hacia atrás al abrir. */}
         <motion.span
           aria-hidden
-          className="absolute inset-x-0 top-0 h-[56%] origin-top [transform-style:preserve-3d]"
+          className="absolute inset-x-0 top-0 h-[46%] origin-top [transform-style:preserve-3d]"
           animate={{ rotateX: opening ? 178 : 0 }}
           transition={{ duration: 0.75, ease: easeWarm }}
         >
@@ -130,7 +132,7 @@ export function Envelope({
         {/* Lacre */}
         <motion.span
           aria-hidden
-          className="-translate-x-1/2 -translate-y-1/2 absolute top-[56%] left-1/2 grid size-16 place-items-center rounded-full bg-carta-seal font-display text-2xl text-carta-paper italic shadow-[0_6px_14px_-4px_var(--carta-shadow)] ring-4 ring-carta-seal/40"
+          className="-translate-x-1/2 -translate-y-1/2 absolute top-[46%] left-1/2 z-10 grid size-16 place-items-center rounded-full bg-carta-seal font-display text-2xl text-carta-paper italic shadow-[0_6px_14px_-4px_var(--carta-shadow)] ring-4 ring-carta-seal/40"
           animate={opening ? { scale: 0, opacity: 0 } : { scale: 1, opacity: 1 }}
           transition={{ duration: 0.35 }}
         >
@@ -154,7 +156,7 @@ export function Envelope({
               <BookOpen className="size-5" aria-hidden />
               Seguir donde estabas
             </button>
-            <span className="font-hand text-carta-night-foreground/80 text-xl">
+            <span className="max-w-xs text-balance font-hand text-carta-night-foreground/80 text-xl">
               Ibas por {resumeLabel}. O tocá el sobre para empezar de nuevo.
             </span>
           </>

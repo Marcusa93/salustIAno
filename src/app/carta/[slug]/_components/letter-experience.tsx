@@ -144,7 +144,8 @@ function LetterPaper({ letter, startAt }: { letter: Letter; startAt: string | nu
   return (
     <motion.main
       className="relative min-h-dvh overflow-x-clip bg-carta-paper text-carta-ink"
-      initial={{ opacity: 0, y: 60 }}
+      // Al retomar, sin desplazamiento: si no, el salto al capítulo queda 60 px corrido.
+      initial={startAt ? { opacity: 0 } : { opacity: 0, y: 60 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 1.4, ease: easeWarm }}
     >
