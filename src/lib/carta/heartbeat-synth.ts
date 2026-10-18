@@ -1,6 +1,12 @@
 /**
- * Latido sintetizado con Web Audio, sin archivos: un golpe grave más el
- * "chas-chas" de una ecografía doppler (ruido filtrado en dos tiempos).
+ * Latido sintetizado con Web Audio, sin archivos: el "pum-pum" de los dos
+ * ruidos del corazón (S1 fuerte, S2 más corto y agudo).
+ *
+ * Los parlantes de un celular casi no reproducen por debajo de ~150 Hz,
+ * así que un seno grave puro se escucha "flojo" o directamente no se
+ * escucha. Por eso cada golpe pasa por una saturación suave que le suma
+ * armónicos (el oído reconstruye el grave a partir de ellos) y por un
+ * compresor que lo empareja y le da presencia.
  */
 export interface HeartbeatSynth {
   start(bpm: number): void;
@@ -15,6 +21,86 @@ export const SILENT_HEARTBEAT: HeartbeatSynth = {
 const LOOKAHEAD_SECONDS = 0.12;
 const SCHEDULER_INTERVAL_MS = 25;
 
+interface Thump {
+  from: number;
+  to: number;
+  peak: number;
+  seconds: number;
+}
+
+// S1 ("pum"): más grave, fuerte y largo. S2: más agudo, suave y corto.
+const S1: Thump = { from: 120, to: 52, peak: 1, seconds: 0.17 };
+const S2: Thump = { from: 140, to: 66, peak: 0.32, seconds: 0.12 };
+
+function saturationCurve(drive: number): Float32Array<ArrayBuffer> {
+  const size = 1024;
+  const curve = new Float32Array(size);
+  const norm = Math.tanh(drive);
+  for (let i = 0; i < size; i++) {
+    const x = (i / (size - 1)) * 2 - 1;
+    curve[i] = Math.tanh(drive * x) / norm;
+  }
+  return curve;
+}
+
+/**
+ * Cadena de salida del latido: saturación → filtro → compresor. Devuelve
+ * el nodo de entrada donde se conectan los golpes.
+ */
+export function createHeartbeatChain(ctx: BaseAudioContext, destination: AudioNode): AudioNode {
+  const drive = ctx.createWaveShaper();
+  drive.curve = saturationCurve(3.5);
+  drive.oversample = '4x';
+
+  // Redondea la saturación: cuerpo sin zumbido.
+  const tone = ctx.createBiquadFilter();
+  tone.type = 'lowpass';
+  tone.frequency.value = 1300;
+  tone.Q.value = 0.6;
+
+  const compressor = ctx.createDynamicsCompressor();
+  compressor.threshold.value = -26;
+  compressor.knee.value = 6;
+  compressor.ratio.value = 8;
+  compressor.attack.value = 0.003;
+  compressor.release.value = 0.15;
+
+  const makeup = ctx.createGain();
+  makeup.gain.value = 1.6;
+
+  drive.connect(tone).connect(compressor).connect(makeup).connect(destination);
+  return drive;
+}
+
+function thump(ctx: BaseAudioContext, input: AudioNode, at: number, shape: Thump) {
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(shape.from, at);
+  osc.frequency.exponentialRampToValueAtTime(shape.to, at + shape.seconds);
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(shape.peak, at + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + shape.seconds);
+
+  osc.connect(gain).connect(input);
+  osc.start(at);
+  osc.stop(at + shape.seconds + 0.02);
+}
+
+/** Un latido completo (pum-pum) que arranca en `at`. */
+export function scheduleHeartbeat(
+  ctx: BaseAudioContext,
+  input: AudioNode,
+  at: number,
+  bpm: number,
+): void {
+  // A más pulsaciones, más pegados los dos golpes (como en un corazón real).
+  const gap = Math.min(0.2, (60 / bpm) * 0.32);
+  thump(ctx, input, at, S1);
+  thump(ctx, input, at + gap, S2);
+}
+
 export function createHeartbeatSynth(
   ctx: AudioContext,
   destination: AudioNode,
@@ -23,68 +109,27 @@ export function createHeartbeatSynth(
   const out = ctx.createGain();
   out.gain.value = 0;
   out.connect(destination);
+  const input = createHeartbeatChain(ctx, out);
 
-  const noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.4), ctx.sampleRate);
-  const samples = noise.getChannelData(0);
-  for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
-
-  let interval = 60 / 140;
+  let bpm = 140;
   let nextBeat = 0;
   let timer: number | null = null;
   let stopTimer: number | null = null;
 
-  const envelope = (at: number, peak: number, seconds: number) => {
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(peak, at + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + seconds);
-    gain.connect(out);
-    return gain;
-  };
-
-  const whoosh = (at: number, peak: number, seconds: number) => {
-    const source = ctx.createBufferSource();
-    source.buffer = noise;
-    const band = ctx.createBiquadFilter();
-    band.type = 'bandpass';
-    band.Q.value = 1.1;
-    band.frequency.setValueAtTime(420, at);
-    band.frequency.exponentialRampToValueAtTime(820, at + seconds);
-    source.connect(band).connect(envelope(at, peak, seconds));
-    source.start(at);
-    source.stop(at + seconds + 0.05);
-  };
-
-  const thump = (at: number, peak: number) => {
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(92, at);
-    osc.frequency.exponentialRampToValueAtTime(44, at + 0.14);
-    osc.connect(envelope(at, peak, 0.18));
-    osc.start(at);
-    osc.stop(at + 0.22);
-  };
-
-  const scheduleBeat = (at: number) => {
-    thump(at, 0.85);
-    whoosh(at, 0.45, 0.15);
-    whoosh(at + 0.15, 0.28, 0.12);
-    if (onBeat) {
-      const delayMs = Math.max(0, (at - ctx.currentTime) * 1000);
-      window.setTimeout(onBeat, delayMs);
-    }
-  };
-
   const schedule = () => {
     while (nextBeat < ctx.currentTime + LOOKAHEAD_SECONDS) {
-      scheduleBeat(nextBeat);
-      nextBeat += interval;
+      scheduleHeartbeat(ctx, input, nextBeat, bpm);
+      if (onBeat) {
+        const delayMs = Math.max(0, (nextBeat - ctx.currentTime) * 1000);
+        window.setTimeout(onBeat, delayMs);
+      }
+      nextBeat += 60 / bpm;
     }
   };
 
   return {
-    start(bpm) {
-      interval = 60 / bpm;
+    start(beatsPerMinute) {
+      bpm = beatsPerMinute;
       if (stopTimer !== null) {
         window.clearTimeout(stopTimer);
         stopTimer = null;
