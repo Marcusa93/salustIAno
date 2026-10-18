@@ -101,6 +101,15 @@ export const letterManifestSchema = z
           signature: z.string().min(1),
         })
         .optional(),
+      // Cierre con cámara: "faltaba una foto, la de hoy". Se guarda en el álbum.
+      photo: z
+        .object({
+          prompt: z.string().min(1),
+          button: z.string().min(1),
+          caption: z.string().min(1).max(200),
+          saved: z.string().min(1),
+        })
+        .optional(),
     }),
   })
   .superRefine((manifest, ctx) => {
@@ -148,6 +157,8 @@ export interface LetterChapter extends Omit<ManifestChapter, 'media' | 'aunque'>
 export interface Letter extends Omit<LetterManifest, 'songs' | 'chapters'> {
   songs: LetterSong[];
   chapters: LetterChapter[];
+  /** Fotos que se sacaron desde el final de la carta (viven en el álbum). */
+  memories: LetterPhoto[];
 }
 
 /** Todos los paths del bucket que la carta necesita firmar. */
@@ -214,7 +225,7 @@ export function hydrateLetter(
     })
     .filter((song): song is LetterSong => song !== null);
 
-  return { ...manifest, songs, chapters };
+  return { ...manifest, songs, chapters, memories: [] };
 }
 
 /** Fotos de toda la carta en orden cronológico — para el visor. */
@@ -229,6 +240,7 @@ export function photosInChronologicalOrder(letter: Letter): LetterPhoto[] {
       photos.push({ ...card.media, caption: card.media.caption ?? card.text });
     }
   }
+  photos.push(...letter.memories);
   return photos.sort((a, b) => Date.parse(a.takenAt) - Date.parse(b.takenAt));
 }
 

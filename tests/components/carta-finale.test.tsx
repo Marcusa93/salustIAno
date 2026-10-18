@@ -34,7 +34,13 @@ function renderFinale(finale: Letter['finale']) {
   return render(
     <SoundtrackProvider songs={[]}>
       <PhotoViewerProvider photos={[]} birthAt="2026-05-04T14:32:00-03:00">
-        <Finale finale={finale} birthAt="2026-05-04T14:32:00-03:00" onEnter={() => {}} />
+        <Finale
+          slug="mama-2026"
+          finale={finale}
+          birthAt="2026-05-04T14:32:00-03:00"
+          memories={[]}
+          onEnter={() => {}}
+        />
       </PhotoViewerProvider>
     </SoundtrackProvider>,
   );

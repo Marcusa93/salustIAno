@@ -103,7 +103,13 @@ function LetterPaper({ letter }: { letter: Letter }) {
       </article>
 
       <div className="relative z-10">
-        <Finale finale={letter.finale} birthAt={letter.birthAt} onEnter={enterFinale} />
+        <Finale
+          slug={letter.slug}
+          finale={letter.finale}
+          birthAt={letter.birthAt}
+          memories={letter.memories}
+          onEnter={enterFinale}
+        />
       </div>
     </motion.main>
   );

@@ -99,6 +99,19 @@ describe('letterManifestSchema', () => {
     expect(parsed.success && parsed.data.finale.postscript?.signature).toBe('Marco');
   });
 
+  it('acepta los textos de la foto del final, con epígrafe corto', () => {
+    const manifest = baseManifest();
+    manifest.finale.photo = {
+      prompt: 'Faltaba una foto: la de hoy.',
+      button: 'Sacarnos una foto',
+      caption: 'Mamá y yo, el día de esta carta.',
+      saved: 'La guardé en el álbum.',
+    };
+    expect(letterManifestSchema.safeParse(manifest).success).toBe(true);
+    manifest.finale.photo.caption = 'x'.repeat(201);
+    expect(letterManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+
   it('rechaza un capítulo que referencia una canción inexistente', () => {
     const manifest = baseManifest();
     nth(manifest.chapters, 0).song = 'no-existe';
@@ -172,6 +185,21 @@ describe('photosInChronologicalOrder', () => {
       'u:fotos/35.jpg',
       'u:fotos/38.jpg',
     ]);
+  });
+
+  it('suma al visor las fotos sacadas desde la carta, en su lugar cronológico', () => {
+    const letter = hydrateLetter(baseManifest(), (path) => `u:${path}`);
+    letter.memories = [
+      {
+        kind: 'photo',
+        src: 'u:album/hoy.jpg',
+        width: 1200,
+        height: 1600,
+        takenAt: '2026-10-18T12:00:00-03:00',
+        alt: 'Mamá y Salu',
+      },
+    ];
+    expect(photosInChronologicalOrder(letter).at(-1)?.src).toBe('u:album/hoy.jpg');
   });
 
   it('usa la frase de la tarjeta como epígrafe en el visor', () => {

@@ -3,14 +3,17 @@ import 'server-only';
 import {
   LETTER_SLUG_PATTERN,
   type Letter,
+  type LetterPhoto,
   collectStoragePaths,
   hydrateLetter,
   letterManifestSchema,
 } from '@/lib/carta/manifest';
+import { letterMemoryTag, memoriesFromItems } from '@/lib/carta/memories';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 export const LETTERS_BUCKET = 'cartas';
+const ALBUM_BUCKET = 'photos';
 // Alcanza para leerla con calma (y volver a leerla) sin recargar la página.
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 12;
 
@@ -67,5 +70,34 @@ export async function loadLetter(slug: string): Promise<LoadLetterResult> {
     }
   }
 
-  return { ok: true, letter: hydrateLetter(manifest, (path) => urls.get(path)) };
+  const memories = await loadMemories(supabase, slug);
+  return { ok: true, letter: { ...hydrateLetter(manifest, (path) => urls.get(path)), memories } };
+}
+
+/**
+ * Fotos que se sacaron desde el final de la carta. Están en el álbum de la
+ * familia, así que se leen con el cliente del usuario: decide RLS.
+ */
+async function loadMemories(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  slug: string,
+): Promise<LetterPhoto[]> {
+  const { data: items } = await supabase
+    .from('media_items')
+    .select('storage_path, caption, taken_at, created_at, width, height')
+    .contains('tags', [letterMemoryTag(slug)])
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(24);
+  if (!items || items.length === 0) return [];
+
+  const { data: signed } = await supabase.storage.from(ALBUM_BUCKET).createSignedUrls(
+    items.map((item) => item.storage_path),
+    SIGNED_URL_TTL_SECONDS,
+  );
+  const urls = new Map<string, string>();
+  for (const entry of signed ?? []) {
+    if (!entry.error && entry.path && entry.signedUrl) urls.set(entry.path, entry.signedUrl);
+  }
+  return memoriesFromItems(items, (path) => urls.get(path), 'Mamá y Salu, el día de la carta.');
 }

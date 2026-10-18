@@ -2,7 +2,7 @@
 
 import { daysSinceBirth, secondsSinceBirth } from '@/lib/carta/dates';
 import type { HeartbeatSynth } from '@/lib/carta/heartbeat-synth';
-import type { Letter } from '@/lib/carta/manifest';
+import type { Letter, LetterPhoto } from '@/lib/carta/manifest';
 import { easeWarm } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { Heart, Images, RotateCcw } from 'lucide-react';
@@ -10,6 +10,7 @@ import { AnimatePresence, motion, useTransform } from 'motion/react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { NightSky } from './atmosphere';
 import { Handwritten } from './handwritten';
+import { LetterSelfie } from './letter-selfie';
 import { usePhotoViewer } from './photo-viewer';
 import { useSoundtrack } from './soundtrack-provider';
 import { useHold } from './use-hold';
@@ -51,12 +52,16 @@ function useNow(active: boolean): Date {
  * Salu; ahora apoya el dedo sobre él para que la carta termine de abrirse.
  */
 export function Finale({
+  slug,
   finale,
   birthAt,
+  memories,
   onEnter,
 }: {
+  slug: string;
   finale: Letter['finale'];
   birthAt: string;
+  memories: LetterPhoto[];
   onEnter: () => void;
 }) {
   const { soundtrack } = useSoundtrack();
@@ -221,6 +226,12 @@ export function Finale({
                 {numberAr.format(secondsSinceBirth(birthAt, now))} segundos, y contando.
               </p>
               <p className="mt-10 font-display text-[1.9rem] italic leading-tight">{finale.wish}</p>
+
+              {finale.photo && (
+                <div className="mt-14 w-full">
+                  <LetterSelfie slug={slug} copy={finale.photo} memories={memories} />
+                </div>
+              )}
 
               <div className="mt-10 flex flex-wrap justify-center gap-3">
                 <button
