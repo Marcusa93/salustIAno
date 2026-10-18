@@ -73,6 +73,18 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const { data } = await supabase.auth.getClaims();
   const isAuthenticated = data?.claims != null;
 
+  // Toda redirección lleva las cookies que Supabase haya renovado en este
+  // request: si no, el navegador reusa el token viejo y la sesión se cae.
+  const redirectTo = (path: string, next?: string) => {
+    const url = request.nextUrl.clone();
+    url.pathname = path;
+    url.search = '';
+    if (next) url.searchParams.set('next', next);
+    const redirect = NextResponse.redirect(url);
+    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+    return redirect;
+  };
+
   const { pathname } = request.nextUrl;
   // Las rutas /compartir/cancion/[token] y /compartir/cuento/[token] son
   // públicas — accedidas con un token random sin necesidad de auth para
@@ -83,18 +95,11 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const isAuthRoute = AUTH_ROUTES.has(pathname);
 
   if (!isAuthenticated && !isPublic) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = '/login';
-    loginUrl.search = '';
-    loginUrl.searchParams.set('next', pathname + request.nextUrl.search);
-    return NextResponse.redirect(loginUrl);
+    return redirectTo('/login', pathname + request.nextUrl.search);
   }
 
   if (isAuthenticated && isAuthRoute) {
-    const homeUrl = request.nextUrl.clone();
-    homeUrl.pathname = '/home';
-    homeUrl.search = '';
-    return NextResponse.redirect(homeUrl);
+    return redirectTo('/home');
   }
 
   // Onboarding forzado: si la persona fue creada por un admin con la
@@ -104,20 +109,25 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   if (isAuthenticated && data?.claims) {
     const meta = (data.claims as { user_metadata?: { must_change_password?: boolean } })
       .user_metadata;
-    const mustChange = meta?.must_change_password === true;
+    let mustChange = meta?.must_change_password === true;
+    // El JWT puede quedar viejo hasta 1 h después de limpiar el flag. Si dice
+    // que falta cambiar la clave, lo confirmamos contra Auth: si ya no hace
+    // falta, refrescamos la sesión en vez de rebotar a /bienvenida (y evitamos
+    // el loop /home ↔ /bienvenida, porque la página lee el dato fresco).
+    if (mustChange) {
+      const { data: fresh } = await supabase.auth.getUser();
+      if (fresh.user && fresh.user.user_metadata?.must_change_password !== true) {
+        await supabase.auth.refreshSession();
+        mustChange = false;
+      }
+    }
     const isAllowed = ONBOARDING_ALLOWED_PREFIXES.some((p) => pathname.startsWith(p));
     if (mustChange && !isAllowed) {
-      const welcomeUrl = request.nextUrl.clone();
-      welcomeUrl.pathname = '/bienvenida';
-      welcomeUrl.search = '';
-      return NextResponse.redirect(welcomeUrl);
+      return redirectTo('/bienvenida');
     }
     // Si ya no necesita cambiar la pass pero está en /bienvenida, lo sacamos.
     if (!mustChange && pathname === '/bienvenida') {
-      const homeUrl = request.nextUrl.clone();
-      homeUrl.pathname = '/home';
-      homeUrl.search = '';
-      return NextResponse.redirect(homeUrl);
+      return redirectTo('/home');
     }
   }
 
