@@ -93,6 +93,14 @@ export const letterManifestSchema = z
       closing: z.array(z.string().min(1)).min(1),
       signature: z.string().min(1),
       wish: z.string().min(1),
+      // Unas líneas de quien armó la carta, después de la firma de Salu.
+      postscript: z
+        .object({
+          label: z.string().min(1),
+          lines: z.array(z.string().min(1)).min(1),
+          signature: z.string().min(1),
+        })
+        .optional(),
     }),
   })
   .superRefine((manifest, ctx) => {

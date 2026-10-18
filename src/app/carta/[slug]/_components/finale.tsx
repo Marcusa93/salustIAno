@@ -187,11 +187,28 @@ export function Finale({
               {finale.signature}
             </motion.p>
 
+            {finale.postscript && (
+              <motion.div
+                className="flex flex-col gap-4"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 3.8, duration: 1.4, ease: easeWarm }}
+              >
+                <p className="font-display text-carta-glow text-lg italic">
+                  {finale.postscript.label}
+                </p>
+                <Handwritten paragraphs={finale.postscript.lines} tone="night" />
+                <p className="-rotate-3 self-end font-hand text-[2.4rem] text-carta-glow leading-none">
+                  {finale.postscript.signature}
+                </p>
+              </motion.div>
+            )}
+
             <motion.div
               className="flex flex-col items-center gap-2 border-carta-night-foreground/15 border-t pt-12 text-center"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 3.6, duration: 1.2, ease: easeWarm }}
+              transition={{ delay: finale.postscript ? 5.6 : 3.6, duration: 1.2, ease: easeWarm }}
             >
               <p className="font-sans text-[0.7rem] text-carta-night-foreground/60 uppercase tracking-[0.3em]">
                 Sos mi mamá hace

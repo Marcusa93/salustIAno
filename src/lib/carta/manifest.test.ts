@@ -88,6 +88,17 @@ describe('letterManifestSchema', () => {
     expect(letterManifestSchema.safeParse(baseManifest()).success).toBe(true);
   });
 
+  it('acepta una posdata al final', () => {
+    const manifest = baseManifest();
+    manifest.finale.postscript = {
+      label: 'P.D. de papá',
+      lines: ['Nadie nunca me hizo tan feliz.'],
+      signature: 'Marco',
+    };
+    const parsed = letterManifestSchema.safeParse(manifest);
+    expect(parsed.success && parsed.data.finale.postscript?.signature).toBe('Marco');
+  });
+
   it('rechaza un capítulo que referencia una canción inexistente', () => {
     const manifest = baseManifest();
     nth(manifest.chapters, 0).song = 'no-existe';
