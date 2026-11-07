@@ -15,6 +15,7 @@ import {
   Stethoscope,
   User,
   Users,
+  UtensilsCrossed,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Route } from 'next';
@@ -93,6 +94,14 @@ const COMMANDS: ReadonlyArray<PaletteCommand> = [
     Icon: Heart,
     href: '/cuidar',
     keywords: ['controles', 'pediatra', 'mediciones', 'vacunas'],
+  },
+  {
+    id: 'comidas',
+    label: 'Comidas',
+    group: 'Saltar a',
+    Icon: UtensilsCrossed,
+    href: '/comidas' as Route,
+    keywords: ['comida', 'papilla', 'blw', 'sólidos', 'alimentos', 'alérgenos'],
   },
   {
     id: 'chat',

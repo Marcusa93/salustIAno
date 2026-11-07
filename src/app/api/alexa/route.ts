@@ -193,6 +193,7 @@ async function getDayStats(admin: AdminClient, childId: string): Promise<DayStat
         .from('feeding_events')
         .select('id', { count: 'exact', head: true })
         .eq('child_id', childId)
+        .neq('type', 'solid')
         .is('deleted_at', null)
         .gte('occurred_at', since),
       admin
@@ -214,6 +215,7 @@ async function getDayStats(admin: AdminClient, childId: string): Promise<DayStat
         .from('feeding_events')
         .select('occurred_at')
         .eq('child_id', childId)
+        .neq('type', 'solid')
         .is('deleted_at', null)
         .order('occurred_at', { ascending: false })
         .limit(1)
@@ -240,6 +242,7 @@ async function lastFeedingText(admin: AdminClient, childId: string): Promise<str
     .from('feeding_events')
     .select('occurred_at, type, amount_ml, duration_minutes')
     .eq('child_id', childId)
+    .neq('type', 'solid')
     .is('deleted_at', null)
     .order('occurred_at', { ascending: false })
     .limit(1)

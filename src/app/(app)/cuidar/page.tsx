@@ -15,6 +15,7 @@ import {
   Pill,
   Ruler,
   Sparkles,
+  UtensilsCrossed,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Metadata, Route } from 'next';
@@ -372,6 +373,14 @@ export default async function CuidarPage() {
       section: 'salud',
     },
     // Patrones — cómo viene la rutina diaria.
+    {
+      href: '/comidas' as Route,
+      title: 'Comidas',
+      description: 'Alimentación complementaria: qué comió, si le gustó, alérgenos y qué probar.',
+      Icon: UtensilsCrossed,
+      badge: 'Nuevo',
+      section: 'patrones',
+    },
     {
       href: '/cuidar/sueno' as Route,
       title: 'Sueño',

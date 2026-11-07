@@ -26,6 +26,20 @@ describe('detectMedicalIntent', () => {
     expect(detectMedicalIntent('ibuprofeno para la fiebre').matched).toBe(true);
   });
 
+  it('deja pasar preguntas de alimentación complementaria', () => {
+    expect(detectMedicalIntent('¿Cuánta papilla le doy?').matched).toBe(false);
+    expect(detectMedicalIntent('cuánto le doy de comer a los 6 meses').matched).toBe(false);
+    expect(detectMedicalIntent('le doy 2 cucharadas de zapallo?').matched).toBe(false);
+    expect(detectMedicalIntent('¿cuánta agua le doy con la comida?').matched).toBe(false);
+  });
+
+  it('con comida de por medio, los remedios se siguen rebotando', () => {
+    expect(detectMedicalIntent('cuánto paracetamol le doy después de la comida').matched).toBe(
+      true,
+    );
+    expect(detectMedicalIntent('cuántas gotas le doy').matched).toBe(true);
+  });
+
   it('rebota pedidos de juicio clínico', () => {
     expect(detectMedicalIntent('¿es grave?').matched).toBe(true);
     expect(detectMedicalIntent('debería llamar al pediatra').matched).toBe(true);

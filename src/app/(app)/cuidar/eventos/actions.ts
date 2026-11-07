@@ -153,6 +153,7 @@ export async function lastFeedingAction(): Promise<
     .from('feeding_events')
     .select('type, side, duration_minutes, amount_ml, foods, reaction, notes')
     .eq('child_id', child.id)
+    .neq('type', 'solid')
     .is('deleted_at', null)
     .order('occurred_at', { ascending: false })
     .limit(1)

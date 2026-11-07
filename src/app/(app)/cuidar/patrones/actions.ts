@@ -106,6 +106,7 @@ export async function getPatternsAction(): Promise<PatternsResult> {
       .from('feeding_events')
       .select('occurred_at, amount_ml')
       .eq('child_id', child.id)
+      .neq('type', 'solid')
       .is('deleted_at', null)
       .gte('occurred_at', sinceIso)
       .order('occurred_at', { ascending: true }),

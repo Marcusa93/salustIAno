@@ -1,5 +1,6 @@
 'use server';
 
+import { saveSolidMealAction } from '@/app/(app)/comidas/actions';
 import {
   createDiaperAction,
   createFeedingAction,
@@ -16,6 +17,7 @@ import {
 import { AIConfigError, AIError, AINetworkError, AIProviderError } from '@/lib/ai/errors';
 import { logStore } from '@/lib/ai/logger';
 import type { ChatMessage } from '@/lib/ai/types';
+import { resolveFood } from '@/lib/solids/progress';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
@@ -260,6 +262,40 @@ export async function executeProposalAction(rawProposal: unknown): Promise<Execu
     };
   }
   const proposal = parsed.data;
+
+  if (proposal.kind === 'feeding' && proposal.type === 'solid') {
+    // Las comidas sólidas van con su detalle por alimento (sección Comidas).
+    const occurredUTC = agentTimestampToUTC(proposal.occurred_at);
+    logTimestampSanity('feeding', proposal.occurred_at, occurredUTC);
+    const names = proposal.foods?.length
+      ? proposal.foods
+      : (proposal.food_details ?? []).map((d) => d.name);
+    const result = await saveSolidMealAction({
+      occurred_at: occurredUTC,
+      notes: proposal.notes ?? '',
+      tastings: (names.length > 0 ? names : ['Comida']).map((name) => {
+        const detail = proposal.food_details?.find(
+          (d) => d.name.toLowerCase() === name.toLowerCase(),
+        );
+        const food = resolveFood(name);
+        return {
+          food_key: food.key,
+          food_name: food.name,
+          format: detail?.format ?? null,
+          acceptance: detail?.acceptance ?? null,
+          amount: detail?.amount ?? null,
+          gagged: detail?.gagged ?? false,
+          reaction: proposal.reaction,
+          reaction_signs: [],
+        };
+      }),
+    });
+    if (!result.ok) {
+      return { ok: false, error: { type: 'provider', message: result.error } };
+    }
+    await logProposalConfirm(proposal.kind, result.id);
+    return { ok: true, eventId: result.id, summary: summarizeProposal(proposal) };
+  }
 
   if (proposal.kind === 'feeding') {
     const occurredUTC = agentTimestampToUTC(proposal.occurred_at);

@@ -11,7 +11,19 @@ import { useNow } from '@/hooks/useNow';
 import { haptic } from '@/lib/haptics';
 import { sinceLabel } from '@/lib/home-now';
 import { cn } from '@/lib/utils';
-import { Baby, BookHeart, Camera, Check, Loader2, Milk, Pill, Plus, Sparkles } from 'lucide-react';
+import {
+  Baby,
+  BookHeart,
+  Camera,
+  Check,
+  ChevronRight,
+  Loader2,
+  Milk,
+  Pill,
+  Plus,
+  Sparkles,
+  UtensilsCrossed,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Route } from 'next';
@@ -35,10 +47,20 @@ const SHORTCUTS: { href: Route; label: string; Icon: LucideIcon }[] = [
   { href: '/chat' as Route, label: 'SalustIA', Icon: Sparkles },
 ];
 
+interface SolidsDock {
+  lastAt: string | null;
+  /** "zapallo, banana" — lo que comió la última vez. */
+  lastFoods: string | null;
+  /** Dos alimentos sugeridos para probar, como atajo. */
+  quick: { key: string; name: string; emoji: string }[];
+}
+
 interface LogDockProps {
   feedingPresets: number[];
   lastFeedingAt: string | null;
   lastDiaperAt: string | null;
+  /** null antes de la edad de los sólidos: la fila no se muestra. */
+  solids: SolidsDock | null;
   renderedAt: string;
 }
 
@@ -47,7 +69,13 @@ interface LogDockProps {
  * mano. Cada botón registra al instante y ofrece "Deshacer"; lo menos
  * frecuente (pecho, seco, foto del pañal) queda en "Más".
  */
-export function LogDock({ feedingPresets, lastFeedingAt, lastDiaperAt, renderedAt }: LogDockProps) {
+export function LogDock({
+  feedingPresets,
+  lastFeedingAt,
+  lastDiaperAt,
+  solids,
+  renderedAt,
+}: LogDockProps) {
   const now = useNow(30_000, renderedAt);
 
   return (
@@ -108,6 +136,43 @@ export function LogDock({ feedingPresets, lastFeedingAt, lastDiaperAt, renderedA
         />
       </LogCard>
 
+      {solids && (
+        <LogCard
+          tone="solid"
+          Icon={UtensilsCrossed}
+          title="Comida"
+          since={
+            solids.lastAt
+              ? `${sinceLabel(solids.lastAt, now)}${solids.lastFoods ? ` · ${solids.lastFoods}` : ''}`
+              : 'todavía no comió'
+          }
+          href={'/comidas' as Route}
+        >
+          {solids.quick.map((f) => (
+            <Link
+              key={f.key}
+              href={`/comidas/anotar?alimento=${f.key}` as Route}
+              aria-label={`Anotar una comida con ${f.name.toLowerCase()}`}
+              className={cn(
+                'flex h-14 min-w-0 items-center justify-center gap-1.5 rounded-2xl px-2 font-medium text-sm ring-1 transition-transform active:scale-95',
+                TONES.solid.chip,
+              )}
+            >
+              <span aria-hidden>{f.emoji}</span>
+              <span className="truncate">{f.name}</span>
+            </Link>
+          ))}
+          <Link
+            href={'/comidas/anotar' as Route}
+            aria-label="Anotar una comida"
+            className="flex h-14 items-center justify-center gap-1 rounded-2xl border border-dashed border-solid/40 font-medium text-muted-foreground text-sm transition-colors hover:text-solid-foreground active:scale-95"
+          >
+            <Plus className="size-4" aria-hidden />
+            Anotar
+          </Link>
+        </LogCard>
+      )}
+
       <nav aria-label="Atajos" className="grid grid-cols-4 gap-2">
         {SHORTCUTS.map(({ href, label, Icon }) => (
           <Link
@@ -124,7 +189,7 @@ export function LogDock({ feedingPresets, lastFeedingAt, lastDiaperAt, renderedA
   );
 }
 
-type Tone = 'feed' | 'diaper';
+type Tone = 'feed' | 'diaper' | 'solid';
 
 const TONES: Record<Tone, { card: string; icon: string; chip: string }> = {
   feed: {
@@ -137,6 +202,11 @@ const TONES: Record<Tone, { card: string; icon: string; chip: string }> = {
     icon: 'bg-diaper-soft text-diaper-foreground',
     chip: 'bg-diaper-soft text-diaper-foreground ring-diaper/25',
   },
+  solid: {
+    card: 'ring-solid/25',
+    icon: 'bg-solid-soft text-solid-foreground',
+    chip: 'bg-solid-soft text-solid-foreground ring-solid/25',
+  },
 };
 
 function LogCard({
@@ -144,12 +214,15 @@ function LogCard({
   Icon,
   title,
   since,
+  href,
   children,
 }: {
   tone: Tone;
   Icon: LucideIcon;
   title: string;
   since: string;
+  /** Si está, el título lleva a la sección completa. */
+  href?: Route;
   children: ReactNode;
 }) {
   return (
@@ -159,17 +232,44 @@ function LogCard({
         TONES[tone].card,
       )}
     >
-      <div className="flex items-center gap-3">
-        <span className={cn('grid size-10 place-items-center rounded-full', TONES[tone].icon)}>
-          <Icon className="size-5" aria-hidden />
-        </span>
-        <span className="flex flex-col">
-          <span className="font-display text-foreground text-xl leading-tight">{title}</span>
-          <span className="text-muted-foreground text-xs">{since}</span>
-        </span>
-      </div>
+      {href ? (
+        <Link href={href} className="flex items-center gap-3">
+          <LogCardHead tone={tone} Icon={Icon} title={title} since={since} />
+          <ChevronRight className="ml-auto size-5 text-muted-foreground" aria-hidden />
+        </Link>
+      ) : (
+        <div className="flex items-center gap-3">
+          <LogCardHead tone={tone} Icon={Icon} title={title} since={since} />
+        </div>
+      )}
       <div className="grid auto-cols-fr grid-flow-col gap-2">{children}</div>
     </div>
+  );
+}
+
+function LogCardHead({
+  tone,
+  Icon,
+  title,
+  since,
+}: {
+  tone: Tone;
+  Icon: LucideIcon;
+  title: string;
+  since: string;
+}) {
+  return (
+    <>
+      <span
+        className={cn('grid size-10 shrink-0 place-items-center rounded-full', TONES[tone].icon)}
+      >
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="font-display text-foreground text-xl leading-tight">{title}</span>
+        <span className="truncate text-muted-foreground text-xs">{since}</span>
+      </span>
+    </>
   );
 }
 

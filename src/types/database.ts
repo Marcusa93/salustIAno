@@ -1322,6 +1322,78 @@ export type Database = {
           },
         ];
       };
+      solid_food_tastings: {
+        Row: {
+          acceptance: Database['public']['Enums']['food_acceptance'] | null;
+          amount: Database['public']['Enums']['food_amount'] | null;
+          child_id: string;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          feeding_event_id: string;
+          food_key: string;
+          food_name: string;
+          format: Database['public']['Enums']['food_format'] | null;
+          gagged: boolean;
+          id: string;
+          position: number;
+          reaction: Database['public']['Enums']['feeding_reaction'];
+          reaction_signs: string[];
+          updated_at: string;
+        };
+        Insert: {
+          acceptance?: Database['public']['Enums']['food_acceptance'] | null;
+          amount?: Database['public']['Enums']['food_amount'] | null;
+          child_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          feeding_event_id: string;
+          food_key: string;
+          food_name: string;
+          format?: Database['public']['Enums']['food_format'] | null;
+          gagged?: boolean;
+          id?: string;
+          position?: number;
+          reaction?: Database['public']['Enums']['feeding_reaction'];
+          reaction_signs?: string[];
+          updated_at?: string;
+        };
+        Update: {
+          acceptance?: Database['public']['Enums']['food_acceptance'] | null;
+          amount?: Database['public']['Enums']['food_amount'] | null;
+          child_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          feeding_event_id?: string;
+          food_key?: string;
+          food_name?: string;
+          format?: Database['public']['Enums']['food_format'] | null;
+          gagged?: boolean;
+          id?: string;
+          position?: number;
+          reaction?: Database['public']['Enums']['feeding_reaction'];
+          reaction_signs?: string[];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'solid_food_tastings_child_id_fkey';
+            columns: ['child_id'];
+            isOneToOne: false;
+            referencedRelation: 'child_profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'solid_food_tastings_feeding_event_id_fkey';
+            columns: ['feeding_event_id'];
+            isOneToOne: false;
+            referencedRelation: 'feeding_events';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       stories: {
         Row: {
           characters_used: Json;
@@ -1463,6 +1535,9 @@ export type Database = {
       family_role: 'admin' | 'caregiver' | 'family' | 'viewer';
       feeding_reaction: 'none' | 'mild' | 'strong';
       feeding_type: 'breastfeeding' | 'bottle' | 'solid';
+      food_acceptance: 'loved' | 'liked' | 'neutral' | 'disliked' | 'refused';
+      food_amount: 'taste' | 'some' | 'half' | 'most' | 'all';
+      food_format: 'puree' | 'mashed' | 'preloaded' | 'finger';
       lullaby_mood: 'dulce' | 'jugueton' | 'calmo' | 'valiente';
       milestone_category: 'control_pediatrico' | 'pesquisa' | 'estudio' | 'vacuna' | 'otro';
       note_category: 'memory' | 'observation' | 'milestone' | 'other';
@@ -1602,6 +1677,9 @@ export const Constants = {
       family_role: ['admin', 'caregiver', 'family', 'viewer'],
       feeding_reaction: ['none', 'mild', 'strong'],
       feeding_type: ['breastfeeding', 'bottle', 'solid'],
+      food_acceptance: ['loved', 'liked', 'neutral', 'disliked', 'refused'],
+      food_amount: ['taste', 'some', 'half', 'most', 'all'],
+      food_format: ['puree', 'mashed', 'preloaded', 'finger'],
       lullaby_mood: ['dulce', 'jugueton', 'calmo', 'valiente'],
       milestone_category: ['control_pediatrico', 'pesquisa', 'estudio', 'vacuna', 'otro'],
       note_category: ['memory', 'observation', 'milestone', 'other'],

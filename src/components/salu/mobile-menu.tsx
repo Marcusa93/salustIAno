@@ -3,7 +3,16 @@
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { Baby, BookHeart, Home, ImageIcon, Menu, Sparkles, Users } from 'lucide-react';
+import {
+  Baby,
+  BookHeart,
+  Home,
+  ImageIcon,
+  Menu,
+  Sparkles,
+  Users,
+  UtensilsCrossed,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -12,6 +21,7 @@ import { useEffect, useState } from 'react';
 const navItems = [
   { href: '/home', label: 'Inicio', icon: Home },
   { href: '/cuidar', label: 'Cuidar', icon: Baby },
+  { href: '/comidas', label: 'Comidas', icon: UtensilsCrossed },
   { href: '/timeline', label: 'Registro', icon: BookHeart },
   { href: '/album', label: 'Álbum', icon: ImageIcon },
   { href: '/crear', label: 'Diversión', icon: Sparkles },

@@ -11,6 +11,8 @@ import { startOfDayArDaysAgo, startOfTodayAr } from '@/lib/format-ar';
 import { greetingFor, isLateNightAr } from '@/lib/greeting';
 import { preciseAgeLabel } from '@/lib/home-now';
 import { averagePerDay, formatPredictionTime, predictNextFeeding } from '@/lib/predictions';
+import { loadSolidMeals } from '@/lib/solids/load';
+import { suggestNext, summarizeFoods } from '@/lib/solids/progress';
 import { createClient } from '@/lib/supabase/server';
 import type { MilestoneCategory } from '@/lib/validators/milestone';
 import { wakeWindowFor } from '@/lib/wake-windows';
@@ -108,6 +110,8 @@ export default async function HomePage() {
   // Ventana de 7 días para tendencia semanal y predicciones rule-based.
   const since7d = startOfDayArDaysAgo(7);
 
+  // Comidas sólidas: van aparte de las tomas de leche (ver LogDock).
+  const solidsPromise = loadSolidMeals(supabase, child.id);
   const [
     { data: recentEvents },
     { data: todayEvents },
@@ -156,6 +160,7 @@ export default async function HomePage() {
       .from('feeding_events')
       .select('occurred_at, type, amount_ml, duration_minutes')
       .eq('child_id', child.id)
+      .neq('type', 'solid')
       .is('deleted_at', null)
       .order('occurred_at', { ascending: false })
       .limit(1)
@@ -173,6 +178,7 @@ export default async function HomePage() {
       .from('feeding_events')
       .select('occurred_at')
       .eq('child_id', child.id)
+      .neq('type', 'solid')
       .is('deleted_at', null)
       .gte('occurred_at', since7d.toISOString())
       .order('occurred_at', { ascending: true }),
@@ -215,6 +221,23 @@ export default async function HomePage() {
   // Cantidades de mamadera a un toque. Desde octubre Salu toma 100 ml como
   // mínimo; cualquier otra cantidad va por "Más".
   const feedingPresets = [100, 120, 150, 180];
+
+  const solids = await solidsPromise;
+  const solidSummaries = summarizeFoods(solids.meals);
+  const lastMeal = solids.meals.at(-1) ?? null;
+  const solidsAgeMonths = babyAgeFromBirth(child.birth_date)?.months ?? 0;
+  const solidsDock =
+    solidsAgeMonths >= 5 || lastMeal
+      ? {
+          lastAt: lastMeal?.occurredAt ?? null,
+          lastFoods: lastMeal?.tastings.map((t) => t.foodName.toLowerCase()).join(', ') ?? null,
+          quick: suggestNext(solids.meals, solidSummaries, {
+            ageMonths: solidsAgeMonths,
+            now: new Date(),
+            limit: 2,
+          }).suggestions.map(({ food }) => ({ key: food.key, name: food.name, emoji: food.emoji })),
+        }
+      : null;
 
   const lastFeedingDetail = lastFeeding
     ? lastFeeding.amount_ml
@@ -338,6 +361,7 @@ export default async function HomePage() {
         feedingPresets={feedingPresets}
         lastFeedingAt={lastFeedingAt}
         lastDiaperAt={lastDiaperAt}
+        solids={solidsDock}
         renderedAt={renderedAt}
       />
 

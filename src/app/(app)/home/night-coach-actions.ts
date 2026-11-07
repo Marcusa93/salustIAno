@@ -60,6 +60,7 @@ export async function getNightCoachAction(): Promise<NightCoachResult> {
       .from('feeding_events')
       .select('occurred_at')
       .eq('child_id', child.id)
+      .neq('type', 'solid')
       .is('deleted_at', null)
       .order('occurred_at', { ascending: false })
       .limit(1)

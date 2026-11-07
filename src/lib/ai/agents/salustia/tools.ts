@@ -170,6 +170,25 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             items: { type: 'string' },
             description: 'Solo para solid. Lista de alimentos. Opcional.',
           },
+          food_details: {
+            type: 'array',
+            description:
+              'Solo para solid. Un objeto por alimento con lo que la familia contó. Dejá afuera lo que no dijeron.',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'El alimento, igual que en foods.' },
+                acceptance: {
+                  type: 'string',
+                  enum: ['loved', 'liked', 'neutral', 'disliked', 'refused'],
+                },
+                format: { type: 'string', enum: ['puree', 'mashed', 'preloaded', 'finger'] },
+                amount: { type: 'string', enum: ['taste', 'some', 'half', 'most', 'all'] },
+                gagged: { type: 'boolean' },
+              },
+              required: ['name'],
+            },
+          },
           reaction: {
             type: 'string',
             enum: ['none', 'mild', 'strong'],

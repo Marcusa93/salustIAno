@@ -8,6 +8,8 @@ import { AIError } from '@/lib/ai/errors';
 import { logStore } from '@/lib/ai/logger';
 import type { ChatMessage } from '@/lib/ai/types';
 import { babyAgeFromBirth } from '@/lib/baby-age';
+import { solidsContextForAI } from '@/lib/solids/ai-context';
+import { loadSolidMeals } from '@/lib/solids/load';
 import { createClient } from '@/lib/supabase/server';
 import { type Sex, percentileForMeasurement } from '@/lib/who-growth';
 import type { Proposal } from './proposals';
@@ -18,11 +20,13 @@ export { proposalSchema, summarizeProposal } from './proposals';
 
 const AGENT_NAME = 'salustia';
 const MODEL = 'anthropic/claude-haiku-4-5';
+// v8: especialista en alimentación complementaria (bloque de sólidos en el
+// contexto + propose_feeding con detalle por alimento).
 // v7: ambient context enriquecido con última medición (peso + percentil
 // OMS), fórmula (marca, stock) y medicamentos activos (últimas 48 h).
 // El modelo ya no necesita llamar herramientas para saber el peso actual.
 // v6: edge cases multi-evento y botón "Confirmar todo". v5 multi-evento.
-const PROMPT_VERSION = 'salustia-v7';
+const PROMPT_VERSION = 'salustia-v8';
 const MAX_ITERATIONS = 5;
 // Cota de inyección: si la familia acumula 200 memorias, no las metemos
 // todas en cada turno. Cortamos por cantidad y por chars.
@@ -166,7 +170,7 @@ async function resolveContext(auth?: {
     const childSex = (child.sex as string | null | undefined) ?? null;
     const birthDate = (child.birth_date as string | null | undefined) ?? null;
 
-    const [measRow, formulaRow, medRows] = await Promise.all([
+    const [measRow, formulaRow, medRows, solids] = await Promise.all([
       supabase
         .from('child_measurements')
         .select('weight_grams, height_cm, head_circumference_cm, measured_at')
@@ -189,6 +193,8 @@ async function resolveContext(auth?: {
         .gte('given_at', new Date(Date.now() - 48 * 3_600_000).toISOString())
         .order('given_at', { ascending: false })
         .limit(5),
+      // Si falla (ej. migración sin aplicar), el chat sigue sin este bloque.
+      loadSolidMeals(supabase, childId).catch(() => null),
     ]);
 
     const meas = measRow.data ?? null;
@@ -221,7 +227,11 @@ async function resolveContext(auth?: {
       }
     }
 
+    const ageMonths = birthDate ? (babyAgeFromBirth(birthDate)?.months ?? 0) : 0;
     liveData = {
+      solidsContext: solids
+        ? solidsContextForAI(solids.meals, { now: new Date(), ageMonths })
+        : null,
       measurement: meas
         ? {
             weightGrams: meas.weight_grams,
@@ -270,6 +280,8 @@ async function resolveContext(auth?: {
 }
 
 interface LiveBabyData {
+  /** Bloque ya armado de alimentación complementaria (null si no aplica). */
+  solidsContext: string | null;
   measurement: {
     weightGrams: number | null;
     heightCm: number | null;
@@ -404,6 +416,10 @@ function buildAmbientContext(
         '\n',
       ),
     );
+  }
+
+  if (live?.solidsContext) {
+    sections.push(live.solidsContext);
   }
 
   if (memories.length > 0) {

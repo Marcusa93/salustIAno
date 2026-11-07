@@ -39,8 +39,6 @@ const MEDICAL_PATTERNS: ReadonlyArray<RegExp> = [
   /\bantibioti/,
   /\bantipiret/,
   /\bjarabe\b.*\b(le|para|de|al)\b/,
-  /\bcuant[oa]\s+le\s+doy\b/,
-  /\b(le|al)\s+doy\s+\d/,
 
   // Pedidos de juicio clínico.
   /\bes\s+grave\b/,
@@ -55,6 +53,21 @@ const MEDICAL_PATTERNS: ReadonlyArray<RegExp> = [
   /\b911\b/,
   /\b107\b/, // SAME / Buenos Aires
 ];
+
+/**
+ * "¿Cuánto le doy?" es dosis… salvo que hablen de comida ("¿cuánta papilla
+ * le doy?", "le doy 2 cucharadas de zapallo"): la alimentación
+ * complementaria la responde SalustIA. Los nombres de remedios se siguen
+ * atajando con los patrones de arriba.
+ */
+const DOSE_PATTERNS: ReadonlyArray<RegExp> = [
+  /\bcuant[oa]s?\s+le\s+doy\b/,
+  /\bcuant[oa]s?\s+\w+\s+le\s+doy\b/,
+  /\b(le|al)\s+doy\s+\d/,
+];
+
+const FOOD_CONTEXT =
+  /\b(comida|comidas|comer|come|comio|papilla|papillas|pure|blw|solidos?|almuerzo|cena|desayuno|merienda|colacion|cucharadas?|porcion|plato|fruta|frutas|verdura|verduras|carne|pollo|pescado|huevo|banana|zapallo|palta|yogur|agua)\b/;
 
 /**
  * Quita acentos y baja a minúsculas para que los patrones (sin tildes)
@@ -87,7 +100,9 @@ export function detectMedicalIntent(message: string): MedicalDeflection | NoMedi
     return { matched: false };
   }
   const normalized = normalize(message);
-  for (const pattern of MEDICAL_PATTERNS) {
+  const aboutFood = FOOD_CONTEXT.test(normalized);
+  const patterns = aboutFood ? MEDICAL_PATTERNS : [...MEDICAL_PATTERNS, ...DOSE_PATTERNS];
+  for (const pattern of patterns) {
     if (pattern.test(normalized)) {
       return {
         matched: true,

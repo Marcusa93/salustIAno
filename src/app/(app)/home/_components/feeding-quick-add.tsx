@@ -32,6 +32,8 @@ import {
 } from '@/lib/validators/events';
 import { zodResolver } from '@/lib/zod-compat';
 import { Loader2, Milk, RotateCcw } from 'lucide-react';
+import type { Route } from 'next';
+import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { useState, useTransition } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
@@ -268,10 +270,17 @@ export function FeedingQuickAdd({ trigger }: FeedingQuickAddProps) {
           )}
 
           {watchedType === 'solid' && (
-            <p className="text-muted-foreground text-sm">
-              Cuando empiece con sólidos, vamos a sumar el campo de alimentos. Por ahora dejá lo que
-              comió en notas.
-            </p>
+            <div className="flex flex-col gap-2 rounded-2xl bg-solid-soft p-3 text-solid-foreground">
+              <p className="text-sm">
+                Las comidas tienen su propia sección: qué comió, si le gustó, cuánto y alérgenos.
+              </p>
+              <Link
+                href={'/comidas/anotar' as Route}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-solid font-medium text-sm text-white dark:text-background"
+              >
+                Anotar en Comidas
+              </Link>
+            </div>
           )}
 
           <div className="flex flex-col gap-1.5">

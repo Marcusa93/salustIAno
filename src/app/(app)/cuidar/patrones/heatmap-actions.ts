@@ -50,6 +50,7 @@ export async function getHourlyHeatmapAction(): Promise<HourlyHeatmapResult | nu
       .from('feeding_events')
       .select('occurred_at')
       .eq('child_id', child.id)
+      .neq('type', 'solid')
       .is('deleted_at', null)
       .gte('occurred_at', sinceIso),
     supabase

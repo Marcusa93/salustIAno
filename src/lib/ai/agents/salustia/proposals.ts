@@ -28,6 +28,7 @@ import {
   sleepQualityEnum,
 } from '@/lib/validators/events';
 import { milestoneCategoryEnum } from '@/lib/validators/milestone';
+import { foodAcceptanceEnum, foodAmountEnum, foodFormatEnum } from '@/lib/validators/solid-meal';
 
 const isoOrLocalDateTime = z
   .string()
@@ -43,10 +44,26 @@ export const feedingProposalSchema = z
     duration_minutes: z.number().int().min(0).max(180).optional(),
     amount_ml: z.number().int().min(0).max(1000).optional(),
     foods: z.array(z.string().min(1).max(100)).max(20).optional(),
+    /** Detalle por alimento (solo sólidos): cómo le fue con cada cosa. */
+    food_details: z
+      .array(
+        z.object({
+          name: z.string().min(1).max(100),
+          acceptance: foodAcceptanceEnum.optional(),
+          format: foodFormatEnum.optional(),
+          amount: foodAmountEnum.optional(),
+          gagged: z.boolean().optional(),
+        }),
+      )
+      .max(20)
+      .optional(),
     reaction: feedingReactionEnum.default('none'),
     notes: z.string().max(2000).optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.type !== 'solid' && data.food_details?.length) {
+      ctx.addIssue({ code: 'custom', path: ['food_details'], message: 'solo para sólidos' });
+    }
     // Misma coherencia que el CHECK de feeding_events_type_consistency.
     if (data.type === 'breastfeeding') {
       if (data.amount_ml !== undefined) {
@@ -181,8 +198,25 @@ export function summarizeProposal(p: Proposal): string {
         if (p.amount_ml) parts.push(`${p.amount_ml} ml`);
         if (p.duration_minutes) parts.push(`${p.duration_minutes} min`);
       } else if (p.type === 'solid') {
-        parts.push('Sólidos');
-        if (p.foods?.length) parts.push(p.foods.join(', '));
+        parts.push('Comida');
+        const names = p.foods?.length ? p.foods : (p.food_details ?? []).map((d) => d.name);
+        if (names.length) {
+          const faces: Record<string, string> = {
+            loved: '😍',
+            liked: '🙂',
+            neutral: '😐',
+            disliked: '😕',
+            refused: '🙅',
+          };
+          parts.push(
+            names
+              .map((n) => {
+                const d = p.food_details?.find((x) => x.name.toLowerCase() === n.toLowerCase());
+                return d?.acceptance ? `${n} ${faces[d.acceptance]}` : n;
+              })
+              .join(', '),
+          );
+        }
       }
       return parts.join(' · ');
     }
