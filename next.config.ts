@@ -28,6 +28,10 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '50mb',
     },
+    // Transiciones entre pantallas con <ViewTransition> de React (ver
+    // components/salu/main-content.tsx). Los navegadores sin View
+    // Transitions navegan igual, sin animación.
+    viewTransition: true,
   },
   images: {
     remotePatterns: supabaseHost
