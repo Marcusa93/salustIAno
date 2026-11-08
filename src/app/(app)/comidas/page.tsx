@@ -2,6 +2,7 @@ import { SaluBotAvatar } from '@/components/salu/salu-bot-avatar';
 import { formatDateAr, formatTimeAr } from '@/lib/format-ar';
 import { FOOD_GROUP_LABELS } from '@/lib/solids/catalog';
 import { GUIDE } from '@/lib/solids/guide';
+import { diaperSignal, milkBalance, textureProgress } from '@/lib/solids/insights';
 import { ACCEPTANCE_EMOJI, ACCEPTANCE_LABELS } from '@/lib/solids/labels';
 import {
   type AllergenState,
@@ -21,11 +22,13 @@ import {
 } from '@/lib/solids/progress';
 import type { AllergenKey, FoodGroup, Meal } from '@/lib/solids/types';
 import { cn } from '@/lib/utils';
-import { ArrowRight, Check, Info, Plus, Sparkles } from 'lucide-react';
+import { ArrowRight, CalendarDays, Check, Info, Plus, Sparkles, Stethoscope } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { MilkCard, PoopCard, TextureCard } from './_components/body-signals';
 import { MealCard } from './_components/meal-card';
-import { loadSolidsData } from './data';
+import { loadMealPhotos, loadSolidsData, loadSolidsSignals } from './data';
 
 export const metadata: Metadata = {
   title: 'Comidas',
@@ -77,7 +80,7 @@ const GROUP_ORDER: readonly FoodGroup[] = [
 
 const CHAT_PROMPTS: readonly string[] = [
   '¿Qué le puedo dar mañana para sumar hierro?',
-  'Armame un menú para esta semana con lo que ya probó',
+  '¿Cómo le corto la banana para que la agarre?',
   '¿Qué alérgeno conviene sumar ahora y cómo?',
   '¿Cómo le preparo el huevo para que lo agarre?',
 ];
@@ -92,8 +95,9 @@ export default async function ComidasPage() {
     );
   }
 
-  const { firstName, meals, summaries, ageMonths, birthDate, detailAvailable } = data;
+  const { childId, firstName, meals, summaries, ageMonths, birthDate, detailAvailable } = data;
   const now = new Date();
+  const texture = textureProgress(meals, { ageMonths, now });
   const today = mealsOnDay(meals, now);
   const ironToday = ironFoods(today);
   const day = dayNumber(meals, now);
@@ -109,6 +113,12 @@ export default async function ComidasPage() {
     .filter((m) => arDateKey(m.occurredAt) !== arDateKey(now))
     .slice(-8)
     .reverse();
+  const [signals, photos] = await Promise.all([
+    loadSolidsSignals(childId, meals),
+    loadMealPhotos([...today, ...past].map((m) => m.id)),
+  ]);
+  const poop = diaperSignal(signals.diapers, meals, now);
+  const milk = milkBalance(signals.milk, meals, now);
   const daysToBirthday = birthDate ? daysUntilFirstBirthday(birthDate, now) : null;
   const goalPct = Math.min(100, Math.round((summaries.length / FOOD_GOAL) * 100));
 
@@ -161,6 +171,22 @@ export default async function ComidasPage() {
         </Link>
       </section>
 
+      {/* Herramientas */}
+      <nav aria-label="Planificar y consultar" className="grid grid-cols-2 gap-2">
+        <ToolLink
+          href={'/comidas/menu' as Route}
+          icon={<CalendarDays className="size-5" aria-hidden />}
+          title="Menú de la semana"
+          hint="Con lista de compras"
+        />
+        <ToolLink
+          href={'/comidas/informe' as Route}
+          icon={<Stethoscope className="size-5" aria-hidden />}
+          title="Informe para la pediatra"
+          hint="Listo para imprimir"
+        />
+      </nav>
+
       {/* Hoy */}
       <section aria-labelledby="hoy" className="flex flex-col gap-3">
         <SectionTitle id="hoy" title="Hoy" />
@@ -196,6 +222,7 @@ export default async function ComidasPage() {
                 timeLabel={formatTimeAr(meal.occurredAt)}
                 method={methodOf(meal)}
                 firstTimeKeys={firstTimeKeys(meal)}
+                photos={photos.get(meal.id)}
               />
             ))}
           </div>
@@ -319,6 +346,26 @@ export default async function ComidasPage() {
         </Link>
       </section>
 
+      {/* Cómo le cae: texturas, caca y leche */}
+      {meals.length > 0 && (
+        <section aria-labelledby="cuerpo" className="flex flex-col gap-3">
+          <SectionTitle
+            id="cuerpo"
+            title="Cómo le cae"
+            hint="Texturas, caca y leche desde que empezó a comer."
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            {texture.weeks.length > 0 && (
+              <div className="sm:col-span-2">
+                <TextureCard progress={texture} />
+              </div>
+            )}
+            {poop && <PoopCard signal={poop} />}
+            {milk && <MilkCard balance={milk} />}
+          </div>
+        </section>
+      )}
+
       {/* Lo que ya probó */}
       {summaries.length > 0 && (
         <section aria-labelledby="probados" className="flex flex-col gap-4">
@@ -370,6 +417,7 @@ export default async function ComidasPage() {
                 }).concat(` · ${formatTimeAr(meal.occurredAt)}`)}
                 method={methodOf(meal)}
                 firstTimeKeys={firstTimeKeys(meal)}
+                photos={photos.get(meal.id)}
               />
             ))}
           </div>
@@ -433,6 +481,33 @@ export default async function ComidasPage() {
         duda, la pediatra de {firstName} tiene la última palabra.
       </p>
     </div>
+  );
+}
+
+function ToolLink({
+  href,
+  icon,
+  title,
+  hint,
+}: {
+  href: Route;
+  icon: ReactNode;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-foreground/[0.06] transition-transform active:scale-[0.99]"
+    >
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-solid-soft text-solid-foreground">
+        {icon}
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="font-medium text-foreground text-sm leading-tight">{title}</span>
+        <span className="truncate text-muted-foreground text-xs">{hint}</span>
+      </span>
+    </Link>
   );
 }
 

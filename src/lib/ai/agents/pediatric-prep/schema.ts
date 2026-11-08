@@ -86,6 +86,12 @@ export const pediatricInputSchema = z.object({
       category: z.string().nullable(),
     }),
   ),
+  /**
+   * Resumen de la alimentación complementaria (todo el historial, no solo el
+   * período), armado con `solidsReportForPrep`. Opcional: null o ausente si
+   * todavía no aplica.
+   */
+  solids: z.string().max(6000).nullable().optional(),
 });
 
 export type PediatricInput = z.infer<typeof pediatricInputSchema>;

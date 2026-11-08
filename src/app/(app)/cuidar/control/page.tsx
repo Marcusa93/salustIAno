@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ChevronLeft, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ShieldCheck, Utensils } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { SummaryGenerator } from './_components/summary-generator';
@@ -40,6 +40,20 @@ export default function ControlPage() {
           </p>
         </div>
       </Card>
+
+      <Link
+        href={'/comidas/informe' as Route}
+        className="flex items-center gap-3 rounded-2xl bg-solid-soft p-4 ring-1 ring-solid/25 transition-transform active:scale-[0.99] print:hidden"
+      >
+        <Utensils className="size-5 shrink-0 text-solid-foreground" aria-hidden />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
+          <span className="font-medium text-solid-foreground">Informe de alimentación</span>
+          <span className="text-solid-foreground/80">
+            Alérgenos, reacciones, texturas y preguntas sobre las comidas, listo para imprimir.
+          </span>
+        </span>
+        <ArrowRight className="size-4 shrink-0 text-solid-foreground" aria-hidden />
+      </Link>
 
       <SummaryGenerator />
     </div>

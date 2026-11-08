@@ -1,6 +1,8 @@
 import { env } from '@/lib/env';
+import { loadSolidMeals } from '@/lib/solids/load';
+import { allergenReminder } from '@/lib/solids/reminders';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendPush } from '@/lib/web-push';
+import { type SaluPushPayload, sendPush } from '@/lib/web-push';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,6 +68,56 @@ export async function GET(request: Request) {
 
   let totalSent = 0;
   let totalSkipped = 0;
+  let allergenFamilies = 0;
+  let allergenSent = 0;
+
+  // Preferencias por usuario, leídas una sola vez aunque haya dos avisos.
+  type PushPrefs = { reminder_2h?: boolean; solids_allergens?: boolean };
+  type PrefKey = keyof PushPrefs;
+  const prefsCache = new Map<string, PushPrefs | null>();
+  async function wants(userId: string, key: PrefKey): Promise<boolean> {
+    if (!prefsCache.has(userId)) {
+      const { data: prefRow } = await admin
+        .from('notification_prefs')
+        .select('prefs')
+        .eq('user_id', userId)
+        .maybeSingle();
+      prefsCache.set(userId, (prefRow?.prefs as PushPrefs | null) ?? null);
+    }
+    // Si no tiene fila (o la clave no está), el default es ON.
+    return prefsCache.get(userId)?.[key] ?? true;
+  }
+
+  // Suscripciones que el navegador ya rechazó en esta corrida.
+  const goneSubs = new Set<string>();
+
+  /** Manda el push a cada usuario que lo tenga activado. Devuelve cuántos salieron. */
+  async function deliver(
+    subsByUser: Map<string, SubRow[]>,
+    key: PrefKey,
+    payload: SaluPushPayload,
+  ): Promise<number> {
+    let sent = 0;
+    for (const [userId, userSubs] of subsByUser) {
+      if (!(await wants(userId, key))) continue;
+
+      for (const sub of userSubs) {
+        if (goneSubs.has(sub.id)) continue;
+        const result = await sendPush({ endpoint: sub.endpoint, keys: sub.keys }, payload);
+
+        if (result.ok) {
+          sent++;
+        } else if (result.gone) {
+          goneSubs.add(sub.id);
+          await admin
+            .from('push_subscriptions')
+            .update({ invalidated_at: new Date().toISOString() })
+            .eq('id', sub.id);
+        }
+      }
+    }
+    return sent;
+  }
 
   for (const [familyGroupId, familySubs] of byFamily) {
     // Perfil del bebé para el nombre y childId.
@@ -82,6 +134,37 @@ export async function GET(request: Request) {
 
     const childId = child.id as string;
     const childName = (child.name as string | undefined) ?? 'Salu';
+
+    // Agrupamos subs por usuario para revisar prefs una vez por user.
+    const subsByUser = new Map<string, SubRow[]>();
+    for (const sub of familySubs) {
+      const list = subsByUser.get(sub.user_id) ?? [];
+      list.push(sub);
+      subsByUser.set(sub.user_id, list);
+    }
+
+    // Alérgenos de sólidos: va por su lado, haya estado activa o no la familia.
+    try {
+      const anyoneWants = await someAsync([...subsByUser.keys()], (userId) =>
+        wants(userId, 'solids_allergens'),
+      );
+      if (anyoneWants) {
+        const { meals } = await loadSolidMeals(admin, childId);
+        const firstName = childName.trim().split(/\s+/)[0] ?? childName;
+        const push = allergenReminder(meals, new Date(), firstName);
+        if (push) {
+          allergenFamilies++;
+          allergenSent += await deliver(subsByUser, 'solids_allergens', {
+            ...push,
+            url: '/comidas',
+            tag: `solids-allergens-${familyGroupId}`,
+          });
+        }
+      }
+    } catch (err) {
+      // Que un error acá no se lleve puesto el recordatorio de actividad.
+      console.error('[cron/reminder] alérgenos', familyGroupId, err);
+    }
 
     // Último evento registrado en cualquier tabla de eventos.
     const [{ data: lastFeeding }, { data: lastSleep }, { data: lastDiaper }] = await Promise.all([
@@ -137,48 +220,24 @@ export async function GET(request: Request) {
       ? `Hace ${sinceLabel} sin registro. ¿Toma, pañal o algo más?`
       : `¿Qué pasó con ${childName} en las últimas horas? Tap para registrar.`;
 
-    // Agrupamos subs por usuario para revisar prefs una vez por user.
-    const subsByUser = new Map<string, SubRow[]>();
-    for (const sub of familySubs) {
-      const list = subsByUser.get(sub.user_id) ?? [];
-      list.push(sub);
-      subsByUser.set(sub.user_id, list);
-    }
-
-    for (const [userId, userSubs] of subsByUser) {
-      // Preferencia del usuario — si no tiene fila, el default es ON.
-      const { data: prefRow } = await admin
-        .from('notification_prefs')
-        .select('prefs')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      const prefs = prefRow?.prefs as { reminder_2h?: boolean } | null;
-      const wantsReminder = prefs?.reminder_2h ?? true;
-      if (!wantsReminder) continue;
-
-      for (const sub of userSubs) {
-        const result = await sendPush(
-          { endpoint: sub.endpoint, keys: sub.keys },
-          {
-            title: `${childName} — recordatorio`,
-            body,
-            url: '/home',
-            tag: `reminder-${familyGroupId}`,
-          },
-        );
-
-        if (result.ok) {
-          totalSent++;
-        } else if (result.gone) {
-          await admin
-            .from('push_subscriptions')
-            .update({ invalidated_at: new Date().toISOString() })
-            .eq('id', sub.id);
-        }
-      }
-    }
+    totalSent += await deliver(subsByUser, 'reminder_2h', {
+      title: `${childName} — recordatorio`,
+      body,
+      url: '/home',
+      tag: `reminder-${familyGroupId}`,
+    });
   }
 
-  return Response.json({ sent: totalSent, skipped: totalSkipped, hour });
+  return Response.json({
+    sent: totalSent,
+    skipped: totalSkipped,
+    allergens: { families: allergenFamilies, sent: allergenSent },
+    hour,
+  });
+}
+
+/** `Array.some` con un predicado async, uno por uno y cortando al primer sí. */
+async function someAsync<T>(items: readonly T[], test: (item: T) => Promise<boolean>) {
+  for (const item of items) if (await test(item)) return true;
+  return false;
 }

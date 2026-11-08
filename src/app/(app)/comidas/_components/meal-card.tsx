@@ -26,9 +26,11 @@ interface MealCardProps {
   method: SolidMethod | null;
   /** Claves de alimentos que en esta comida probó por primera vez. */
   firstTimeKeys: readonly string[];
+  /** Fotos de la comida, con URL ya firmada. */
+  photos?: readonly { id: string; url: string }[];
 }
 
-export function MealCard({ meal, timeLabel, method, firstTimeKeys }: MealCardProps) {
+export function MealCard({ meal, timeLabel, method, firstTimeKeys, photos }: MealCardProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -87,6 +89,27 @@ export function MealCard({ meal, timeLabel, method, firstTimeKeys }: MealCardPro
           </button>
         </div>
       </header>
+
+      {photos && photos.length > 0 && (
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1">
+          {photos.map((p) => (
+            <a
+              key={p.id}
+              href={p.url}
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 overflow-hidden rounded-2xl ring-1 ring-foreground/[0.06]"
+            >
+              <img
+                src={p.url}
+                alt={`Foto de la comida: ${meal.tastings.map((t) => t.foodName).join(', ')}`}
+                loading="lazy"
+                className="h-40 w-auto max-w-[16rem] object-cover"
+              />
+            </a>
+          ))}
+        </div>
+      )}
 
       <ul className="flex flex-col gap-2.5">
         {meal.tastings.map((t) => {

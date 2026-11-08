@@ -1,10 +1,12 @@
 import 'server-only';
 
-import type { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/types/database';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { type SolidEventRow, type TastingRow, buildMeals } from './progress';
 import type { Meal } from './types';
 
-type Supabase = Awaited<ReturnType<typeof createClient>>;
+/** Sirve el cliente del usuario (RLS) y el admin del cron. */
+type Supabase = SupabaseClient<Database>;
 
 export interface SolidMealsResult {
   meals: Meal[];

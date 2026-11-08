@@ -19,6 +19,8 @@ export interface NotificationPrefs {
   formula_low_stock: boolean;
   /** Recordatorio cada ~2h para cargar eventos (7-22h AR). Default ON. */
   reminder_2h: boolean;
+  /** Volver a darle un alérgeno de sólidos para sostener la tolerancia. Default ON. */
+  solids_allergens: boolean;
 }
 
 const DEFAULT_PREFS: NotificationPrefs = {
@@ -29,6 +31,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   medication_due: true,
   formula_low_stock: true,
   reminder_2h: true,
+  solids_allergens: true,
 };
 
 const VALID_KEYS = new Set<keyof NotificationPrefs>([
@@ -39,6 +42,7 @@ const VALID_KEYS = new Set<keyof NotificationPrefs>([
   'medication_due',
   'formula_low_stock',
   'reminder_2h',
+  'solids_allergens',
 ]);
 
 /**

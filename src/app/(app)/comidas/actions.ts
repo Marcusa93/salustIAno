@@ -1,5 +1,6 @@
 'use server';
 
+import { getOrCreateMonthlyAlbum } from '@/lib/album/monthly-album';
 import { maxReaction } from '@/lib/solids/progress';
 import { createClient } from '@/lib/supabase/server';
 import { type SolidMealInput, solidMealSchema } from '@/lib/validators/solid-meal';
@@ -129,4 +130,108 @@ export async function saveSolidMealAction(
   revalidatePath('/home');
   revalidatePath('/timeline');
   return { ok: true, id, detailSaved, firstTimes };
+}
+
+// ─── Foto de la comida ───────────────────────────────────────────────────────
+
+const PHOTO_BUCKET = 'photos';
+const PHOTO_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
+
+export type AttachMealPhotoResult =
+  | {
+      ok: true;
+      /** false si la foto quedó en el álbum pero sin asociarse a la comida (migración sin aplicar). */
+      linked: boolean;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Sube la foto de una comida al bucket `photos`, la suma al álbum del mes
+ * (con los alimentos como epígrafe) y la asocia a la comida.
+ */
+export async function attachMealPhotoAction(
+  mealId: string,
+  formData: FormData,
+): Promise<AttachMealPhotoResult> {
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: 'No recibimos la foto.' };
+  }
+  if (file.size > MAX_PHOTO_BYTES) return { ok: false, error: 'La foto pesa más de 20 MB.' };
+  if (!PHOTO_MIME.includes(file.type)) return { ok: false, error: 'Ese formato de foto no va.' };
+
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return { ok: false, error: 'Sesión expirada.' };
+
+  const { data: meal } = await supabase
+    .from('feeding_events')
+    .select('id, child_id, occurred_at, foods')
+    .eq('id', mealId)
+    .eq('type', 'solid')
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (!meal) return { ok: false, error: 'No encontramos esa comida.' };
+
+  const { data: child } = await supabase
+    .from('child_profiles')
+    .select('family_group_id')
+    .eq('id', meal.child_id)
+    .maybeSingle();
+  if (!child?.family_group_id) return { ok: false, error: 'No encontramos tu grupo familiar.' };
+  const familyGroupId = child.family_group_id;
+
+  const ext =
+    (file.name.split('.').pop() ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const rand = Math.random().toString(36).slice(2, 8);
+  const path = `${familyGroupId}/comidas/${Date.now()}-${rand}.${ext}`;
+
+  const { error: uploadErr } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, await file.arrayBuffer(), {
+      contentType: file.type,
+      cacheControl: '31536000',
+      upsert: false,
+    });
+  if (uploadErr) return { ok: false, error: 'No pudimos subir la foto.' };
+
+  const albumId = await getOrCreateMonthlyAlbum(
+    supabase,
+    familyGroupId,
+    meal.child_id,
+    userData.user.id,
+    new Date(meal.occurred_at),
+  );
+  const foods = (meal.foods ?? []).filter(Boolean);
+  const row = {
+    child_id: meal.child_id,
+    family_group_id: familyGroupId,
+    album_id: albumId,
+    storage_path: path,
+    mime_type: file.type,
+    size_bytes: file.size,
+    caption: foods.length > 0 ? `A la mesa: ${foods.join(', ').toLowerCase()}` : 'A la mesa',
+    tags: ['comida', ...foods.map((f) => f.toLowerCase())].slice(0, 10),
+    taken_at: meal.occurred_at,
+    created_by: userData.user.id,
+  };
+
+  let linked = true;
+  let { error: insertErr } = await supabase
+    .from('media_items')
+    .insert({ ...row, feeding_event_id: meal.id });
+  if (insertErr && /feeding_event_id/.test(insertErr.message)) {
+    // La columna todavía no existe: la foto igual queda en el álbum.
+    linked = false;
+    ({ error: insertErr } = await supabase.from('media_items').insert(row));
+  }
+  if (insertErr) {
+    await supabase.storage.from(PHOTO_BUCKET).remove([path]);
+    return { ok: false, error: 'No pudimos guardar la foto.' };
+  }
+
+  revalidatePath('/comidas');
+  revalidatePath('/album');
+  return { ok: true, linked };
 }

@@ -25,12 +25,12 @@ import type {
   ReactionSign,
 } from '@/lib/solids/types';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Loader2, Phone, Plus, Search, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Camera, Loader2, Phone, Plus, Search, Sparkles, X } from 'lucide-react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { saveSolidMealAction } from '../actions';
+import { attachMealPhotoAction, saveSolidMealAction } from '../actions';
 
 export interface DraftTasting {
   uid: string;
@@ -132,6 +132,8 @@ export function MealForm({
   const [items, setItems] = useState<DraftTasting[]>(initialTastings ?? []);
   const [query, setQuery] = useState('');
   const [defaultFormat, setDefaultFormat] = useState<FoodFormat | null>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const preselected = useRef(false);
   const tried = useMemo(() => new Set(triedKeys), [triedKeys]);
 
@@ -173,6 +175,17 @@ export function MealForm({
     // biome-ignore lint/correctness/useExhaustiveDependencies: solo al montar, con el alimento que vino en la URL.
   }, [preselectKey]);
 
+  // La vista previa es un object URL: se libera al cambiarla o al salir.
+  useEffect(() => {
+    if (!photo) {
+      setPhotoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(photo);
+    setPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
+
   const update = (uid: string, patch: Partial<DraftTasting>) =>
     setItems((prev) => prev.map((t) => (t.uid === uid ? { ...t, ...patch } : t)));
 
@@ -212,6 +225,14 @@ export function MealForm({
         haptic('warning');
         toast.error(res.error);
         return;
+      }
+      if (photo) {
+        const fd = new FormData();
+        fd.append('photo', photo);
+        const up = await attachMealPhotoAction(res.id, fd).catch(() => null);
+        if (!up?.ok) {
+          toast.warning(`La comida se guardó, pero la foto no: ${up?.error ?? 'probá de nuevo.'}`);
+        }
       }
       haptic('success');
       if (!res.detailSaved) {
@@ -362,6 +383,50 @@ export function MealForm({
           className="rounded-2xl bg-card px-4 py-3 text-foreground ring-1 ring-foreground/[0.08] placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-solid"
         />
       </label>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="px-1 font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+          Foto
+        </span>
+        {photoPreview ? (
+          <div className="relative self-start">
+            <img
+              src={photoPreview}
+              alt="Foto de la comida"
+              className="h-44 w-auto max-w-full rounded-2xl object-cover ring-1 ring-foreground/[0.08]"
+            />
+            <button
+              type="button"
+              onClick={() => setPhoto(null)}
+              aria-label="Sacar la foto"
+              className="absolute top-2 right-2 grid size-8 place-items-center rounded-full bg-background/90 text-foreground shadow"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          </div>
+        ) : (
+          <label className="flex h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-foreground/15 border-dashed bg-card text-muted-foreground text-sm transition-colors hover:text-foreground">
+            <Camera className="size-5" aria-hidden />
+            Sumar una foto (opcional)
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                if (file && file.size > 20 * 1024 * 1024) {
+                  toast.error('La foto pesa más de 20 MB.');
+                  return;
+                }
+                setPhoto(file);
+              }}
+            />
+          </label>
+        )}
+        <span className="px-1 text-muted-foreground text-xs">
+          Queda en la comida y en el álbum del mes.
+        </span>
+      </div>
 
       <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.25rem)] z-30 px-4 md:bottom-6 md:pl-64">
         <button

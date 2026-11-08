@@ -9,6 +9,9 @@ import {
   AIProviderError,
   AIValidationError,
 } from '@/lib/ai/errors';
+import { babyAgeFromBirth } from '@/lib/baby-age';
+import { loadSolidMeals } from '@/lib/solids/load';
+import { buildSolidsReport, solidsReportForPrep } from '@/lib/solids/report';
 import { createClient } from '@/lib/supabase/server';
 
 const ALLOWED_DAYS = [7, 14, 30] as const;
@@ -109,7 +112,7 @@ export async function generatePediatricSummaryAction(
 
   const startedAt = Date.now();
 
-  const [timelineRes, sleepRes, measurementsRes, milestonesRes] = await Promise.all([
+  const [timelineRes, sleepRes, measurementsRes, milestonesRes, solidsRes] = await Promise.all([
     supabase.rpc('get_timeline', {
       p_child_id: child.id,
       p_event_types: ['feeding', 'diaper'],
@@ -140,6 +143,7 @@ export async function generatePediatricSummaryAction(
       .is('completed_at', null)
       .order('due_at', { ascending: true, nullsFirst: false })
       .limit(20),
+    loadSolidMeals(supabase, child.id as string),
   ]);
 
   const timeline = (timelineRes.data ?? []) as TimelineRow[];
@@ -198,6 +202,19 @@ export async function generatePediatricSummaryAction(
     }
   }
 
+  // ---- Sólidos (todo el historial: alérgenos y reacciones no caducan) ----
+  const birthDate = (child.birth_date as string | null) ?? null;
+  const age = babyAgeFromBirth(birthDate, now);
+  const solids = solidsReportForPrep(
+    buildSolidsReport({
+      meals: solidsRes.meals,
+      // Sin fecha de nacimiento no suponemos edad: solo se resume lo anotado.
+      ageMonths: age && !age.unborn ? age.months : 0,
+      birthDate,
+      now,
+    }),
+  );
+
   const input: PediatricInput = {
     daysBack,
     child: {
@@ -227,6 +244,7 @@ export async function generatePediatricSummaryAction(
     },
     measurements,
     pending_milestones: milestones,
+    solids,
   };
 
   try {

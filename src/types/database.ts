@@ -908,6 +908,7 @@ export type Database = {
           created_by: string | null;
           deleted_at: string | null;
           family_group_id: string | null;
+          feeding_event_id: string | null;
           height: number | null;
           id: string;
           mime_type: string;
@@ -927,6 +928,7 @@ export type Database = {
           created_by?: string | null;
           deleted_at?: string | null;
           family_group_id?: string | null;
+          feeding_event_id?: string | null;
           height?: number | null;
           id?: string;
           mime_type: string;
@@ -946,6 +948,7 @@ export type Database = {
           created_by?: string | null;
           deleted_at?: string | null;
           family_group_id?: string | null;
+          feeding_event_id?: string | null;
           height?: number | null;
           id?: string;
           mime_type?: string;
@@ -977,6 +980,13 @@ export type Database = {
             columns: ['family_group_id'];
             isOneToOne: false;
             referencedRelation: 'family_groups';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'media_items_feeding_event_id_fkey';
+            columns: ['feeding_event_id'];
+            isOneToOne: false;
+            referencedRelation: 'feeding_events';
             referencedColumns: ['id'];
           },
           {

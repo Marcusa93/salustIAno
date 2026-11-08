@@ -2,7 +2,17 @@
 
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Baby, BellRing, CalendarClock, Clock, Loader2, Milk, Pill, Sparkles } from 'lucide-react';
+import {
+  Baby,
+  BellRing,
+  CalendarClock,
+  Clock,
+  Egg,
+  Loader2,
+  Milk,
+  Pill,
+  Sparkles,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -59,6 +69,13 @@ const ROWS: ReadonlyArray<PrefRow> = [
     label: 'Recordatorio cada 2 horas',
     description:
       'Un toque cada ~2h entre las 7 y las 22 para que no se te escape nada. Solo avisa si hubo más de 1.5h sin cargar nada.',
+  },
+  {
+    key: 'solids_allergens',
+    Icon: Egg,
+    label: 'Recordatorios de alérgenos',
+    description:
+      'Te avisamos cuando conviene volver a darle huevo, maní y los demás para sostener la tolerancia.',
   },
 ];
 

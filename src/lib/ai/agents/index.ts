@@ -42,6 +42,16 @@ export {
 } from './pediatric-prep/schema';
 export type { PediatricPrepOutput } from './pediatric-prep';
 
+export { generateSolidsMenu, SOLIDS_MENU_AGENT } from './solids-menu';
+export {
+  solidsMenuInputSchema,
+  solidsMenuOutputSchema,
+  MENU_TAGS,
+  type MenuTag,
+  type SolidsMenuInput,
+  type SolidsMenuOutput,
+} from './solids-menu/schema';
+
 export { generateLullaby } from './lullaby';
 export {
   lullabyInputSchema,
