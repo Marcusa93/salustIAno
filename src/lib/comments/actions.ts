@@ -6,8 +6,8 @@ import {
   type CreateCommentInput,
   createCommentSchema,
 } from '@/lib/validators/comment';
+import { sendPushToFamily } from '@/lib/web-push';
 import { revalidatePath } from 'next/cache';
-import { sendPushToFamily } from '../../app/(app)/perfil/push-actions';
 
 export interface CommentEntry {
   id: string;

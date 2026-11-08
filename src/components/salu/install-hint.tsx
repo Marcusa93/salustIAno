@@ -1,69 +1,109 @@
 'use client';
 
+import { IosInstallSteps } from '@/components/pwa/ios-install-steps';
 import { Button } from '@/components/ui/button';
+import {
+  INSTALL_HINT_STORAGE_KEY,
+  type InstallHintKind,
+  getInstallHintKind,
+  readDeviceInfo,
+} from '@/lib/pwa/platform';
 import { cn } from '@/lib/utils';
-import { Share, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Download, Share, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
-const STORAGE_KEY = 'salu-install-hint-dismissed-at';
-// Si la familia descartó el hint, no se lo mostramos por ~30 días.
-const DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** Evento no estándar de Chromium; TypeScript no lo trae en lib.dom. */
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+// Pequeño delay para no aparecer junto con otras toasts/animaciones.
+const IOS_HINT_DELAY_MS = 1200;
+
+function readDismissedAt(): string | null {
+  try {
+    return window.localStorage.getItem(INSTALL_HINT_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
 
 /**
- * Banner discreto que recuerda a usuarios de iOS cómo instalar Salu como
- * PWA (iOS no tiene prompt automático: hay que tocar el botón Compartir →
- * "Agregar a la pantalla de inicio"). Se muestra:
- *  - Solo en iPhone/iPad
- *  - Solo si NO está corriendo ya como PWA standalone
- *  - Solo si no fue descartado en los últimos 30 días
- *
- * En Android Chrome ya hay prompt automático del browser, así que no nos
- * metemos en esa UX. Resto de browsers desktop tampoco lo necesitan.
+ * Banner discreto que invita a instalar Salu como app:
+ *  - Android / Chromium: cuando el navegador ofrece instalar
+ *    (`beforeinstallprompt`), guardamos el evento y mostramos un botón
+ *    "Instalar" que abre el diálogo nativo.
+ *  - iPhone / iPad: no hay prompt; mostramos los pasos de Compartir →
+ *    Agregar a inicio. Ahí importa doble: en iOS los avisos push solo
+ *    funcionan con la app instalada.
+ * No aparece si ya está instalada o si la descartaron en los últimos 30 días.
  */
 export function InstallHint() {
-  const [show, setShow] = useState(false);
+  const [kind, setKind] = useState<InstallHintKind>(null);
+  const [installing, setInstalling] = useState(false);
+  const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const device = readDeviceInfo();
+    const evaluate = (canPrompt: boolean) =>
+      getInstallHintKind({ device, canPrompt, dismissedAt: readDismissedAt(), now: Date.now() });
 
-    // 1. ¿Ya está instalado como PWA?
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      // iOS exposes una propiedad propietaria en navigator.
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-    if (standalone) return;
+    const onBeforeInstallPrompt = (event: Event) => {
+      if (evaluate(true) !== 'prompt') return; // dejamos que el navegador siga con lo suyo
+      event.preventDefault();
+      deferredPrompt.current = event as BeforeInstallPromptEvent;
+      setKind('prompt');
+    };
+    const onAppInstalled = () => {
+      deferredPrompt.current = null;
+      setKind(null);
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onAppInstalled);
 
-    // 2. ¿Es iOS? (ipad nuevos reportan "Macintosh", chequeamos también touch)
-    const ua = window.navigator.userAgent;
-    const isIOS =
-      /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && navigator.maxTouchPoints > 1);
-    if (!isIOS) return;
+    const timer =
+      evaluate(false) === 'ios'
+        ? setTimeout(() => setKind((current) => current ?? 'ios'), IOS_HINT_DELAY_MS)
+        : undefined;
 
-    // 3. ¿Lo descartó hace poco?
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const at = Number.parseInt(raw, 10);
-      if (Number.isFinite(at) && Date.now() - at < DISMISS_TTL_MS) return;
-    }
-
-    // Pequeño delay para no aparecer simultáneo con otras toasts/animaciones.
-    const t = setTimeout(() => setShow(true), 1200);
-    return () => clearTimeout(t);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onAppInstalled);
+      clearTimeout(timer);
+    };
   }, []);
 
   function dismiss() {
     try {
-      localStorage.setItem(STORAGE_KEY, String(Date.now()));
+      window.localStorage.setItem(INSTALL_HINT_STORAGE_KEY, String(Date.now()));
     } catch {
       /* localStorage bloqueado (modo privado): igual ocultamos para esta sesión */
     }
-    setShow(false);
+    setKind(null);
   }
 
-  if (!show) return null;
+  async function install() {
+    const prompt = deferredPrompt.current;
+    if (!prompt) return;
+    setInstalling(true);
+    try {
+      await prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      if (outcome === 'accepted') setKind(null);
+      else dismiss();
+    } finally {
+      // El evento sirve una sola vez.
+      deferredPrompt.current = null;
+      setInstalling(false);
+    }
+  }
+
+  if (!kind) return null;
 
   return (
-    <output
+    <section
+      aria-label="Instalar Salu"
       className={cn(
         'fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+76px)] z-50 mx-auto max-w-sm',
         'animate-stagger-up rounded-2xl border border-border/60 bg-card/95 p-3 shadow-lg backdrop-blur-md',
@@ -74,18 +114,39 @@ export function InstallHint() {
         aria-hidden
         className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary"
       >
-        <Share className="size-4" />
+        {kind === 'ios' ? <Share className="size-4" /> : <Download className="size-4" />}
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="font-medium text-foreground text-sm leading-tight">
-          Instalá Salu en tu iPhone
-        </p>
-        <p className="text-muted-foreground text-xs leading-snug">
-          Tocá el botón Compartir y elegí{' '}
-          <span className="font-medium">Agregar a la pantalla de inicio</span> — abrís Salu sin la
-          barra del navegador.
-        </p>
-      </div>
+
+      {kind === 'ios' ? (
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <p className="font-medium text-foreground text-sm leading-tight">
+            Instalá Salu en tu iPhone
+          </p>
+          <IosInstallSteps finalStep="Abrí Salu desde el ícono: así también te llegan los avisos." />
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <p className="font-medium text-foreground text-sm leading-tight">
+              Instalá Salu en tu celu
+            </p>
+            <p className="text-muted-foreground text-xs leading-snug">
+              Se abre como una app, sin la barra del navegador, y te pueden llegar los avisos.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={install}
+            disabled={installing}
+            className="self-start"
+          >
+            <Download aria-hidden />
+            Instalar
+          </Button>
+        </div>
+      )}
+
       <Button
         type="button"
         size="icon-sm"
@@ -96,6 +157,6 @@ export function InstallHint() {
       >
         <X className="size-4" aria-hidden />
       </Button>
-    </output>
+    </section>
   );
 }

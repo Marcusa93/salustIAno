@@ -1,9 +1,9 @@
 'use server';
 
-import { sendPushToFamily } from '@/app/(app)/perfil/push-actions';
 import { tagPhoto } from '@/lib/ai/agents/photo-tagger';
 import { getOrCreateMonthlyAlbum } from '@/lib/album/monthly-album';
 import { createClient } from '@/lib/supabase/server';
+import { sendPushToFamily } from '@/lib/web-push';
 import { revalidatePath } from 'next/cache';
 
 const BUCKET = 'photos';
