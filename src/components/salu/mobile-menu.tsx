@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
+import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -74,7 +75,7 @@ export function MobileMenu() {
             return (
               <Link
                 key={href}
-                href={href}
+                href={href as Route}
                 aria-current={isActive ? 'page' : undefined}
                 onClick={() => setOpen(false)}
                 className={cn(

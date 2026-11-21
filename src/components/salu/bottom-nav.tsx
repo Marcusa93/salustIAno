@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils';
 import { Baby, BookHeart, Home, ImageIcon, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
+import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 
 // Bottom nav mobile: 5 ítems, los de uso diario. Comidas entró cuando
@@ -33,7 +34,7 @@ export function BottomNav() {
           return (
             <Link
               key={href}
-              href={href}
+              href={href as Route}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'group/bnav relative flex min-h-[52px] min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 font-medium text-[9px] tracking-wide transition-all duration-200 active:scale-95 sm:gap-1 sm:text-[10px]',

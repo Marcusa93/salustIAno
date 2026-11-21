@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils';
 import { Baby, BookHeart, Home, ImageIcon, Sparkles, Users, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
+import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 
 const items = [
@@ -29,7 +30,7 @@ export function DesktopSidebar() {
           return (
             <Link
               key={href}
-              href={href}
+              href={href as Route}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'group/nav relative flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-sm transition-all duration-200',
