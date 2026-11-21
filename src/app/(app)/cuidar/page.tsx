@@ -8,6 +8,7 @@ import {
   BookHeart,
   CalendarClock,
   Camera,
+  ChefHat,
   ClipboardCheck,
   Droplets,
   FileText,
@@ -370,6 +371,14 @@ export default async function CuidarPage() {
       title: 'Informe para la pediatra',
       description: 'Mediciones, medicamentos y datos clave en una página imprimible.',
       Icon: FileText,
+      section: 'salud',
+    },
+    {
+      href: '/cuidar/menu' as Route,
+      title: '¿Qué puede comer?',
+      description: 'Contame qué tenés en casa y te sugiero recetas aptas para su edad.',
+      Icon: ChefHat,
+      badge: 'IA',
       section: 'salud',
     },
     // Patrones — cómo viene la rutina diaria.
