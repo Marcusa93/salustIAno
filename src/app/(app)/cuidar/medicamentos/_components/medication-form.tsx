@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import { type MedicationDoseInput, medicationDoseSchema } from '@/lib/validators/medication';
 import { zodResolver } from '@/lib/zod-compat';
 import { Loader2, Save } from 'lucide-react';
@@ -41,11 +42,14 @@ export function MedicationForm({
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<MedicationDoseInput>({
     resolver: zodResolver(medicationDoseSchema),
     defaultValues: { ...FALLBACK_DEFAULTS, ...defaultValues },
   });
+  const isDaily = watch('interval_hours') === 24;
 
   async function onSubmit(values: MedicationDoseInput) {
     const result = await onSubmitAction({
@@ -72,7 +76,7 @@ export function MedicationForm({
           <Input
             id="med-name"
             type="text"
-            placeholder="Thermofren, ibuprofeno…"
+            placeholder="Hierro, ibuprofeno…"
             list={suggestions.length > 0 ? 'med-suggestions' : undefined}
             autoComplete="off"
             {...register('medication_name')}
@@ -118,8 +122,25 @@ export function MedicationForm({
             {errors.interval_hours && (
               <p className="text-destructive text-sm">{errors.interval_hours.message}</p>
             )}
+            <button
+              type="button"
+              onClick={() =>
+                setValue('interval_hours', isDaily ? Number.NaN : 24, { shouldValidate: true })
+              }
+              aria-pressed={isDaily}
+              className={cn(
+                'self-start rounded-full border px-3 py-1 text-xs transition-colors',
+                isDaily
+                  ? 'border-primary bg-primary/10 font-medium text-primary'
+                  : 'border-border text-muted-foreground hover:text-foreground',
+              )}
+            >
+              Una vez por día
+            </button>
             <p className="text-muted-foreground text-xs">
-              Calculamos cuándo toca la próxima dosis automáticamente.
+              {isDaily
+                ? 'Queda como remedio de todos los días: en Casa vas a ver si hoy ya se dio.'
+                : 'Calculamos cuándo toca la próxima dosis automáticamente.'}
             </p>
           </div>
         </div>

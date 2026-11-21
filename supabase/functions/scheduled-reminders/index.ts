@@ -532,27 +532,39 @@ async function processDiaperPredictions(): Promise<{ checked: number; notified: 
 
 interface MedicationDoseRow {
   id: string;
+  child_id: string;
   medication_name: string;
+  given_at: string;
   next_dose_at: string;
   child_profiles: { name: string; family_group_id: string } | null;
 }
 
 /**
- * Notifica dosis de medicamentos que vencen en los próximos 20 min.
+ * Avisa las dosis de medicamentos que tocan alrededor de esta corrida.
+ *
+ * El cron corre una vez por hora (a los :05), así que la ventana tiene que
+ * cubrir la hora entera: desde 40 min atrás hasta 20 min adelante. Antes
+ * miraba solo los próximos 20 min y las dosis que caían entre los :25 y
+ * los :05 nunca se avisaban.
+ *
  * Usa next_dose_notified_at para idempotencia — si ya se notificó, no
- * vuelve a mandar push aunque el cron corra de nuevo.
+ * vuelve a mandar push aunque el cron corra de nuevo. Si ya se cargó una
+ * dosis más nueva del mismo remedio, no avisa.
  */
 async function processMedicationReminders(): Promise<{ checked: number; notified: number }> {
   const now = new Date();
+  const lookback = new Date(now.getTime() - 40 * 60 * 1000);
   const lookahead = new Date(now.getTime() + 20 * 60 * 1000);
 
   // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
   const { data: doses } = await (supabase as any)
     .from('medication_doses')
-    .select('id, medication_name, next_dose_at, child_profiles(name, family_group_id)')
+    .select(
+      'id, child_id, medication_name, given_at, next_dose_at, child_profiles(name, family_group_id)',
+    )
     .is('deleted_at', null)
     .is('next_dose_notified_at', null)
-    .gte('next_dose_at', now.toISOString())
+    .gte('next_dose_at', lookback.toISOString())
     .lte('next_dose_at', lookahead.toISOString());
 
   if (!doses || doses.length === 0) return { checked: 0, notified: 0 };
@@ -560,22 +572,41 @@ async function processMedicationReminders(): Promise<{ checked: number; notified
   let notified = 0;
   for (const dose of doses as MedicationDoseRow[]) {
     const child = dose.child_profiles;
-    if (!child) continue;
 
-    const minutesUntil = Math.round(
-      (new Date(dose.next_dose_at).getTime() - now.getTime()) / 60_000,
-    );
+    // ¿Ya se dio la siguiente? (alguien se adelantó al aviso)
+    // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
+    const { data: newer } = await (supabase as any)
+      .from('medication_doses')
+      .select('id')
+      .eq('child_id', dose.child_id)
+      .ilike(
+        'medication_name',
+        dose.medication_name.replace(/[\\%_]/g, (c: string) => `\\${c}`),
+      )
+      .is('deleted_at', null)
+      .gt('given_at', dose.given_at)
+      .limit(1);
+    const alreadyGiven = Array.isArray(newer) && newer.length > 0;
 
-    const result = await sendToFamily(
-      child.family_group_id,
-      {
-        title: '💊 Próxima dosis',
-        body: `${dose.medication_name} para ${child.name} en ${minutesUntil} min.`,
-        url: '/cuidar/medicamentos',
-        tag: `medication-reminder-${dose.id}`,
-      },
-      'medication_due',
-    );
+    let sent = 0;
+    if (child && !alreadyGiven) {
+      const minutesUntil = Math.round(
+        (new Date(dose.next_dose_at).getTime() - now.getTime()) / 60_000,
+      );
+      const when = minutesUntil > 1 ? `en ${minutesUntil} min` : 'ahora';
+
+      const result = await sendToFamily(
+        child.family_group_id,
+        {
+          title: '💊 Próxima dosis',
+          body: `${dose.medication_name} para ${child.name}: toca ${when}.`,
+          url: '/cuidar/medicamentos',
+          tag: `medication-reminder-${dose.id}`,
+        },
+        'medication_due',
+      );
+      sent = result.sent;
+    }
 
     // Marcar notificado aunque no haya llegado a nadie — evita reintento spam.
     // biome-ignore lint/suspicious/noExplicitAny: medication_doses stale en database.ts
@@ -584,7 +615,7 @@ async function processMedicationReminders(): Promise<{ checked: number; notified
       .update({ next_dose_notified_at: now.toISOString() })
       .eq('id', dose.id);
 
-    if (result.sent > 0) notified += 1;
+    if (sent > 0) notified += 1;
   }
   return { checked: doses.length, notified };
 }

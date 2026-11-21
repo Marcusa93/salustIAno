@@ -1,4 +1,5 @@
 import { env } from '@/lib/env';
+import { loadMedicationDoses } from '@/lib/medication/load';
 import { loadSolidMeals } from '@/lib/solids/load';
 import { allergenReminder } from '@/lib/solids/reminders';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -70,9 +71,15 @@ export async function GET(request: Request) {
   let totalSkipped = 0;
   let allergenFamilies = 0;
   let allergenSent = 0;
+  let dailyMedFamilies = 0;
+  let dailyMedSent = 0;
 
   // Preferencias por usuario, leídas una sola vez aunque haya dos avisos.
-  type PushPrefs = { reminder_2h?: boolean; solids_allergens?: boolean };
+  type PushPrefs = {
+    reminder_2h?: boolean;
+    solids_allergens?: boolean;
+    medication_due?: boolean;
+  };
   type PrefKey = keyof PushPrefs;
   const prefsCache = new Map<string, PushPrefs | null>();
   async function wants(userId: string, key: PrefKey): Promise<boolean> {
@@ -166,6 +173,31 @@ export async function GET(request: Request) {
       console.error('[cron/reminder] alérgenos', familyGroupId, err);
     }
 
+    // Remedios de todos los días (hierro…) que hoy nadie anotó todavía.
+    // El cron corre a las 18 h: queda tiempo para dárselo.
+    try {
+      const anyoneWants = await someAsync([...subsByUser.keys()], (userId) =>
+        wants(userId, 'medication_due'),
+      );
+      if (anyoneWants) {
+        const { courses } = await loadMedicationDoses(admin, childId);
+        const missing = courses.filter((course) => course.today.length === 0);
+        if (missing.length > 0) {
+          const firstName = childName.trim().split(/\s+/)[0] ?? childName;
+          const names = missing.map((course) => course.name).join(' y ');
+          dailyMedFamilies++;
+          dailyMedSent += await deliver(subsByUser, 'medication_due', {
+            title: `💊 Falta ${names} de hoy`,
+            body: `Nadie anotó todavía ${names} de ${firstName}. Si ya se lo dieron, anotalo con un toque.`,
+            url: '/home',
+            tag: `daily-med-${familyGroupId}`,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[cron/reminder] remedios diarios', familyGroupId, err);
+    }
+
     // Último evento registrado en cualquier tabla de eventos.
     const [{ data: lastFeeding }, { data: lastSleep }, { data: lastDiaper }] = await Promise.all([
       admin
@@ -232,6 +264,7 @@ export async function GET(request: Request) {
     sent: totalSent,
     skipped: totalSkipped,
     allergens: { families: allergenFamilies, sent: allergenSent },
+    dailyMeds: { families: dailyMedFamilies, sent: dailyMedSent },
     hour,
   });
 }

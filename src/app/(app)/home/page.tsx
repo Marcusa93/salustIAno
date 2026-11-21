@@ -10,6 +10,7 @@ import { scheduledLetterAt } from '@/lib/carta/letter-window';
 import { startOfDayArDaysAgo, startOfTodayAr } from '@/lib/format-ar';
 import { greetingFor, isLateNightAr } from '@/lib/greeting';
 import { preciseAgeLabel } from '@/lib/home-now';
+import { loadMedicationDoses, loadMemberNames } from '@/lib/medication/load';
 import { averagePerDay, formatPredictionTime, predictNextFeeding } from '@/lib/predictions';
 import { loadSolidMeals } from '@/lib/solids/load';
 import { suggestNext, summarizeFoods } from '@/lib/solids/progress';
@@ -19,6 +20,7 @@ import { wakeWindowFor } from '@/lib/wake-windows';
 import { Moon, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
+import { type DailyMedItem, DailyMedsCard } from './_components/daily-meds-card';
 import { DailySummaryCard } from './_components/daily-summary-card';
 import { DiaperQuickAdd } from './_components/diaper-quick-add';
 import { ExpectationsCard } from './_components/expectations-card';
@@ -112,6 +114,8 @@ export default async function HomePage() {
 
   // Comidas sólidas: van aparte de las tomas de leche (ver LogDock).
   const solidsPromise = loadSolidMeals(supabase, child.id);
+  // Remedios de todos los días (hierro…): si hoy ya se dio y quién.
+  const medsPromise = loadMedicationDoses(supabase, child.id);
   const [
     { data: recentEvents },
     { data: todayEvents },
@@ -223,6 +227,27 @@ export default async function HomePage() {
   const feedingPresets = [100, 120, 150, 180];
 
   const solids = await solidsPromise;
+
+  const { courses: dailyCourses } = await medsPromise;
+  const memberNames = dailyCourses.some((c) => c.today.length > 0)
+    ? await loadMemberNames(supabase)
+    : new Map<string, string>();
+  const dailyMeds: DailyMedItem[] = dailyCourses.map((course) => {
+    const last = course.today.at(-1);
+    return {
+      name: course.name,
+      doseAmount: course.doseAmount,
+      latestDoseId: course.latestDoseId,
+      dayNumber: course.dayNumber,
+      givenToday: last
+        ? {
+            at: last.given_at,
+            by: last.created_by ? (memberNames.get(last.created_by) ?? null) : null,
+            count: course.today.length,
+          }
+        : null,
+    };
+  });
   const solidSummaries = summarizeFoods(solids.meals);
   const lastMeal = solids.meals.at(-1) ?? null;
   const solidsAgeMonths = babyAgeFromBirth(child.birth_date)?.months ?? 0;
@@ -364,6 +389,9 @@ export default async function HomePage() {
         solids={solidsDock}
         renderedAt={renderedAt}
       />
+
+      {/* REMEDIOS — tratamientos de todos los días: ¿hoy ya se dio? */}
+      {dailyMeds.length > 0 && <DailyMedsCard items={dailyMeds} />}
 
       {/* Coach pediátrico de sueño — solo en modo madrugada (22-06 AR).
           Lee la situación del bebé y devuelve diagnóstico + sugerencia.

@@ -1,5 +1,7 @@
 'use server';
 
+import { formatTimeAr, startOfTodayAr } from '@/lib/format-ar';
+import { escapeLike } from '@/lib/medication/daily';
 import { createClient } from '@/lib/supabase/server';
 import { type MedicationDoseInput, medicationDoseSchema } from '@/lib/validators/medication';
 import type { Route } from 'next';
@@ -139,4 +141,85 @@ export async function deleteMedicationDoseAction(
   revalidatePath('/cuidar/medicamentos');
   revalidatePath('/cuidar');
   redirect('/cuidar/medicamentos' as Route);
+}
+
+export type LogDailyDoseResult =
+  | { ok: true; givenAt: string }
+  | { ok: false; error: string; alreadyGiven?: boolean };
+
+/**
+ * "Se lo di": anota ahora una dosis de un remedio diario, copiando la
+ * última. Si alguien ya la anotó hoy, no la duplica salvo que se pida
+ * explícitamente (`force`): con dos personas cuidando, es fácil que el
+ * remedio se dé dos veces.
+ */
+export async function logDailyDoseAction(
+  doseId: string,
+  force = false,
+): Promise<LogDailyDoseResult> {
+  const ctx = await getActorContext();
+  if ('error' in ctx) return { ok: false, error: ctx.error ?? 'Error inesperado.' };
+
+  const { data: original } = await ctx.supabase
+    .from('medication_doses')
+    .select('medication_name, dose_amount, interval_hours')
+    .eq('id', doseId)
+    .eq('child_id', ctx.childId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (!original) return { ok: false, error: 'No encontramos el remedio.' };
+  const name = original.medication_name.trim();
+
+  if (!force) {
+    const { data: todays } = await ctx.supabase
+      .from('medication_doses')
+      .select('given_at, created_by')
+      .eq('child_id', ctx.childId)
+      .ilike('medication_name', escapeLike(name))
+      .is('deleted_at', null)
+      .gte('given_at', startOfTodayAr().toISOString())
+      .order('given_at', { ascending: false })
+      .limit(1);
+
+    const last = todays?.[0];
+    if (last) {
+      const at = formatTimeAr(last.given_at);
+      if (last.created_by === ctx.userId) {
+        return { ok: false, alreadyGiven: true, error: `Ya lo anotaste hoy a las ${at}.` };
+      }
+      const { data: member } = await ctx.supabase
+        .from('family_memberships')
+        .select('display_name')
+        .eq('user_id', last.created_by)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle();
+      const who = member?.display_name?.trim() || 'Alguien de la familia';
+      return { ok: false, alreadyGiven: true, error: `${who} ya lo anotó hoy a las ${at}.` };
+    }
+  }
+
+  const now = new Date();
+  const nextDoseAt =
+    original.interval_hours != null
+      ? new Date(now.getTime() + original.interval_hours * 60 * 60 * 1000)
+      : null;
+
+  const { error: insertError } = await ctx.supabase.from('medication_doses').insert({
+    child_id: ctx.childId,
+    medication_name: name,
+    dose_amount: original.dose_amount ?? null,
+    interval_hours: original.interval_hours ?? null,
+    given_at: now.toISOString(),
+    next_dose_at: nextDoseAt?.toISOString() ?? null,
+    created_by: ctx.userId,
+  });
+
+  if (insertError) return { ok: false, error: 'No pudimos anotar la dosis.' };
+
+  revalidatePath('/home');
+  revalidatePath('/cuidar/medicamentos');
+  revalidatePath('/cuidar');
+  return { ok: true, givenAt: now.toISOString() };
 }

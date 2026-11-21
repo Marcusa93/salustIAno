@@ -1,12 +1,14 @@
 import { PageHeader } from '@/components/salu/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { loadMedicationDoses, loadMemberNames } from '@/lib/medication/load';
 import { createClient } from '@/lib/supabase/server';
 import { cn } from '@/lib/utils';
 import { Clock, Pencil, Pill, Plus } from 'lucide-react';
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { CountdownChip } from './_components/countdown-chip';
+import { DailyCourseCard } from './_components/daily-course-card';
 import { DeleteDoseButton } from './_components/delete-dose-button';
 import { RepeatDoseButton } from './_components/repeat-dose-button';
 
@@ -95,24 +97,26 @@ export default async function MedicamentosPage() {
     .limit(1)
     .maybeSingle();
 
-  const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { doses: recentDoses, courses: dailyCourses } = child
+    ? await loadMedicationDoses(supabase, child.id)
+    : { doses: [], courses: [] };
+  const memberNames =
+    dailyCourses.length > 0 ? await loadMemberNames(supabase) : new Map<string, string>();
 
-  const { data: rawDoses } = child
-    ? await supabase
-        .from('medication_doses')
-        .select('id, medication_name, dose_amount, given_at, interval_hours, next_dose_at, notes')
-        .eq('child_id', child.id)
-        .is('deleted_at', null)
-        .gte('given_at', since7d)
-        .order('given_at', { ascending: false })
-    : { data: null };
+  const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const rawDoses = recentDoses.filter((d) => d.given_at >= since7d);
 
   const doses = (rawDoses ?? []) as MedicationDose[];
   const now = new Date();
 
   // Medicamentos activos: última dosis por nombre, de las últimas 48 h.
+  // Los de todos los días van en su propia sección.
+  const dailyNames = new Set(dailyCourses.map((c) => c.name.toLocaleLowerCase('es')));
   const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-  const recent = doses.filter((d) => d.given_at >= since48h);
+  const recent = doses.filter(
+    (d) =>
+      d.given_at >= since48h && !dailyNames.has(d.medication_name.trim().toLocaleLowerCase('es')),
+  );
   const byName = new Map<string, MedicationDose>();
   for (const dose of recent) {
     if (!byName.has(dose.medication_name)) {
@@ -162,6 +166,23 @@ export default async function MedicamentosPage() {
             Registrar primera dosis
           </Button>
         </Card>
+      )}
+
+      {dailyCourses.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-medium text-[10.5px] text-muted-foreground/80 uppercase tracking-[0.22em]">
+            Todos los días
+          </h2>
+          <div className="flex flex-col gap-3">
+            {dailyCourses.map((course) => (
+              <DailyCourseCard
+                key={course.latestDoseId}
+                course={course}
+                memberNames={memberNames}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       {activeDoses.length > 0 && (
