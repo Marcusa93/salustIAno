@@ -93,7 +93,7 @@ export function ChapterRail({
                 onClick={() => setIndexOpen((open) => !open)}
                 aria-expanded={indexOpen}
                 aria-controls={indexId}
-                aria-label={`${current.label}, ${current.title}. Ver los meses`}
+                aria-label={`${current.label}, ${current.title}. Ver los capítulos`}
                 className="pointer-events-auto flex items-center gap-2 rounded-full bg-carta-paper/80 px-4 py-1.5 font-display text-carta-ink text-sm shadow-[0_4px_14px_-8px_var(--carta-shadow)] backdrop-blur-md"
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -137,7 +137,7 @@ export function ChapterRail({
           <>
             <motion.button
               type="button"
-              aria-label="Cerrar los meses"
+              aria-label="Cerrar los capítulos"
               onClick={() => setIndexOpen(false)}
               className="fixed inset-0 z-40 bg-carta-night/20 backdrop-blur-[2px]"
               initial={{ opacity: 0 }}
@@ -146,7 +146,7 @@ export function ChapterRail({
             />
             <motion.nav
               id={indexId}
-              aria-label="Meses de la carta"
+              aria-label="Capítulos de la carta"
               className="fixed inset-x-6 top-[calc(env(safe-area-inset-top)+3.75rem)] z-50 mx-auto max-w-sm overflow-hidden rounded-3xl bg-carta-paper shadow-[0_24px_48px_-20px_var(--carta-shadow)] ring-1 ring-carta-ink/10"
               initial={{ opacity: 0, y: -10, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}

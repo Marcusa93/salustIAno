@@ -5,7 +5,7 @@ import type { HeartbeatSynth } from '@/lib/carta/heartbeat-synth';
 import type { Letter, LetterPhoto } from '@/lib/carta/manifest';
 import { easeWarm } from '@/lib/motion';
 import { cn } from '@/lib/utils';
-import { Fingerprint } from 'lucide-react';
+import { Fingerprint, PawPrint } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { NightSky, Tape } from './atmosphere';
@@ -44,7 +44,9 @@ function RevealedPhoto({ photo }: { photo: LetterPhoto }) {
       />
       <figcaption className="flex items-end justify-between px-1 pt-2 font-hand text-carta-ink">
         <span className="text-xl leading-tight">{photo.caption ?? ''}</span>
-        <span className="text-carta-ink-soft text-sm">{polaroidDateLabel(photo.takenAt)}</span>
+        {photo.takenAt && (
+          <span className="text-carta-ink-soft text-sm">{polaroidDateLabel(photo.takenAt)}</span>
+        )}
       </figcaption>
     </motion.figure>
   );
@@ -54,6 +56,7 @@ function RevealedPhoto({ photo }: { photo: LetterPhoto }) {
  * Escena 2: "Antes de verme, ya me escuchabas". Mientras mamá sostiene el
  * dedo, suena el latido de la ecografía; al completarse, el latido se
  * funde con la primera canción y (si hay) se revela la foto de ese día.
+ * El ritmo y el ícono (huella o pata) los puede cambiar el manifest.
  */
 export function HeartbeatGate({
   copy,
@@ -67,6 +70,8 @@ export function HeartbeatGate({
   const { soundtrack } = useSoundtrack();
   const synth = useRef<HeartbeatSynth | null>(null);
   const [heard, setHeard] = useState(false);
+  const bpm = copy.bpm ?? FETAL_BPM;
+  const Icon = copy.icon === 'paw' ? PawPrint : Fingerprint;
   const [showFallback, setShowFallback] = useState(false);
 
   const heartbeat = () => {
@@ -84,7 +89,7 @@ export function HeartbeatGate({
 
   const hold = useHold({
     durationMs: HOLD_MS,
-    onStart: () => heartbeat().start(FETAL_BPM),
+    onStart: () => heartbeat().start(bpm),
     onCancel: () => heartbeat().stop(),
     onComplete: finish,
   });
@@ -97,7 +102,7 @@ export function HeartbeatGate({
     };
   }, []);
 
-  const beatStyle = { '--beat': `${60 / FETAL_BPM}s` } as CSSProperties;
+  const beatStyle = { '--beat': `${60 / bpm}s` } as CSSProperties;
 
   return (
     <motion.div
@@ -179,7 +184,7 @@ export function HeartbeatGate({
                 style={{ pathLength: hold.progress }}
               />
             </svg>
-            <Fingerprint
+            <Icon
               aria-hidden
               strokeWidth={1.2}
               className={cn(

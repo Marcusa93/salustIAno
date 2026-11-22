@@ -74,6 +74,7 @@ export function LetterExperience({ letter }: { letter: Letter }) {
                 key="sealed"
                 envelope={letter.envelope}
                 resumeLabel={resumeLabel}
+                canExit={!letter.public}
                 onOpened={() => {
                   clearProgress(safeStorage(), letter.slug);
                   setStage('heartbeat');
@@ -150,7 +151,7 @@ function LetterPaper({ letter, startAt }: { letter: Letter; startAt: string | nu
       transition={{ duration: 1.4, ease: easeWarm }}
     >
       <PaperGrain />
-      <ExitLetterLink />
+      {!letter.public && <ExitLetterLink />}
       <ChapterRail
         chapters={letter.chapters}
         current={current}
@@ -177,6 +178,7 @@ function LetterPaper({ letter, startAt }: { letter: Letter; startAt: string | nu
           slug={letter.slug}
           finale={letter.finale}
           birthAt={letter.birthAt}
+          canExit={!letter.public}
           memories={letter.memories}
           onEnter={enterFinale}
         />

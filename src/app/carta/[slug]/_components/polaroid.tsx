@@ -122,9 +122,11 @@ export function Polaroid({
             {photo.caption}
           </span>
         )}
-        <span className="self-end font-hand text-carta-ink-soft text-sm">
-          {polaroidDateLabel(photo.takenAt)}
-        </span>
+        {photo.takenAt && (
+          <span className="self-end font-hand text-carta-ink-soft text-sm">
+            {polaroidDateLabel(photo.takenAt)}
+          </span>
+        )}
       </figcaption>
     </motion.figure>
   );

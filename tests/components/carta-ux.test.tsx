@@ -49,7 +49,13 @@ describe('Sobre: seguir donde estabas', () => {
   it('sin progreso, invita a abrir el sobre', () => {
     render(
       withProviders(
-        <Envelope envelope={ENVELOPE} resumeLabel={null} onOpened={vi.fn()} onResume={vi.fn()} />,
+        <Envelope
+          envelope={ENVELOPE}
+          resumeLabel={null}
+          canExit
+          onOpened={vi.fn()}
+          onResume={vi.fn()}
+        />,
       ),
     );
     expect(screen.getByText('Tocá para abrir')).toBeInTheDocument();
@@ -64,6 +70,7 @@ describe('Sobre: seguir donde estabas', () => {
         <Envelope
           envelope={ENVELOPE}
           resumeLabel="Agosto"
+          canExit
           onOpened={vi.fn()}
           onResume={onResume}
         />,
@@ -77,7 +84,7 @@ describe('Sobre: seguir donde estabas', () => {
   });
 });
 
-describe('Barra de arriba: índice de meses y canción', () => {
+describe('Barra de arriba: índice de capítulos y canción', () => {
   const chapters = [
     { id: 'mayo', label: 'Mayo', title: 'Mis primeras semanas' },
     { id: 'agosto', label: 'Agosto', title: 'Tres meses' },
@@ -88,14 +95,14 @@ describe('Barra de arriba: índice de meses y canción', () => {
     const onJump = vi.fn();
     render(<ChapterRail chapters={chapters} current={current} nowPlaying={null} onJump={onJump} />);
     await userEvent.click(screen.getByRole('button', { name: /Mayo, Mis primeras semanas/ }));
-    const index = screen.getByRole('navigation', { name: 'Meses de la carta' });
+    const index = screen.getByRole('navigation', { name: 'Capítulos de la carta' });
     expect(index).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Agosto/ }));
     expect(onJump).toHaveBeenCalledWith('agosto');
     await waitFor(() =>
       expect(
-        screen.queryByRole('navigation', { name: 'Meses de la carta' }),
+        screen.queryByRole('navigation', { name: 'Capítulos de la carta' }),
       ).not.toBeInTheDocument(),
     );
 
@@ -118,6 +125,25 @@ describe('Barra de arriba: índice de meses y canción', () => {
   });
 });
 
+describe('Sobre de una carta con link', () => {
+  it('lleva su propio lacre y saludo, y no ofrece salir a la app', () => {
+    render(
+      withProviders(
+        <Envelope
+          envelope={{ ...ENVELOPE, seal: 'T', greeting: 'Franco:' }}
+          resumeLabel={null}
+          canExit={false}
+          onOpened={vi.fn()}
+          onResume={vi.fn()}
+        />,
+      ),
+    );
+    expect(screen.getByText('T')).toBeInTheDocument();
+    expect(screen.getByText('Franco:')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Salir de la carta/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('Final: si no le sale mantener apretado', () => {
   it('explica que hay que sostener y, a la segunda, deja seguir igual', async () => {
     render(
@@ -132,6 +158,7 @@ describe('Final: si no le sale mantener apretado', () => {
             wish: 'Feliz primer Día de la Madre.',
           }}
           birthAt="2026-05-04T14:32:00-03:00"
+          canExit
           memories={[]}
           onEnter={() => {}}
         />,

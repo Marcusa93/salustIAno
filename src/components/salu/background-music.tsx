@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 const STORAGE_KEY = 'salu:music-on';
 const SRC = '/audio/en-mi-corazon-viviras.mp3';
 // Rutas con banda sonora propia: acá la música ambiente se calla.
-const SILENT_PREFIXES = ['/carta/'];
+const SILENT_PREFIXES = ['/carta/', '/tibu'];
 
 /**
  * Música ambiente en loop ("En mi corazón vivirás" — Tarzán). Mounted en

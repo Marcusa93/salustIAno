@@ -31,14 +31,21 @@ beforeAll(() => {
   } as unknown as typeof IntersectionObserver;
 });
 
-function renderFinale(finale: Letter['finale']) {
+function renderFinale(
+  finale: Letter['finale'],
+  {
+    birthAt = '2026-05-04T14:32:00-03:00',
+    canExit = true,
+  }: { birthAt?: string; canExit?: boolean } = {},
+) {
   return render(
     <SoundtrackProvider songs={[]}>
-      <PhotoViewerProvider photos={[]} birthAt="2026-05-04T14:32:00-03:00">
+      <PhotoViewerProvider photos={[]} birthAt={birthAt}>
         <Finale
           slug="mama-2026"
           finale={finale}
-          birthAt="2026-05-04T14:32:00-03:00"
+          birthAt={birthAt}
+          canExit={canExit}
           memories={[]}
           onEnter={() => {}}
         />
@@ -91,6 +98,17 @@ describe('Finale de la carta', () => {
     expect(await screen.findByText('P.D. de papá', {}, { timeout: 6000 })).toBeInTheDocument();
     expect(screen.getByText('Salu')).toBeInTheDocument();
     expect(screen.getByText('Marco')).toBeInTheDocument();
+  }, 10_000);
+
+  it('una carta con link, sin bebé ni contador: no cuenta días ni ofrece volver a Salu', async () => {
+    const { postscript: _postscript, ...finale } = FINALE;
+    renderFinale({ ...finale, signature: 'Tibu' }, { birthAt: '', canExit: false });
+    fireEvent.pointerDown(screen.getByRole('button', { name: /Mantené apretado/ }));
+    expect(await screen.findByText('Tibu', {}, { timeout: 6000 })).toBeInTheDocument();
+    expect(await screen.findByText(finale.wish, {}, { timeout: 6000 })).toBeInTheDocument();
+    expect(screen.queryByText(/días/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Volver a Salu/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Volver a leer/ })).toBeInTheDocument();
   }, 10_000);
 
   it('sin P.D. el final queda como estaba', async () => {

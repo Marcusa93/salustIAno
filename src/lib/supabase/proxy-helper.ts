@@ -19,6 +19,9 @@ const PUBLIC_ROUTES = new Set<string>([
 
 const AUTH_ROUTES = new Set<string>(['/login', '/signup']);
 
+/** Cartas abiertas por link (con su imagen para compartir: `/tibu/opengraph-image`). */
+const OPEN_LETTER_ROUTES = ['/tibu'];
+
 /**
  * Rutas en las que dejamos pasar a un user que tiene `must_change_password`
  * sin redirigir a /bienvenida. Necesitamos:
@@ -91,7 +94,12 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // que cualquier persona con el link (familia extensa) pueda escuchar
   // o leer.
   const isShareRoute = pathname.startsWith('/compartir/') || pathname.startsWith('/salu/');
-  const isPublic = PUBLIC_ROUTES.has(pathname) || pathname === '/' || isShareRoute;
+  // Cartas para gente de afuera de la familia (ej. /tibu, para Franco): se
+  // abren con el link. La página solo sirve manifests con "public": true.
+  const isOpenLetter = OPEN_LETTER_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+  const isPublic = PUBLIC_ROUTES.has(pathname) || pathname === '/' || isShareRoute || isOpenLetter;
   const isAuthRoute = AUTH_ROUTES.has(pathname);
 
   if (!isAuthenticated && !isPublic) {

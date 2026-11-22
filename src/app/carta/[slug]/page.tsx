@@ -1,15 +1,8 @@
 import { loadLetter } from '@/lib/carta/load-letter';
 import type { Metadata } from 'next';
-import { Caveat } from 'next/font/google';
 import { notFound } from 'next/navigation';
+import { caveat } from '../fonts';
 import { LetterExperience } from './_components/letter-experience';
-
-// Letra manuscrita solo para las cartas: no se descarga en el resto de la app.
-const caveat = Caveat({
-  variable: '--font-caveat',
-  subsets: ['latin', 'latin-ext'],
-  display: 'swap',
-});
 
 export const dynamic = 'force-dynamic';
 

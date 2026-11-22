@@ -25,7 +25,9 @@ const photoSchema = z.object({
   path: mediaPathSchema,
   width: z.number().int().positive(),
   height: z.number().int().positive(),
-  takenAt: isoDateTimeSchema,
+  // Opcional: de las fotos viejas a veces no se sabe la fecha. Sin fecha, la
+  // polaroid no la muestra y el visor sigue el orden de la carta.
+  takenAt: isoDateTimeSchema.optional(),
   caption: z.string().min(1).optional(),
   alt: z.string().min(1),
   featured: z.boolean().optional(),
@@ -38,6 +40,8 @@ const photoSchema = z.object({
 const videoSchema = photoSchema.extend({
   kind: z.literal('video'),
   poster: mediaPathSchema.optional(),
+  // Video sin audio (ej. una grabación de pantalla): no ofrece "escucharme".
+  silent: z.boolean().optional(),
 });
 
 const mediaSchema = z.discriminatedUnion('kind', [photoSchema, videoSchema]);
@@ -70,13 +74,21 @@ export const letterManifestSchema = z
   .object({
     version: z.literal(1),
     slug: z.string().regex(LETTER_SLUG_PATTERN),
-    childId: z.uuid(),
-    birthAt: isoDateTimeSchema,
+    // Carta de la familia: la lee quien puede ver a este bebé (RLS).
+    childId: z.uuid().optional(),
+    // Carta para alguien de afuera de la familia: se abre con su link, sin
+    // cuenta. Solo la sirve una ruta propia (ej. /tibu), nunca /carta/[slug].
+    public: z.literal(true).optional(),
+    // Nacimiento del bebé: edad en el visor y contador del final.
+    birthAt: isoDateTimeSchema.optional(),
     envelope: z.object({
       to: z.string().min(1),
       from: z.string().min(1),
       stamp: z.string().min(1),
       hint: z.string().min(1),
+      // Inicial del lacre (por defecto "S") y saludo de la carta que asoma.
+      seal: z.string().min(1).max(2).optional(),
+      greeting: z.string().min(1).optional(),
     }),
     heartbeat: z.object({
       prompt: z.string().min(1),
@@ -84,6 +96,10 @@ export const letterManifestSchema = z
       after: z.string().min(1),
       // Foto que se revela junto al "after" ("Ese era yo…").
       photo: photoSchema.optional(),
+      // Latidos por minuto (por defecto, los de una ecografía: 140).
+      bpm: z.number().int().min(40).max(220).optional(),
+      // Qué se apoya: un dedo (huella) o una pata.
+      icon: z.enum(['fingerprint', 'paw']).optional(),
     }),
     // Encabezado de carta: "Tucumán, 18 de octubre de 2026".
     dateline: z.string().min(1).optional(),
@@ -99,6 +115,10 @@ export const letterManifestSchema = z
       closing: z.array(z.string().min(1)).min(1),
       signature: z.string().min(1),
       wish: z.string().min(1),
+      // Latidos por minuto del corazón del final (por defecto, 120).
+      bpm: z.number().int().min(40).max(220).optional(),
+      // "Sos mi mamá hace N días". Sin esto, se cuenta desde `birthAt`, si hay.
+      counter: z.object({ label: z.string().min(1), since: isoDateTimeSchema }).optional(),
       // Unas líneas de quien armó la carta, después de la firma de Salu.
       postscript: z
         .object({
@@ -127,6 +147,20 @@ export const letterManifestSchema = z
     }),
   })
   .superRefine((manifest, ctx) => {
+    if (!manifest.childId && !manifest.public) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'La carta necesita "childId" (familia) o "public": true (con link).',
+      });
+    }
+    // Quien abre una carta con link no tiene cuenta: no puede guardar en el álbum.
+    if (manifest.public && manifest.finale.photo) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Una carta con link no puede tener la foto del final (finale.photo).',
+      });
+    }
+
     const songIds = new Set(manifest.songs.map((song) => song.id));
     const referenced = [
       ...manifest.chapters.map((chapter) => chapter.song),
@@ -295,20 +329,36 @@ export function hydrateLetter(
   };
 }
 
-/** Fotos de toda la carta en orden cronológico — para el visor. */
+/**
+ * Fotos de toda la carta para el visor: la del principio, las de cada
+ * capítulo, la del final y las que se sacaron desde la carta. Si todas
+ * tienen fecha, en orden cronológico; si alguna no, en el orden de la carta.
+ */
 export function photosInChronologicalOrder(letter: Letter): LetterPhoto[] {
   const photos: LetterPhoto[] = [];
+  const seen = new Set<string>();
+  const add = (photo: LetterPhoto) => {
+    if (seen.has(photo.src)) return;
+    seen.add(photo.src);
+    photos.push(photo);
+  };
+
+  if (letter.heartbeat.photo) add(letter.heartbeat.photo);
   for (const chapter of letter.chapters) {
     for (const media of chapter.media) {
-      if (media.kind === 'photo') photos.push(media);
+      if (media.kind === 'photo') add(media);
     }
     // En el visor, las tarjetas de "aunque…" llevan su frase como epígrafe.
     for (const card of chapter.aunque?.cards ?? []) {
-      photos.push({ ...card.media, caption: card.media.caption ?? card.text });
+      add({ ...card.media, caption: card.media.caption ?? card.text });
     }
   }
-  photos.push(...letter.memories);
-  return photos.sort((a, b) => Date.parse(a.takenAt) - Date.parse(b.takenAt));
+  if (letter.finale.moment) add(letter.finale.moment.photo);
+  for (const memory of letter.memories) add(memory);
+
+  const dated = photos.every((photo) => photo.takenAt !== undefined);
+  if (!dated) return photos;
+  return photos.sort((a, b) => Date.parse(a.takenAt ?? '') - Date.parse(b.takenAt ?? ''));
 }
 
 function isPublicAsset(src: string): boolean {

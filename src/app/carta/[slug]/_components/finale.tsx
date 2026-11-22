@@ -57,12 +57,15 @@ export function Finale({
   slug,
   finale,
   birthAt,
+  canExit,
   memories,
   onEnter,
 }: {
   slug: string;
   finale: Letter['finale'];
-  birthAt: string;
+  birthAt?: string;
+  /** Una carta abierta por link (sin cuenta) no tiene "Volver a Salu". */
+  canExit: boolean;
   memories: LetterPhoto[];
   onEnter: () => void;
 }) {
@@ -76,6 +79,9 @@ export function Finale({
   const postscriptDelay = finale.moment ? 5 : 3.8;
   const counterDelay = 3.6 + (finale.moment ? 1.6 : 0) + (finale.postscript ? 2 : 0);
   const now = useNow(revealed);
+  const bpm = finale.bpm ?? BABY_BPM;
+  const counter =
+    finale.counter ?? (birthAt ? { label: 'Sos mi mamá hace', since: birthAt } : undefined);
 
   const heartbeat = () => {
     synth.current ??= soundtrack.heartbeat(() => navigator.vibrate?.(22));
@@ -94,7 +100,7 @@ export function Finale({
     durationMs: HOLD_MS,
     onStart: () => {
       soundtrack.setDucked(true);
-      heartbeat().start(BABY_BPM);
+      heartbeat().start(bpm);
     },
     onCancel: () => {
       heartbeat().stop();
@@ -112,7 +118,7 @@ export function Finale({
   }, [revealed, momentSound, soundtrack]);
 
   const fillY = useTransform(hold.progress, [0, 1], [92, 0]);
-  const beatStyle = { '--beat': `${60 / BABY_BPM}s` } as CSSProperties;
+  const beatStyle = { '--beat': `${60 / bpm}s` } as CSSProperties;
 
   return (
     <motion.section
@@ -276,17 +282,28 @@ export function Finale({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: counterDelay, duration: 1.2, ease: easeWarm }}
             >
-              <p className="font-sans text-[0.7rem] text-carta-night-foreground/60 uppercase tracking-[0.3em]">
-                Sos mi mamá hace
+              {counter && (
+                <>
+                  <p className="font-sans text-[0.7rem] text-carta-night-foreground/60 uppercase tracking-[0.3em]">
+                    {counter.label}
+                  </p>
+                  <p className="font-display text-[3.6rem] text-carta-night-foreground italic leading-none">
+                    {numberAr.format(daysSinceBirth(counter.since, now))}{' '}
+                    <span className="text-[1.6rem]">días</span>
+                  </p>
+                  <p className="font-display text-carta-glow tabular-nums">
+                    {numberAr.format(secondsSinceBirth(counter.since, now))} segundos, y contando.
+                  </p>
+                </>
+              )}
+              <p
+                className={cn(
+                  'font-display text-[1.9rem] italic leading-tight',
+                  counter && 'mt-10',
+                )}
+              >
+                {finale.wish}
               </p>
-              <p className="font-display text-[3.6rem] text-carta-night-foreground italic leading-none">
-                {numberAr.format(daysSinceBirth(birthAt, now))}{' '}
-                <span className="text-[1.6rem]">días</span>
-              </p>
-              <p className="font-display text-carta-glow tabular-nums">
-                {numberAr.format(secondsSinceBirth(birthAt, now))} segundos, y contando.
-              </p>
-              <p className="mt-10 font-display text-[1.9rem] italic leading-tight">{finale.wish}</p>
 
               {finale.photo && (
                 <div className="mt-14 w-full">
@@ -311,13 +328,15 @@ export function Finale({
                   <RotateCcw className="size-4" aria-hidden />
                   Volver a leer
                 </button>
-                <Link
-                  href="/home"
-                  className="flex items-center gap-2 rounded-full bg-carta-night-foreground/10 px-5 py-3 text-sm transition-colors hover:bg-carta-night-foreground/20"
-                >
-                  <House className="size-4" aria-hidden />
-                  Volver a Salu
-                </Link>
+                {canExit && (
+                  <Link
+                    href="/home"
+                    className="flex items-center gap-2 rounded-full bg-carta-night-foreground/10 px-5 py-3 text-sm transition-colors hover:bg-carta-night-foreground/20"
+                  >
+                    <House className="size-4" aria-hidden />
+                    Volver a Salu
+                  </Link>
+                )}
               </div>
             </motion.div>
           </motion.div>

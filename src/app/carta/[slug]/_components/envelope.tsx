@@ -19,10 +19,13 @@ const OPEN_ANIMATION_MS = 1500;
 export function Envelope({
   envelope,
   resumeLabel,
+  canExit,
   onOpened,
   onResume,
 }: {
   envelope: Letter['envelope'];
+  /** Una carta abierta por link (sin cuenta) no tiene a dónde volver. */
+  canExit: boolean;
   /** "Agosto", "el final"… o `null` si no hay dónde seguir. */
   resumeLabel: string | null;
   onOpened: () => void;
@@ -50,7 +53,7 @@ export function Envelope({
       exit={{ opacity: 0, transition: { duration: 0.6 } }}
     >
       <NightSky />
-      <ExitLetterLink tone="night" />
+      {canExit && <ExitLetterLink tone="night" />}
 
       <motion.p
         className="relative mb-12 font-display text-carta-night-foreground/70 text-sm uppercase tracking-[0.35em]"
@@ -90,7 +93,7 @@ export function Envelope({
           transition={{ delay: 0.55, duration: 0.9, ease: easeWarm }}
         >
           <span className="block px-5 pt-4 text-left font-hand text-2xl text-carta-ink/70">
-            Mamá:
+            {envelope.greeting ?? 'Mamá:'}
           </span>
         </motion.span>
 
@@ -136,7 +139,7 @@ export function Envelope({
           animate={opening ? { scale: 0, opacity: 0 } : { scale: 1, opacity: 1 }}
           transition={{ duration: 0.35 }}
         >
-          S
+          {envelope.seal ?? 'S'}
         </motion.span>
       </motion.button>
 

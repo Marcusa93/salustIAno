@@ -1,6 +1,6 @@
 'use client';
 
-import { ageLabelAt, polaroidDateLabel } from '@/lib/carta/dates';
+import { photoDateLine } from '@/lib/carta/dates';
 import type { LetterPhoto } from '@/lib/carta/manifest';
 import { Dialog } from '@base-ui/react/dialog';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -35,7 +35,7 @@ export function PhotoViewerProvider({
   children,
 }: {
   photos: LetterPhoto[];
-  birthAt: string;
+  birthAt?: string;
   children: ReactNode;
 }) {
   const [index, setIndex] = useState<number | null>(null);
@@ -128,8 +128,8 @@ export function PhotoViewerProvider({
 
             {photo && (
               <div className="flex flex-col items-center gap-1 px-6 pt-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] text-center">
-                <p className="font-display text-carta-glow text-sm italic">
-                  {polaroidDateLabel(photo.takenAt)} · {ageLabelAt(birthAt, photo.takenAt)}
+                <p className="min-h-5 font-display text-carta-glow text-sm italic">
+                  {photoDateLine(photo.takenAt, birthAt)}
                 </p>
                 <p className="min-h-[2.25rem] font-hand text-[1.7rem] leading-tight">
                   {photo.caption ?? ''}

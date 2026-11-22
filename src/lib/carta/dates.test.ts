@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ageLabelAt, daysSinceBirth, polaroidDateLabel, secondsSinceBirth } from './dates';
+import {
+  ageLabelAt,
+  daysSinceBirth,
+  photoDateLine,
+  polaroidDateLabel,
+  secondsSinceBirth,
+} from './dates';
 
 const BIRTH = '2026-05-04T18:30:00-03:00';
 
@@ -53,5 +59,13 @@ describe('daysSinceBirth / secondsSinceBirth', () => {
   it('cuenta segundos desde el nacimiento y nunca da negativo', () => {
     expect(secondsSinceBirth(BIRTH, new Date('2026-05-04T18:31:00-03:00'))).toBe(60);
     expect(secondsSinceBirth(BIRTH, new Date('2026-05-01T00:00:00-03:00'))).toBe(0);
+  });
+});
+
+describe('photoDateLine', () => {
+  it('con bebé muestra fecha y edad; sin bebé, solo la fecha; sin fecha, nada', () => {
+    expect(photoDateLine('2026-05-24T12:00:00-03:00', BIRTH)).toBe('24 may · 2 semanas');
+    expect(photoDateLine('2026-05-24T12:00:00-03:00')).toBe('24 may');
+    expect(photoDateLine(undefined, BIRTH)).toBe('');
   });
 });

@@ -51,5 +51,5 @@ export function memoriesFromItems(
       };
     })
     .filter((photo): photo is LetterPhoto => photo !== null)
-    .sort((a, b) => Date.parse(a.takenAt) - Date.parse(b.takenAt));
+    .sort((a, b) => Date.parse(a.takenAt ?? '') - Date.parse(b.takenAt ?? ''));
 }

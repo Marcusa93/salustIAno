@@ -12,6 +12,7 @@ import { useSoundtrack } from './soundtrack-provider';
 /**
  * Video corto en marco de polaroid: corre mudo en loop y con un toque se
  * escucha. Mientras suena con audio, la música baja y después vuelve.
+ * Si el video no tiene audio (`silent`), solo corre en loop.
  */
 export function BirthVideo({ video, tilt }: { video: LetterVideo; tilt: number }) {
   const { soundtrack } = useSoundtrack();
@@ -65,20 +66,22 @@ export function BirthVideo({ video, tilt }: { video: LetterVideo; tilt: number }
           className="block w-full"
           style={{ aspectRatio: `${video.width} / ${video.height}` }}
         />
-        <button
-          type="button"
-          onClick={withSound ? backToSilent : listen}
-          aria-pressed={withSound}
-          className={cn(
-            '-translate-x-1/2 absolute bottom-3 left-1/2 flex items-center gap-2 rounded-full px-4 py-2 font-hand text-xl shadow-lg backdrop-blur-md transition-colors',
-            withSound
-              ? 'bg-carta-night/60 text-carta-night-foreground'
-              : 'bg-carta-polaroid/85 text-carta-ink',
-          )}
-        >
-          <Volume2 className={cn('size-4', withSound && 'animate-pulse')} aria-hidden />
-          {withSound ? 'Escuchándome…' : 'Tocá para escucharme'}
-        </button>
+        {!video.silent && (
+          <button
+            type="button"
+            onClick={withSound ? backToSilent : listen}
+            aria-pressed={withSound}
+            className={cn(
+              '-translate-x-1/2 absolute bottom-3 left-1/2 flex items-center gap-2 rounded-full px-4 py-2 font-hand text-xl shadow-lg backdrop-blur-md transition-colors',
+              withSound
+                ? 'bg-carta-night/60 text-carta-night-foreground'
+                : 'bg-carta-polaroid/85 text-carta-ink',
+            )}
+          >
+            <Volume2 className={cn('size-4', withSound && 'animate-pulse')} aria-hidden />
+            {withSound ? 'Escuchándome…' : 'Tocá para escucharme'}
+          </button>
+        )}
       </div>
       <figcaption className="flex flex-col px-1 pt-3">
         {video.caption && (
@@ -86,9 +89,11 @@ export function BirthVideo({ video, tilt }: { video: LetterVideo; tilt: number }
             {video.caption}
           </span>
         )}
-        <span className="self-end font-hand text-carta-ink-soft text-sm">
-          {polaroidDateLabel(video.takenAt)}
-        </span>
+        {video.takenAt && (
+          <span className="self-end font-hand text-carta-ink-soft text-sm">
+            {polaroidDateLabel(video.takenAt)}
+          </span>
+        )}
       </figcaption>
     </motion.figure>
   );

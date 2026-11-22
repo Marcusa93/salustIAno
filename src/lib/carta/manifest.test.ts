@@ -144,6 +144,52 @@ describe('letterManifestSchema', () => {
   });
 });
 
+describe('cartas con link (para alguien de afuera de la familia)', () => {
+  const publicManifest = (): LetterManifest => {
+    const { childId: _childId, birthAt: _birthAt, ...manifest } = baseManifest();
+    return {
+      ...manifest,
+      slug: 'tibu',
+      public: true,
+      envelope: { ...manifest.envelope, seal: 'T', greeting: 'Franco:' },
+      heartbeat: { ...manifest.heartbeat, bpm: 160, icon: 'paw' },
+      chapters: manifest.chapters.map((chapter) => ({
+        ...chapter,
+        media: chapter.media.map(({ takenAt: _takenAt, ...media }) => media),
+        aunque: undefined,
+      })),
+    };
+  };
+
+  it('acepta una carta pública sin bebé, sin nacimiento y con fotos sin fecha', () => {
+    const parsed = letterManifestSchema.safeParse(publicManifest());
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.heartbeat.icon).toBe('paw');
+  });
+
+  it('exige childId o public', () => {
+    const { public: _public, ...manifest } = publicManifest();
+    expect(letterManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+
+  it('no deja guardar la foto del final en una carta con link (no hay cuenta)', () => {
+    const manifest = publicManifest();
+    manifest.finale.photo = {
+      prompt: 'Faltaba una foto.',
+      button: 'Sacar foto',
+      caption: 'Hoy.',
+      saved: 'Guardada.',
+    };
+    expect(letterManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+
+  it('acepta un contador propio para el final', () => {
+    const manifest = publicManifest();
+    manifest.finale.counter = { label: 'Te quiero hace', since: '2013-05-01T12:00:00-03:00' };
+    expect(letterManifestSchema.safeParse(manifest).success).toBe(true);
+  });
+});
+
 describe('collectStoragePaths', () => {
   it('junta fotos, video, poster, tarjetas y canciones del bucket, sin las públicas', () => {
     expect(collectStoragePaths(baseManifest()).sort()).toEqual([
@@ -252,6 +298,36 @@ describe('photosInChronologicalOrder', () => {
       },
     ];
     expect(photosInChronologicalOrder(letter).at(-1)?.src).toBe('u:album/hoy.jpg');
+  });
+
+  it('suma la foto del principio y la del final, sin repetir', () => {
+    const manifest = baseManifest();
+    manifest.heartbeat.photo = photo('fotos/03.jpg', '2026-05-04T18:36:20-03:00');
+    manifest.finale.moment = {
+      photo: photo('fotos/46.jpg', '2026-10-17T20:30:00-03:00'),
+      hint: 'Tocame',
+    };
+    const letter = hydrateLetter(manifest, (path) => `u:${path}`);
+    expect(photosInChronologicalOrder(letter).map((p) => p.src)).toEqual([
+      'u:fotos/03.jpg',
+      'u:fotos/35.jpg',
+      'u:fotos/38.jpg',
+      'u:fotos/46.jpg',
+    ]);
+  });
+
+  it('si alguna foto no tiene fecha, respeta el orden de la carta', () => {
+    const manifest = baseManifest();
+    const { takenAt: _takenAt, ...undated } = photo('fotos/00.jpg', '2026-01-01T00:00:00-03:00');
+    manifest.heartbeat.photo = undated;
+    manifest.chapters.reverse();
+    const letter = hydrateLetter(manifest, (path) => `u:${path}`);
+    expect(photosInChronologicalOrder(letter).map((p) => p.src)).toEqual([
+      'u:fotos/00.jpg',
+      'u:fotos/35.jpg',
+      'u:fotos/38.jpg',
+      'u:fotos/03.jpg',
+    ]);
   });
 
   it('usa la frase de la tarjeta como epígrafe en el visor', () => {

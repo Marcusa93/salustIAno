@@ -67,3 +67,10 @@ export function daysSinceBirth(birthAt: string, now: Date = new Date()): number 
 export function secondsSinceBirth(birthAt: string, now: Date = new Date()): number {
   return Math.max(0, Math.floor((now.getTime() - Date.parse(birthAt)) / 1000));
 }
+
+/** Pie del visor: "24 may · 3 meses", solo "24 may" sin bebé, o nada sin fecha. */
+export function photoDateLine(takenAt?: string, birthAt?: string): string {
+  if (!takenAt) return '';
+  const date = polaroidDateLabel(takenAt);
+  return birthAt ? `${date} · ${ageLabelAt(birthAt, takenAt)}` : date;
+}
