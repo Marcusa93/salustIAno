@@ -1,8 +1,10 @@
 import { PageHeader } from '@/components/salu/page-header';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
+import { env } from '@/lib/env';
 import { formatDateAr } from '@/lib/format-ar';
 import { createClient } from '@/lib/supabase/server';
+import { ensurePushConfigured } from '@/lib/web-push';
 import type { Metadata } from 'next';
 import { NotificationPrefsCard } from './_components/notification-prefs';
 import { PushToggle } from './_components/push-toggle';
@@ -78,7 +80,10 @@ export default async function PerfilPage() {
       </div>
 
       <div className="animate-stagger-up" style={{ animationDelay: '120ms' }}>
-        <PushToggle />
+        <PushToggle
+          publicKey={env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
+          serverConfigured={ensurePushConfigured()}
+        />
       </div>
 
       <div className="animate-stagger-up" style={{ animationDelay: '180ms' }}>

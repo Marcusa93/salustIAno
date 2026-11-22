@@ -1,3 +1,4 @@
+import { ServiceWorkerRegistrar } from '@/components/pwa/service-worker-registrar';
 import { BackgroundMusic } from '@/components/salu/background-music';
 import { Toaster } from '@/components/ui/sonner';
 import type { Metadata, Viewport } from 'next';
@@ -101,6 +102,7 @@ export default function RootLayout({
               FloatingSalu y safe-area-inset; arriba se ven sin tapar nada
               y son fáciles de descartar. */}
           <Toaster position="top-center" richColors />
+          <ServiceWorkerRegistrar />
         </ThemeProvider>
       </body>
     </html>
